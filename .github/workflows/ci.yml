@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint-test:
+    name: lint + typecheck + vitest
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://phosky:phosky@localhost:5432/phoskywiki
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: phosky
+          POSTGRES_PASSWORD: phosky
+          POSTGRES_DB: phoskywiki
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U phosky -d phoskywiki"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      meilisearch:
+        image: getmeili/meilisearch:v1.15.0
+        env:
+          MEILI_ENV: development
+          MEILI_MASTER_KEY: ci-meili-master-key
+        ports:
+          - 7700:7700
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm db:migrate
+      - run: pnpm test
+
+  e2e:
+    name: playwright
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://phosky:phosky@localhost:5432/phoskywiki
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: phosky
+          POSTGRES_PASSWORD: phosky
+          POSTGRES_DB: phoskywiki
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U phosky -d phoskywiki"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build
+      - run: pnpm db:migrate
+      - run: pnpm test:e2e
