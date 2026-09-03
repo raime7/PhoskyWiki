@@ -28,6 +28,11 @@ services:
       - "7700:7700"
     volumes:
       - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7700/health | grep -q available"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
 volumes:
   pgdata:

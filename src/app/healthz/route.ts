@@ -11,7 +11,7 @@ export async function GET() {
     await getDb().execute(sql`select 1`);
     postgres = "up";
   } catch {
-    postgres = "down";
+    // 连不上就保持 down，让状态码与响应体如实报告
   }
 
   return Response.json(

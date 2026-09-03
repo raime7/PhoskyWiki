@@ -8,7 +8,7 @@ test("首页渲染站点壳：站头与占位内容", async ({ page }) => {
   await expect(page.getByRole("contentinfo")).toContainText("原子笔记");
 });
 
-test("/healthz 打穿全部层：真实浏览器请求返回 PG 连接状态", async ({ request }) => {
+test("/healthz 返回 PG 连接状态（经真实起动的应用）", async ({ request }) => {
   const res = await request.get("/healthz");
 
   expect(res.status()).toBe(200);

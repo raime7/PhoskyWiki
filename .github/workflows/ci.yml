@@ -24,13 +24,6 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 12
-      meilisearch:
-        image: getmeili/meilisearch:v1.15.0
-        env:
-          MEILI_ENV: development
-          MEILI_MASTER_KEY: ci-meili-master-key
-        ports:
-          - 7700:7700
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+// TODO(T02+): 三轴导航的真实路由（词条 / 诠释者 / 学派）落地后替换占位链接
 const navItems = [
   { href: "/", label: "词条" },
   { href: "/", label: "诠释者" },
