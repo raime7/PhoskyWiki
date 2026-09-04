@@ -1,6 +1,7 @@
 // 种子数据：读路径的第一批演示内容。
 // T02 验收：≥3 词条、≥3 诠释者、≥4 视角（含编委会通俗视角、跨词条双链、红链）。
 // T03 验收：≥2 学派（成员 + 派生核心词条就位）、分类树（多级 + 词条多挂）。
+// T04 增补：显式视角链接（含红链示例）、消歧义双义示例（「价值」）。
 //
 // seedDatabase() 幂等：TRUNCATE 全部内容表后按固定顺序重插（serial 因此确定），
 // 集成测试与 e2e 共用这一份 fixture。生产环境不该跑它。
@@ -21,12 +22,19 @@ import {
   terms,
 } from "@/db/schema";
 import { slugify } from "@/lib/slug";
-import { extractWikiLinks } from "@/lib/wiki-links";
+import { parseWikiLinks, wikiLinkKey } from "@/lib/wiki-links";
 
 interface SeedTerm {
   title: string;
   aliases: string[];
   summary: string;
+}
+
+interface SeedDisambiguation {
+  /** 基准名：聚合「基准名」与「基准名（…）」形态的全部词条（ADR-0003 #5/#6） */
+  title: string;
+  /** 分流页导语；成员列表由命名约定派生，不写入正文 */
+  content: string;
 }
 
 interface SeedInterpreter {
@@ -85,6 +93,25 @@ const SEED_TERMS: SeedTerm[] = [
     aliases: ["Mehrwert"],
     summary:
       "工人创造的价值超过其劳动力价格的部分——不等价的占有藏身于等价交换之中。",
+  },
+  {
+    title: "价值（政治经济学）",
+    aliases: ["劳动价值", "value"],
+    summary:
+      "凝结在商品中的社会必要劳动：一个看似物性的范畴，如何支配整个社会生产。",
+  },
+  {
+    title: "价值（哲学）",
+    aliases: ["价值论", "axiology"],
+    summary: "善、美、正当为何值得欲求？价值论（axiology）对价值客观性的追问。",
+  },
+];
+
+// 消歧义双义示例（T04 验收）：「价值」聚合 括号限定的同组词条
+const SEED_DISAMBIGUATIONS: SeedDisambiguation[] = [
+  {
+    title: "价值",
+    content: `「价值」是典型的同名多义概念：政治经济学里指凝结在商品中的社会必要劳动与它所支配的社会关系；哲学里指善、美、正当等值得欲求的性质（价值论）。两个问题链共享同一个中文词，但概念机器互不相通——请按你的问题选择词条。`,
   },
 ];
 
@@ -189,6 +216,8 @@ const SEED_TERM_CATEGORIES: SeedTermCategory[] = [
   { term: "意识形态", categories: ["意识形态批判"] },
   { term: "异化", categories: ["异化理论"] },
   { term: "剩余价值", categories: ["政治经济学", "马克思主义"] },
+  { term: "价值（政治经济学）", categories: ["政治经济学"] },
+  { term: "价值（哲学）", categories: ["哲学"] },
 ];
 
 const SEED_PERSPECTIVES: SeedPerspective[] = [
@@ -210,7 +239,7 @@ const SEED_PERSPECTIVES: SeedPerspective[] = [
 
 进入象征界后，主体进一步被大他者（语言与法的秩序）所询唤，「我」只是能指链上不断滑动的效果。因此拉康的主体是分裂的主体：言说的「我」永远无法与被言说的「我」重合。
 
-在意识形态问题上，拉康的框架后来被阿尔都塞借用：意识形态把个体询唤为主体，正是一种镜像式的误认。可参照[[意识形态]]词条下阿尔都塞的视角；主体与对象颠倒的问题亦见[[异化]]。若想看[[镜像阶段]]作为独立概念的展开，该词条尚待撰写——这是一个写作缺口。`,
+在意识形态问题上，拉康的框架后来被阿尔都塞借用：意识形态把个体询唤为主体，正是一种镜像式的误认。可参照[[意识形态]]词条下阿尔都塞的视角；主体与对象颠倒的问题亦见[[异化]]。若想看[[镜像阶段]]作为独立概念的展开，该词条尚待撰写——这是一个写作缺口。同样尚待撰写的还有德里达对拉康的解构式读法[[主体性|德里达论主体性@德里达]]。`,
   },
   {
     term: "主体性",
@@ -271,7 +300,7 @@ const SEED_PERSPECTIVES: SeedPerspective[] = [
     interpreter: "阿尔都塞",
     content: `阿尔都塞的《意识形态和意识形态国家机器》做出四个论断：意识形态没有历史；意识形态是个人与其生存条件的想象关系的「表象」；意识形态具有物质的存在（仪式、机构、实践）；意识形态把个体询唤为主体。
 
-最后一论断把问题从「观念真伪」转移到「主体生产」：教堂、学校、家庭、媒体等意识形态国家机器日复一日地把个体制造为「自由主体」。详见[[主体性]]词条下本诠释者的视角。
+最后一论断把问题从「观念真伪」转移到「主体生产」：教堂、学校、家庭、媒体等意识形态国家机器日复一日地把个体制造为「自由主体」。详见[[主体性|阿尔都塞论主体性@阿尔都塞]]。
 
 意识形态因此是「永恒的」——不存在无意识形态的社会，能改变的只是其形态。这与把意识形态视为可用科学彻底清除的幻象（某种启蒙立场）构成尖锐对立，也与[[异化]]的「复归本真」想象分道扬镳。`,
   },
@@ -291,7 +320,7 @@ const SEED_PERSPECTIVES: SeedPerspective[] = [
 
 在成熟期的《资本论》里，「异化」的术语退居幕后，分析让位于[[剩余价值]]的剥削机制——商品拜物教一节描述的「物与物的关系掩盖人与人的关系」，可视为异化理论在政治经济学批判中的完成形态。
 
-争论在于：异化是否预设了一个本真的类本质？阿尔都塞后来主张根本不存在这样的「人本主义」主体——见[[意识形态]]词条。黑格尔的原始版本则见本词条另一视角。`,
+争论在于：异化是否预设了一个本真的类本质？阿尔都塞后来主张根本不存在这样的「人本主义」主体——见[[意识形态|阿尔都塞论意识形态@阿尔都塞]]。黑格尔的原始版本则见本词条另一视角。`,
   },
   {
     term: "异化",
@@ -309,7 +338,25 @@ const SEED_PERSPECTIVES: SeedPerspective[] = [
 
 把这一概念与日常的「剥削」直觉区分开的关键在于：剩余价值不需要欺诈——等价交换的市场上照样发生。资本家按价值购买劳动力（付工资），而劳动力是一种特殊商品：它的使用（劳动）本身就能创造出大于自身价值的价值。
 
-本词条当前只有通俗视角，具体展开（不变资本与可变资本、绝对剩余价值与相对剩余价值、资本有机构成）尚待撰写。相关概念见[[异化]]与[[主体性]]。`,
+本词条当前只有通俗视角，具体展开（不变资本与可变资本、绝对剩余价值与相对剩余价值、资本有机构成）尚待撰写。相关概念见[[异化]]与[[主体性]]；价值概念的哲学分支另见[[价值]]（消歧义）。`,
+  },
+  {
+    term: "价值（政治经济学）",
+    interpreter: "编委会",
+    content: `政治经济学里的「价值」不是物品的固有属性，而是一种社会关系的结晶式表达：一物有价值，因为它是无差别人类劳动的凝结，并且这层关系只有通过交换才显形。
+
+本词条处理古典政治经济学与马克思传统的问题链：使用价值与交换价值的二分、劳动价值论、价值形式如何从简单等价发展到货币，以及价值规律如何支配一个看似自由的市场社会。剥削的机制性概念见[[剩余价值]]，劳动颠倒的哲学表达见[[异化]]。
+
+「价值」的哲学用法（价值论、伦理学意义的价值）是另一条问题链，概念机器互不相通——分流见[[价值]]（消歧义页）。`,
+  },
+  {
+    term: "价值（哲学）",
+    interpreter: "编委会",
+    content: `哲学里的「价值」（value / axiology）问的是：什么使得事物值得欲求、值得追求？善、美、正当是客观的性质，还是情绪与偏好的投射？
+
+本词条聚合价值论的传统站点：新康德主义对价值客观性的辩护、情感主义与偏好论的还原、相对主义的挑战，以及规范如何可能的社会建构论回答。价值的构成离不开评价者，因此与[[主体性]]问题相通。
+
+注意分流：政治经济学里的价值（凝结在商品中的社会必要劳动）是另一条问题链，见[[价值]]（消歧义页）。`,
   },
   {
     term: "主体性",
@@ -343,6 +390,7 @@ const SEED_PERSPECTIVES: SeedPerspective[] = [
 /** 清空内容表并重灌种子数据。返回计数摘要。 */
 export async function seedDatabase(): Promise<{
   terms: number;
+  disambiguations: number;
   interpreters: number;
   schools: number;
   perspectives: number;
@@ -354,8 +402,8 @@ export async function seedDatabase(): Promise<{
     sql`truncate table ${links}, ${revisions}, ${perspectives}, ${termCategories}, ${categories}, ${schoolMembers}, ${schools}, ${interpreters}, ${terms}, ${pages} restart identity cascade`,
   );
 
-  // 词条与诠释者：pages 壳 + 负载表
-  const termIds = new Map<string, number>();
+  // 词条与消歧义页：pages 壳 + 负载/修订（消歧义页无负载表，ADR-0003 #6）
+  const titleToPageId = new Map<string, number>();
   for (const term of SEED_TERMS) {
     const [page] = await db
       .insert(pages)
@@ -364,7 +412,21 @@ export async function seedDatabase(): Promise<{
     await db
       .insert(terms)
       .values({ pageId: page.id, summary: term.summary, aliases: term.aliases });
-    termIds.set(term.title, page.id);
+    titleToPageId.set(term.title, page.id);
+  }
+  for (const disambiguation of SEED_DISAMBIGUATIONS) {
+    const [page] = await db
+      .insert(pages)
+      .values({
+        type: "disambiguation",
+        title: disambiguation.title,
+        slug: slugify(disambiguation.title),
+      })
+      .returning({ id: pages.id });
+    await db
+      .insert(revisions)
+      .values({ pageId: page.id, content: disambiguation.content });
+    titleToPageId.set(disambiguation.title, page.id);
   }
 
   const interpreterIds = new Map<string, number>();
@@ -418,17 +480,17 @@ export async function seedDatabase(): Promise<{
     categoryIds.set(category.name, row.id);
   }
   for (const { term, categories: termCats } of SEED_TERM_CATEGORIES) {
-    const termId = termIds.get(term)!;
+    const termId = titleToPageId.get(term)!;
     for (const name of termCats) {
       await db.insert(termCategories).values({ termId, categoryId: categoryIds.get(name)! });
     }
   }
 
-  // 视角：pages 壳 + 负载表 + 首个修订（受理产生修订的种子等价物）+ links 落库
-  let resolvedLinks = 0;
-  let redLinks = 0;
+  // 视角：pages 壳 + 负载表 + 首个修订（受理产生修订的种子等价物）
+  const perspectiveIdByRef = new Map<string, number>();
+  const perspectivePageIds: number[] = [];
   for (const perspective of SEED_PERSPECTIVES) {
-    const termId = termIds.get(perspective.term)!;
+    const termId = titleToPageId.get(perspective.term)!;
     const interpreterId = interpreterIds.get(perspective.interpreter)!;
     const title = `${perspective.interpreter}论${perspective.term}`;
     const [page] = await db
@@ -439,20 +501,34 @@ export async function seedDatabase(): Promise<{
       .insert(perspectives)
       .values({ pageId: page.id, termId, interpreterId });
     await db.insert(revisions).values({ pageId: page.id, content: perspective.content });
+    perspectiveIdByRef.set(wikiLinkKey({ term: perspective.term, interpreter: perspective.interpreter }), page.id);
+    perspectivePageIds.push(page.id);
+  }
 
-    // 保存时解析（ADR-0003 #4）：目标存在落 page_id，不存在留名称快照（红链）
-    for (const name of extractWikiLinks(perspective.content)) {
-      const targetId = termIds.get(name) ?? null;
+  // 保存时解析（ADR-0003 #4）：默认链接按词条/消歧义页名解析；
+  // 显式视角链接按「词条@诠释者」定位视角页；未命中留名称快照（红链）。
+  // 页面先建全、链接后解析，链接目标与视角插入顺序无关。
+  let resolvedLinks = 0;
+  let redLinks = 0;
+  for (const [index, perspective] of SEED_PERSPECTIVES.entries()) {
+    for (const ref of parseWikiLinks(perspective.content)) {
+      const targetId =
+        ref.interpreter === null
+          ? (titleToPageId.get(ref.term) ?? null)
+          : (perspectiveIdByRef.get(wikiLinkKey(ref)) ?? null);
       if (targetId) resolvedLinks += 1;
       else redLinks += 1;
-      await db
-        .insert(links)
-        .values({ sourcePageId: page.id, targetPageId: targetId, targetName: name });
+      await db.insert(links).values({
+        sourcePageId: perspectivePageIds[index],
+        targetPageId: targetId,
+        targetName: wikiLinkKey(ref),
+      });
     }
   }
 
   return {
     terms: SEED_TERMS.length,
+    disambiguations: SEED_DISAMBIGUATIONS.length,
     interpreters: SEED_INTERPRETERS.length,
     schools: SEED_SCHOOLS.length,
     perspectives: SEED_PERSPECTIVES.length,

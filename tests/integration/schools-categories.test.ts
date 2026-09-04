@@ -160,6 +160,9 @@ describe("分类轴读路径（弱类型标签树只组织词条）", () => {
   it("软删除的词条从分类计数与分类词条列表消失，恢复后回归", async () => {
     const db = getDb();
     const philosophyId = await categoryIdByName("哲学");
+    // 种子可能给「哲学」直挂词条（T04 起「价值（哲学）」），计数断言只看夹具带来的增量
+    const baseline =
+      (await getCategoryTree()).find((n) => n.name === "哲学")?.termCount ?? 0;
     const [fixture] = await db
       .insert(pages)
       .values({ type: "term", title: "边界测试词条（学派分类自建）", slug: "bian-jie-ce-shi" })
@@ -170,12 +173,16 @@ describe("分类轴读路径（弱类型标签树只组织词条）", () => {
     try {
       const withLive = await getCategoryDetailBySlug("哲学");
       expect(withLive?.terms.map((t) => t.title)).toContain("边界测试词条（学派分类自建）");
-      expect((await getCategoryTree()).find((n) => n.name === "哲学")?.termCount).toBe(1);
+      expect((await getCategoryTree()).find((n) => n.name === "哲学")?.termCount).toBe(
+        baseline + 1,
+      );
 
       await db.update(pages).set({ deletedAt: new Date() }).where(eq(pages.id, fixture.id));
       const withDeleted = await getCategoryDetailBySlug("哲学");
       expect(withDeleted?.terms.map((t) => t.title)).not.toContain("边界测试词条（学派分类自建）");
-      expect((await getCategoryTree()).find((n) => n.name === "哲学")?.termCount).toBe(0);
+      expect((await getCategoryTree()).find((n) => n.name === "哲学")?.termCount).toBe(
+        baseline,
+      );
 
       await db.update(pages).set({ deletedAt: null }).where(eq(pages.id, fixture.id));
       const restored = await getCategoryDetailBySlug("哲学");

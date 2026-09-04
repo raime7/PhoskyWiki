@@ -36,6 +36,13 @@
       "when": 1788504949909,
       "tag": "0004_watery_slyde",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788506788204,
+      "tag": "0005_overjoyed_sabretooth",
+      "breakpoints": true
     }
   ]
 }

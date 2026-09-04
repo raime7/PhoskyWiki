@@ -1,8 +1,8 @@
 // Markdown 渲染管线（纯函数，无 IO）：unified/remark 扩展 wiki-link（ADR-0003、spec 技术栈）。
 //
-// `[[词条名]]` 渲染为站内链接，落点由调用方注入的 resolveWikiLink 决定——
-// 读路径上传入该页 links 表的解析结果（受理时的解析结果即真相）；
-// 目标不存在（红链）渲染为带 title 提示的 span，不可点击。
+// `[[词条名]]` 渲染为落词条枢纽的站内链接；`[[词条名|视角@诠释者]]` 直落视角页。
+// 落点由调用方注入的 resolveWikiLink 决定——读路径上传入该页 links 表的解析结果
+// （受理时的解析结果即真相）；目标不存在（红链）渲染为带 title 提示的 span，不可点击。
 
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import rehypeStringify from "rehype-stringify";
@@ -13,6 +13,8 @@ import { unified } from "unified";
 
 import type { Node, Parent } from "unist";
 
+import { parseWikiLink, wikiLinkKey, type WikiLinkRef } from "@/lib/wiki-links";
+
 export interface WikiLinkTarget {
   /** 已解析目标的站内路径（如 /term/主体性-3）；红链为空字符串 */
   href: string;
@@ -20,7 +22,14 @@ export interface WikiLinkTarget {
   exists: boolean;
 }
 
-export type ResolveWikiLink = (name: string) => WikiLinkTarget;
+export type ResolveWikiLink = (ref: WikiLinkRef) => WikiLinkTarget;
+
+/** 用 links 表解析结果（键 = wikiLinkKey）构造渲染器的落点回调；未命中即红链。 */
+export function wikiLinkResolver(
+  targets: Map<string, WikiLinkTarget>,
+): ResolveWikiLink {
+  return (ref) => targets.get(wikiLinkKey(ref)) ?? { href: "", exists: false };
+}
 
 interface WikiLinkNode extends Node {
   type: "wikiLink";
@@ -49,18 +58,20 @@ function visitWikiLinks(tree: Node, visit: (node: WikiLinkNode) => void): void {
 function rewriteWikiLinks(resolve: ResolveWikiLink) {
   return (tree: Node) => {
     visitWikiLinks(tree, (node) => {
-      const display = node.data?.alias ?? node.value;
-      const { href, exists } = resolve(node.value);
+      const parsed = parseWikiLink(node.value, node.data?.alias ?? null);
+      // remark-wiki-link 保证 value 非空，解析失败仅可能来自空白名，防御性跳过
+      if (!parsed) return;
+      const { href, exists } = resolve(parsed);
       if (exists) {
         node.data!.hProperties = { className: ["wiki-link"], href };
       } else {
         node.data!.hName = "span";
         node.data!.hProperties = {
           className: ["wiki-link", "wiki-link--red"],
-          title: "词条尚未创建",
+          title: parsed.interpreter === null ? "词条尚未创建" : "视角尚未创建",
         };
       }
-      node.data!.hChildren = [{ type: "text", value: display }];
+      node.data!.hChildren = [{ type: "text", value: parsed.display }];
     });
   };
 }

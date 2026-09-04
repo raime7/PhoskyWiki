@@ -2,17 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
+import { BacklinkPanel } from "@/components/backlink-panel";
 import { Infobox, InfoboxLinks, WikiContent } from "@/components/wiki-content";
 import { PerspectiveList } from "@/components/perspective-list";
 import {
   getTermDetail,
+  getTermDisambiguation,
   getHeadContent,
   getWikiLinkTargets,
+  listBacklinks,
   listCategoriesOfTerm,
   listPerspectivesOfTerm,
 } from "@/lib/content";
 import { categoryPath } from "@/lib/categories";
-import { renderMarkdown } from "@/lib/markdown";
+import { renderMarkdown, wikiLinkResolver } from "@/lib/markdown";
 import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
 
@@ -32,9 +35,11 @@ export default async function TermPage({ params }: Params) {
   const term = await getTermDetail(page.id);
   if (!term) notFound();
 
-  const [perspectives, categories] = await Promise.all([
+  const [perspectives, categories, backlinks, disambiguation] = await Promise.all([
     listPerspectivesOfTerm(page.id),
     listCategoriesOfTerm(page.id),
+    listBacklinks(page.id),
+    getTermDisambiguation(term.title),
   ]);
   const board = perspectives.find((p) => p.isBoard);
   const others = perspectives.filter((p) => !p.isBoard);
@@ -54,6 +59,19 @@ export default async function TermPage({ params }: Params) {
 
       <div className="flex flex-col gap-10 lg:flex-row lg:gap-10">
         <div className="min-w-0 flex-1">
+          {disambiguation && (
+            <p className="mb-3 rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
+              「{disambiguation.title}」是同名多义概念：本页指{term.title}；其他含义见{" "}
+              <Link
+                href={pagePath("disambiguation", disambiguation.slug, disambiguation.id)}
+                className="text-foreground underline-offset-4 hover:underline"
+              >
+                {disambiguation.title}（消歧义）
+              </Link>
+              。
+            </p>
+          )}
+
           <h1 className="text-3xl font-bold tracking-tight">{term.title}</h1>
           <p className="mt-3 text-lg leading-relaxed text-muted-foreground">
             {term.summary}
@@ -73,8 +91,9 @@ export default async function TermPage({ params }: Params) {
                 </Link>
               </div>
               <WikiContent
-                html={renderMarkdown(boardContent, (name) =>
-                  boardTargets?.get(name) ?? { href: "", exists: false },
+                html={renderMarkdown(
+                  boardContent,
+                  wikiLinkResolver(boardTargets ?? new Map()),
                 )}
               />
             </section>
@@ -96,6 +115,7 @@ export default async function TermPage({ params }: Params) {
                     p.interpreterSlug,
                     p.interpreterId,
                   ),
+                  pinned: p.pinned,
                   linkCount: p.linkCount,
                 }))}
               />
@@ -105,6 +125,8 @@ export default async function TermPage({ params }: Params) {
               </p>
             )}
           </section>
+
+          <BacklinkPanel items={backlinks} />
         </div>
 
         <div className="shrink-0 lg:w-64">
