@@ -1,6 +1,7 @@
-// URL 寻址的纯函数（ADR-0003）：
+// URL 寻址与标题命名的纯函数（ADR-0003）：
 //   /<type>/<slug>-<id> —— id 永不改变、是唯一权威；slug 只是可读装饰，改名只换 slug。
 //   中文名 slug 生成失败（清洗后为空）时退化为纯 id。
+//   括号限定标题（消歧义的命名约定）→ 基准名的剥取也在这里。
 
 import type { PageType } from "@/db/schema";
 

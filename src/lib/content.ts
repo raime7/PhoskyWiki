@@ -3,7 +3,7 @@
 
 import "server-only";
 
-import { and, asc, desc, eq, isNull, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, like, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db";
@@ -327,8 +327,9 @@ function escapeLike(value: string): string {
 }
 
 /**
- * 消歧义页成员（ADR-0003 #5）：标题等于基准名、或以「基准名（…）」括号限定的
- * 全部在线词条。成员由命名约定派生，新增同名词目自动进入分流列表。
+ * 消歧义页成员（T04/ADR-0003 #5）：以「基准名（…）」括号限定标题的全部在线词条。
+ * 成员由命名约定派生，新增同组词目自动进入分流列表；恰好以基准名为题的词条
+ * 不是成员——那是主词条而非待分流项（[[基准名]] 双链直接解析到它）。
  */
 async function listDisambiguationMembers(base: string): Promise<DisambiguationMember[]> {
   return getDb()
@@ -348,10 +349,7 @@ async function listDisambiguationMembers(base: string): Promise<DisambiguationMe
       and(
         eq(pages.type, "term"),
         isNull(pages.deletedAt),
-        or(
-          eq(pages.title, base),
-          like(pages.title, `${escapeLike(base)}\uFF08%\uFF09`),
-        ),
+        like(pages.title, `${escapeLike(base)}\uFF08%\uFF09`),
       ),
     )
     .orderBy(asc(pages.title));

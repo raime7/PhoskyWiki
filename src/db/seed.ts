@@ -289,7 +289,7 @@ export async function seedDatabase(): Promise<{
   );
 
   // 词条与消歧义页：pages 壳 + 负载/修订（消歧义页无负载表，ADR-0003 #6）
-  const nameToPage = new Map<string, number>();
+  const titleToPageId = new Map<string, number>();
   for (const term of SEED_TERMS) {
     const [page] = await db
       .insert(pages)
@@ -298,7 +298,7 @@ export async function seedDatabase(): Promise<{
     await db
       .insert(terms)
       .values({ pageId: page.id, summary: term.summary, aliases: term.aliases });
-    nameToPage.set(term.title, page.id);
+    titleToPageId.set(term.title, page.id);
   }
   for (const disambiguation of SEED_DISAMBIGUATIONS) {
     const [page] = await db
@@ -312,7 +312,7 @@ export async function seedDatabase(): Promise<{
     await db
       .insert(revisions)
       .values({ pageId: page.id, content: disambiguation.content });
-    nameToPage.set(disambiguation.title, page.id);
+    titleToPageId.set(disambiguation.title, page.id);
   }
 
   const interpreterIds = new Map<string, number>();
@@ -336,10 +336,10 @@ export async function seedDatabase(): Promise<{
   }
 
   // 视角：pages 壳 + 负载表 + 首个修订（受理产生修订的种子等价物）
-  const perspectiveByRef = new Map<string, number>();
+  const perspectiveIdByRef = new Map<string, number>();
   const perspectivePageIds: number[] = [];
   for (const perspective of SEED_PERSPECTIVES) {
-    const termId = nameToPage.get(perspective.term)!;
+    const termId = titleToPageId.get(perspective.term)!;
     const interpreterId = interpreterIds.get(perspective.interpreter)!;
     const title = `${perspective.interpreter}论${perspective.term}`;
     const [page] = await db
@@ -350,7 +350,7 @@ export async function seedDatabase(): Promise<{
       .insert(perspectives)
       .values({ pageId: page.id, termId, interpreterId });
     await db.insert(revisions).values({ pageId: page.id, content: perspective.content });
-    perspectiveByRef.set(wikiLinkKey({ term: perspective.term, interpreter: perspective.interpreter }), page.id);
+    perspectiveIdByRef.set(wikiLinkKey({ term: perspective.term, interpreter: perspective.interpreter }), page.id);
     perspectivePageIds.push(page.id);
   }
 
@@ -363,8 +363,8 @@ export async function seedDatabase(): Promise<{
     for (const ref of parseWikiLinks(perspective.content)) {
       const targetId =
         ref.interpreter === null
-          ? (nameToPage.get(ref.term) ?? null)
-          : (perspectiveByRef.get(wikiLinkKey(ref)) ?? null);
+          ? (titleToPageId.get(ref.term) ?? null)
+          : (perspectiveIdByRef.get(wikiLinkKey(ref)) ?? null);
       if (targetId) resolvedLinks += 1;
       else redLinks += 1;
       await db.insert(links).values({

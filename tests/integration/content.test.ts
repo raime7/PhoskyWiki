@@ -309,6 +309,30 @@ describe("消歧义（T04：同名多义词条经基准名分流）", () => {
     expect(await getTermDisambiguation("主体性")).toBeNull();
   });
 
+  it("恰好以基准名为题的词条不是分流成员（主词条，不是待分流项）", async () => {
+    const db = getDb();
+    const [disambigPage] = await db
+      .select({ id: pages.id })
+      .from(pages)
+      .where(and(eq(pages.type, "disambiguation"), eq(pages.title, "价值")))
+      .limit(1);
+    const [bareTerm] = await db
+      .insert(pages)
+      .values({ type: "term", title: "价值", slug: "jia-zhi" })
+      .returning({ id: pages.id });
+    await db.insert(terms).values({ pageId: bareTerm.id, summary: "主词条" });
+    try {
+      const detail = await getDisambiguationDetail(disambigPage.id);
+      expect(detail?.members.map((m) => m.title)).not.toContain("价值");
+      expect(detail?.members.map((m) => m.title)).toEqual([
+        "价值（哲学）",
+        "价值（政治经济学）",
+      ]);
+    } finally {
+      await db.delete(pages).where(eq(pages.id, bareTerm.id));
+    }
+  });
+
   it("指向基准名的双链落消歧义页（分流入口）", async () => {
     const db = getDb();
     const [disambigPage] = await db
@@ -373,17 +397,10 @@ describe("POST/DELETE /api/admin/perspectives/:pageId/pin", () => {
     else process.env.ADMIN_TOKEN = originalToken;
   });
 
-  function pinRequest(pageId: string, token?: string) {
+  function pinRequest(pageId: string, method: "POST" | "DELETE", token?: string) {
     return new Request(`http://localhost/api/admin/perspectives/${pageId}/pin`, {
-      method: "POST",
+      method,
       headers: token === undefined ? {} : { "x-admin-token": token },
-    });
-  }
-
-  function unpinRequest(pageId: string, token: string) {
-    return new Request(`http://localhost/api/admin/perspectives/${pageId}/pin`, {
-      method: "DELETE",
-      headers: { "x-admin-token": token },
     });
   }
 
@@ -403,7 +420,7 @@ describe("POST/DELETE /api/admin/perspectives/:pageId/pin", () => {
   it("未配置 ADMIN_TOKEN 时 fail-closed（503，不做任何变更）", async () => {
     delete process.env.ADMIN_TOKEN;
     const pageId = String(await foucaultPageId());
-    const res = await POST(pinRequest(pageId, "whatever"), {
+    const res = await POST(pinRequest(pageId, "POST", "whatever"), {
       params: Promise.resolve({ pageId }),
     });
     expect(res.status).toBe(503);
@@ -415,16 +432,16 @@ describe("POST/DELETE /api/admin/perspectives/:pageId/pin", () => {
     const pageId = String(await foucaultPageId());
     const ctx = { params: Promise.resolve({ pageId }) };
 
-    const wrong = await POST(pinRequest(pageId, "wrong-token"), ctx);
+    const wrong = await POST(pinRequest(pageId, "POST", "wrong-token"), ctx);
     expect(wrong.status).toBe(403);
     expect((await orderOfSubjectivity())[1]).not.toBe("福柯论主体性");
 
     try {
-      const ok = await POST(pinRequest(pageId, "test-admin-token"), ctx);
+      const ok = await POST(pinRequest(pageId, "POST", "test-admin-token"), ctx);
       expect(ok.status).toBe(204);
       expect((await orderOfSubjectivity())[1]).toBe("福柯论主体性");
 
-      const undone = await DELETE(unpinRequest(pageId, "test-admin-token"), ctx);
+      const undone = await DELETE(pinRequest(pageId, "DELETE", "test-admin-token"), ctx);
       expect(undone.status).toBe(204);
       expect((await orderOfSubjectivity())[1]).not.toBe("福柯论主体性");
     } finally {
@@ -435,12 +452,12 @@ describe("POST/DELETE /api/admin/perspectives/:pageId/pin", () => {
   it("非视角页 404；非法 id 400", async () => {
     process.env.ADMIN_TOKEN = "test-admin-token";
     const subjectivity = await termIdByTitle("主体性");
-    const termRes = await POST(pinRequest(String(subjectivity), "test-admin-token"), {
+    const termRes = await POST(pinRequest(String(subjectivity), "POST", "test-admin-token"), {
       params: Promise.resolve({ pageId: String(subjectivity) }),
     });
     expect(termRes.status).toBe(404);
 
-    const badRes = await POST(pinRequest("abc", "test-admin-token"), {
+    const badRes = await POST(pinRequest("abc", "POST", "test-admin-token"), {
       params: Promise.resolve({ pageId: "abc" }),
     });
     expect(badRes.status).toBe(400);
