@@ -95,6 +95,8 @@ export const perspectives = pgTable(
     interpreterId: integer("interpreter_id")
       .notNull()
       .references(() => interpreters.pageId, { onDelete: "cascade" }),
+    // 编者置顶标记：null = 未置顶；置顶时间即标记时间（管理员可置顶/取消，T04）
+    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
   },
   // 同一诠释者对同一词条只有一个视角
   (t) => [uniqueIndex("perspectives_term_interpreter_unique").on(t.termId, t.interpreterId)],

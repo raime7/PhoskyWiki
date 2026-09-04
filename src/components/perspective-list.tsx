@@ -10,6 +10,8 @@ export interface PerspectiveListProps {
     href: string;
     interpreterName: string;
     interpreterHref: string;
+    /** 编者置顶（管理员标记）：显示置顶徽标 */
+    pinned?: boolean;
     linkCount: number;
   }[];
 }
@@ -31,6 +33,11 @@ export function PerspectiveList({ items }: PerspectiveListProps) {
               <Link href={item.href} className="font-medium hover:underline">
                 {item.title}
               </Link>
+              {item.pinned && (
+                <span className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-xs">
+                  置顶
+                </span>
+              )}
               <span className="ml-2 text-sm text-muted-foreground">
                 <Link
                   href={item.interpreterHref}

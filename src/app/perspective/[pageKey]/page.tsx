@@ -2,14 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
+import { BacklinkPanel } from "@/components/backlink-panel";
 import { Infobox, WikiContent } from "@/components/wiki-content";
 import {
   getHeadContent,
   getPerspectiveDetail,
   getWikiLinkTargets,
+  listBacklinks,
 } from "@/lib/content";
 import { formatYears } from "@/lib/format";
-import { renderMarkdown } from "@/lib/markdown";
+import { renderMarkdown, wikiLinkResolver } from "@/lib/markdown";
 import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
 
@@ -37,10 +39,11 @@ export default async function PerspectivePage({ params }: Params) {
   const content = await getHeadContent(page.id);
   if (content === null) notFound();
 
-  const targets = await getWikiLinkTargets(page.id);
-  const html = renderMarkdown(content, (name) =>
-    targets.get(name) ?? { href: "", exists: false },
-  );
+  const [targets, backlinks] = await Promise.all([
+    getWikiLinkTargets(page.id),
+    listBacklinks(page.id),
+  ]);
+  const html = renderMarkdown(content, wikiLinkResolver(targets));
 
   const termHref = pagePath("term", detail.termSlug, detail.termId);
   const interpreterHref = pagePath(
@@ -64,26 +67,30 @@ export default async function PerspectivePage({ params }: Params) {
       </nav>
 
       <div className="flex flex-col gap-10 lg:flex-row lg:gap-10">
-        <article className="min-w-0 flex-1">
-          <h1 className="text-3xl font-bold tracking-tight">{detail.title}</h1>
-          <p className="mt-3 text-sm text-muted-foreground">
-            <Link href={interpreterHref} className="underline-offset-4 hover:underline">
-              {detail.interpreterName}
-            </Link>
-            <span className="mx-1.5">·</span>
-            属于词条{" "}
-            <Link href={termHref} className="underline-offset-4 hover:underline">
-              {detail.termTitle}
-            </Link>
-            {detail.isBoard && (
-              <span className="ml-2 rounded bg-secondary px-1.5 py-0.5">通俗视角</span>
-            )}
-          </p>
+        <div className="min-w-0 flex-1">
+          <article>
+            <h1 className="text-3xl font-bold tracking-tight">{detail.title}</h1>
+            <p className="mt-3 text-sm text-muted-foreground">
+              <Link href={interpreterHref} className="underline-offset-4 hover:underline">
+                {detail.interpreterName}
+              </Link>
+              <span className="mx-1.5">·</span>
+              属于词条{" "}
+              <Link href={termHref} className="underline-offset-4 hover:underline">
+                {detail.termTitle}
+              </Link>
+              {detail.isBoard && (
+                <span className="ml-2 rounded bg-secondary px-1.5 py-0.5">通俗视角</span>
+              )}
+            </p>
 
-          <div className="mt-8">
-            <WikiContent html={html} />
-          </div>
-        </article>
+            <div className="mt-8">
+              <WikiContent html={html} />
+            </div>
+          </article>
+
+          <BacklinkPanel items={backlinks} />
+        </div>
 
         <div className="shrink-0 lg:w-64">
           <Infobox

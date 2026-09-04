@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pageKey, pagePath, parsePageKey, slugify } from "@/lib/slug";
+import { baseTermTitle, pageKey, pagePath, parsePageKey, slugify } from "@/lib/slug";
 
 describe("slugify", () => {
   it("保留中文并小写化拉丁字母", () => {
@@ -55,5 +55,22 @@ describe("parsePageKey", () => {
 
   it("超出安全整数范围返回 null", () => {
     expect(parsePageKey("99999999999999999999")).toBeNull();
+  });
+});
+
+describe("baseTermTitle", () => {
+  it("剥结尾的全角括号限定段", () => {
+    expect(baseTermTitle("价值（政治经济学）")).toBe("价值");
+    expect(baseTermTitle("价值（哲学）")).toBe("价值");
+  });
+
+  it("无限定段返回原题（去除首尾空白）", () => {
+    expect(baseTermTitle("主体性")).toBe("主体性");
+    expect(baseTermTitle(" 价值 ")).toBe("价值");
+  });
+
+  it("括号不在结尾或未闭合时不剥", () => {
+    expect(baseTermTitle("（价值）政治经济学")).toBe("（价值）政治经济学");
+    expect(baseTermTitle("价值（政治经济学")).toBe("价值（政治经济学");
   });
 });
