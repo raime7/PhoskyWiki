@@ -2,8 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
-import { Infobox } from "@/components/wiki-content";
-import { getInterpreterDetail, listPerspectivesOfInterpreter } from "@/lib/content";
+import { Infobox, InfoboxLinks } from "@/components/wiki-content";
+import {
+  getInterpreterDetail,
+  listPerspectivesOfInterpreter,
+  listSchoolsOfInterpreter,
+} from "@/lib/content";
 import { formatYears } from "@/lib/format";
 import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
@@ -23,9 +27,10 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function InterpreterPage({ params }: Params) {
   const page = await resolveLivePage("interpreter", (await params).pageKey);
-  const [interpreter, perspectives] = await Promise.all([
+  const [interpreter, perspectives, schools] = await Promise.all([
     getInterpreterDetail(page.id),
     listPerspectivesOfInterpreter(page.id),
+    listSchoolsOfInterpreter(page.id),
   ]);
   if (!interpreter) notFound();
 
@@ -93,6 +98,18 @@ export default async function InterpreterPage({ params }: Params) {
                 content: interpreter.isBoard
                   ? "—"
                   : formatYears(interpreter.birthYear, interpreter.deathYear),
+              },
+              {
+                label: "所属学派",
+                content: (
+                  <InfoboxLinks
+                    items={schools.map((school) => ({
+                      key: String(school.id),
+                      label: school.title,
+                      href: pagePath("school", school.slug, school.id),
+                    }))}
+                  />
+                ),
               },
               { label: "视角", content: `${perspectives.length} 个` },
             ]}

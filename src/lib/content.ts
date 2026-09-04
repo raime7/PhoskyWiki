@@ -1,4 +1,4 @@
-// 读路径的数据访问层：词条页 / 视角页 / 诠释者页 的查询都在这里。
+// 读路径的数据访问层：词条页 / 视角页 / 诠释者页 / 学派页 / 分类树 的查询都在这里。
 // 全部过滤 pages.deleted_at（软删除页面对读路径不可见，ADR-0003 #7）。
 
 import "server-only";
@@ -7,8 +7,25 @@ import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db";
-import { interpreters, links, pages, perspectives, revisions, terms } from "@/db/schema";
+import {
+  categories,
+  interpreters,
+  links,
+  pages,
+  perspectives,
+  revisions,
+  schoolMembers,
+  schools,
+  termCategories,
+  terms,
+} from "@/db/schema";
 import type { PageType } from "@/db/schema";
+import {
+  buildCategoryTree,
+  categoryAncestorPath,
+  type CategoryRow,
+  type CategoryTreeNode,
+} from "@/lib/categories";
 import { pagePath } from "@/lib/slug";
 import type { WikiLinkTarget } from "@/lib/markdown";
 
@@ -262,4 +279,217 @@ export async function getWikiLinkTargets(
       ];
     }),
   );
+}
+
+// ===== 学派轴（强类型实体，只组织诠释者）=====
+
+/** 学派列表（成员数与核心词条数为在线页面计数）。 */
+export async function listSchools(): Promise<
+  { id: number; title: string; slug: string; summary: string; memberCount: number; coreTermCount: number }[]
+> {
+  return getDb()
+    .select({
+      id: pages.id,
+      title: pages.title,
+      slug: pages.slug,
+      summary: schools.summary,
+      memberCount: sql<number>`(
+        select count(*) from ${schoolMembers} sm
+        join ${pages} mp on mp.id = sm.interpreter_id
+        where sm.school_id = ${pages.id} and mp.deleted_at is null
+      )`.mapWith(Number),
+      coreTermCount: sql<number>`(
+        select count(distinct pp.term_id) from ${schoolMembers} sm
+        join ${pages} mpage on mpage.id = sm.interpreter_id
+        join ${perspectives} pp on pp.interpreter_id = sm.interpreter_id
+        join ${pages} ppage on ppage.id = pp.page_id
+        join ${pages} tp on tp.id = pp.term_id
+        where sm.school_id = ${pages.id}
+          and mpage.deleted_at is null and ppage.deleted_at is null and tp.deleted_at is null
+      )`.mapWith(Number),
+    })
+    .from(pages)
+    .innerJoin(schools, eq(schools.pageId, pages.id))
+    .where(and(eq(pages.type, "school"), isNull(pages.deletedAt)))
+    .orderBy(asc(pages.id));
+}
+
+/** 学派详情（信息框用）。 */
+export async function getSchoolDetail(id: number) {
+  const [row] = await getDb()
+    .select({ id: pages.id, title: pages.title, slug: pages.slug, summary: schools.summary })
+    .from(pages)
+    .innerJoin(schools, eq(schools.pageId, pages.id))
+    .where(and(eq(pages.id, id), eq(pages.type, "school"), isNull(pages.deletedAt)))
+    .limit(1);
+  return row ?? null;
+}
+
+/** 学派成员诠释者列表（软删除的诠释者视同退出学派），按诠释者页 id 稳定排序。 */
+export async function listSchoolMembers(
+  schoolId: number,
+): Promise<
+  {
+    interpreterId: number;
+    name: string;
+    slug: string;
+    birthYear: number | null;
+    deathYear: number | null;
+    perspectiveCount: number;
+  }[]
+> {
+  const interpreterPages = alias(pages, "interpreter_pages");
+  return getDb()
+    .select({
+      interpreterId: interpreters.pageId,
+      name: interpreterPages.title,
+      slug: interpreterPages.slug,
+      birthYear: interpreters.birthYear,
+      deathYear: interpreters.deathYear,
+      perspectiveCount: sql<number>`(
+        select count(*) from ${perspectives} pc
+        join ${pages} pcPage on pcPage.id = pc.page_id
+        join ${pages} ptPage on ptPage.id = pc.term_id
+        where pc.interpreter_id = ${interpreters.pageId}
+          and pcPage.deleted_at is null and ptPage.deleted_at is null
+      )`.mapWith(Number),
+    })
+    .from(schoolMembers)
+    .innerJoin(interpreters, eq(interpreters.pageId, schoolMembers.interpreterId))
+    .innerJoin(interpreterPages, eq(interpreterPages.id, interpreters.pageId))
+    .where(and(eq(schoolMembers.schoolId, schoolId), isNull(interpreterPages.deletedAt)))
+    .orderBy(asc(interpreterPages.id));
+}
+
+/**
+ * 学派核心词条：派生数据——成员的在线视角按词条聚合（视角数降序）。
+ * 学派不直接挂词条（强弱类型边界），「核心」由成员的作品说话。
+ */
+export async function listSchoolCoreTerms(
+  schoolId: number,
+): Promise<{ termId: number; title: string; slug: string; perspectiveCount: number }[]> {
+  const termPages = alias(pages, "term_pages");
+  const memberPages = alias(pages, "member_pages");
+  return getDb()
+    .select({
+      termId: terms.pageId,
+      title: termPages.title,
+      slug: termPages.slug,
+      perspectiveCount: sql<number>`count(*)`.mapWith(Number),
+    })
+    .from(schoolMembers)
+    .innerJoin(interpreters, eq(interpreters.pageId, schoolMembers.interpreterId))
+    .innerJoin(memberPages, eq(memberPages.id, interpreters.pageId))
+    .innerJoin(perspectives, eq(perspectives.interpreterId, interpreters.pageId))
+    .innerJoin(pages, eq(pages.id, perspectives.pageId))
+    .innerJoin(terms, eq(terms.pageId, perspectives.termId))
+    .innerJoin(termPages, eq(termPages.id, terms.pageId))
+    .where(
+      and(
+        eq(schoolMembers.schoolId, schoolId),
+        isNull(memberPages.deletedAt),
+        isNull(pages.deletedAt),
+        isNull(termPages.deletedAt),
+      ),
+    )
+    .groupBy(terms.pageId, termPages.title, termPages.slug)
+    .orderBy(desc(sql`count(*)`), asc(terms.pageId));
+}
+
+/** 诠释者所属学派（诠释者页信息框用）。 */
+export async function listSchoolsOfInterpreter(
+  interpreterId: number,
+): Promise<{ id: number; title: string; slug: string }[]> {
+  return getDb()
+    .select({ id: pages.id, title: pages.title, slug: pages.slug })
+    .from(schoolMembers)
+    .innerJoin(schools, eq(schools.pageId, schoolMembers.schoolId))
+    .innerJoin(pages, eq(pages.id, schools.pageId))
+    .where(and(eq(schoolMembers.interpreterId, interpreterId), isNull(pages.deletedAt)))
+    .orderBy(asc(pages.id));
+}
+
+// ===== 分类轴（弱类型标签树，只组织词条）=====
+
+/**
+ * 全部分类（带在线词条数），分类数量小，一次取全在内存建树。
+ * 注意：词条数用独立 GROUP BY 查询合并——单表主查询里内嵌相关子查询时，
+ * drizzle 会把列渲染成无限定名（"id"），子查询内会错误绑定到 join 别名。
+ */
+export async function listCategoryRows(): Promise<CategoryRow[]> {
+  const db = getDb();
+  const [rows, counts] = await Promise.all([
+    db
+      .select({
+        id: categories.id,
+        name: categories.name,
+        slug: categories.slug,
+        parentId: categories.parentId,
+      })
+      .from(categories)
+      .orderBy(asc(categories.id)),
+    db
+      .select({
+        categoryId: termCategories.categoryId,
+        count: sql<number>`count(*)`.mapWith(Number),
+      })
+      .from(termCategories)
+      .innerJoin(pages, eq(pages.id, termCategories.termId))
+      .where(isNull(pages.deletedAt))
+      .groupBy(termCategories.categoryId),
+  ]);
+  const countByCategory = new Map(counts.map((row) => [row.categoryId, row.count]));
+  return rows.map((row) => ({ ...row, termCount: countByCategory.get(row.id) ?? 0 }));
+}
+
+/** 分类树浏览页数据：根分类嵌套全部后代。 */
+export async function getCategoryTree(): Promise<CategoryTreeNode[]> {
+  return buildCategoryTree(await listCategoryRows());
+}
+
+export interface CategoryDetail {
+  id: number;
+  name: string;
+  slug: string;
+  /** 从根到本分类的祖先链（不含自身），面包屑用。 */
+  path: { id: number; name: string; slug: string }[];
+  children: CategoryRow[];
+  terms: { id: number; title: string; slug: string; summary: string }[];
+}
+
+/** 分类详情：祖先链 + 子分类 + 本分类（直接挂载）的在线词条。 */
+export async function getCategoryDetailBySlug(slug: string): Promise<CategoryDetail | null> {
+  const rows = await listCategoryRows();
+  const category = rows.find((row) => row.slug === slug);
+  if (!category) return null;
+
+  const categoryTerms = await getDb()
+    .select({ id: pages.id, title: pages.title, slug: pages.slug, summary: terms.summary })
+    .from(termCategories)
+    .innerJoin(terms, eq(terms.pageId, termCategories.termId))
+    .innerJoin(pages, eq(pages.id, terms.pageId))
+    .where(and(eq(termCategories.categoryId, category.id), isNull(pages.deletedAt)))
+    .orderBy(asc(pages.id));
+
+  return {
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    path: categoryAncestorPath(rows, category.id).map(({ id, name, slug }) => ({ id, name, slug })),
+    children: rows.filter((row) => row.parentId === category.id),
+    terms: categoryTerms,
+  };
+}
+
+/** 词条所属分类（词条页信息框用），按分类 id 稳定排序；挂载表无时序列。 */
+export async function listCategoriesOfTerm(
+  termId: number,
+): Promise<{ id: number; name: string; slug: string }[]> {
+  return getDb()
+    .select({ id: categories.id, name: categories.name, slug: categories.slug })
+    .from(termCategories)
+    .innerJoin(categories, eq(categories.id, termCategories.categoryId))
+    .innerJoin(pages, eq(pages.id, termCategories.termId))
+    .where(and(eq(termCategories.termId, termId), isNull(pages.deletedAt)))
+    .orderBy(asc(categories.id));
 }

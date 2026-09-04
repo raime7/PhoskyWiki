@@ -13,5 +13,7 @@ export default defineConfig({
     environment: "node",
     include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts"],
     setupFiles: ["tests/setup.ts"],
+    // 集成测试文件各自 seedDatabase()（内部 TRUNCATE 内容表），并行会互相清表
+    fileParallelism: false,
   },
 });

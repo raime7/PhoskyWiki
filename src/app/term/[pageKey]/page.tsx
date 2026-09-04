@@ -2,14 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
-import { Infobox, WikiContent } from "@/components/wiki-content";
+import { Infobox, InfoboxLinks, WikiContent } from "@/components/wiki-content";
 import { PerspectiveList } from "@/components/perspective-list";
 import {
   getTermDetail,
   getHeadContent,
   getWikiLinkTargets,
+  listCategoriesOfTerm,
   listPerspectivesOfTerm,
 } from "@/lib/content";
+import { categoryPath } from "@/lib/categories";
 import { renderMarkdown } from "@/lib/markdown";
 import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
@@ -30,7 +32,10 @@ export default async function TermPage({ params }: Params) {
   const term = await getTermDetail(page.id);
   if (!term) notFound();
 
-  const perspectives = await listPerspectivesOfTerm(page.id);
+  const [perspectives, categories] = await Promise.all([
+    listPerspectivesOfTerm(page.id),
+    listCategoriesOfTerm(page.id),
+  ]);
   const board = perspectives.find((p) => p.isBoard);
   const others = perspectives.filter((p) => !p.isBoard);
   const [boardContent, boardTargets] = board
@@ -110,6 +115,18 @@ export default async function TermPage({ params }: Params) {
               {
                 label: "别名",
                 content: term.aliases.length > 0 ? term.aliases.join("、") : "—",
+              },
+              {
+                label: "分类",
+                content: (
+                  <InfoboxLinks
+                    items={categories.map((category) => ({
+                      key: String(category.id),
+                      label: category.name,
+                      href: categoryPath(category.slug),
+                    }))}
+                  />
+                ),
               },
               { label: "视角", content: `${perspectives.length} 个（含通俗视角）` },
               {
