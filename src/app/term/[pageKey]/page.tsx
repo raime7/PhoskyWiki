@@ -103,9 +103,19 @@ export default async function TermPage({ params }: Params) {
           )}
 
           <section aria-labelledby="perspectives-heading" className="mt-12">
-            <h2 id="perspectives-heading" className="mb-4 text-xl font-semibold">
-              诠释者视角（{others.length}）
-            </h2>
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="perspectives-heading" className="text-xl font-semibold">
+                诠释者视角（{others.length}）
+              </h2>
+              {sessionUser && (
+                <Link
+                  href={`/new/perspective?term=${page.id}`}
+                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  撰写视角 +
+                </Link>
+              )}
+            </div>
             {others.length > 0 ? (
               <PerspectiveList
                 isAdmin={sessionUser?.role === "admin"}

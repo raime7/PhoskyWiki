@@ -43,6 +43,9 @@ export async function SiteHeader() {
         <div className="ml-auto flex items-center gap-2 text-sm">
           {user ? (
             <>
+              <ButtonLikeLink href="/new/term">创建词条</ButtonLikeLink>
+              <ButtonLikeLink href="/new/interpreter">新诠释者</ButtonLikeLink>
+              {user.role === "admin" && <ButtonLikeLink href="/review">审核队列</ButtonLikeLink>}
               <span data-testid="session-user" className="text-muted-foreground">
                 {user.name}
                 <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-xs">

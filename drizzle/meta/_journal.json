@@ -43,6 +43,13 @@
       "when": 1788506788204,
       "tag": "0005_overjoyed_sabretooth",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788515392668,
+      "tag": "0006_overconfident_purple_man",
+      "breakpoints": true
     }
   ]
 }

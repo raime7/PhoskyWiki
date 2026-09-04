@@ -226,6 +226,96 @@ export const links = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// 审核域（T06）：提交与投票。语义见 ADR-0004——
+// submissions 存全量提议内容 + base_revision_id（不存 diff，队列页 diff 现算）；
+// pending → approved/rejected 均终态、任一驳回即 rejected、修改重提 = 新建提交；
+// quorum = min(2, 提交创建时管理员数)，其后管理员人数变化不追溯；
+// 管理员本人提交不经此表（直编直接生效，与受理共用修订管线）。
+// ---------------------------------------------------------------------------
+
+export const submissionStatusEnum = pgEnum("submission_status", [
+  "pending",
+  "approved",
+  "rejected",
+] as const);
+
+export type SubmissionStatus = (typeof submissionStatusEnum.enumValues)[number];
+
+/** 提议类型：编辑既有视角页，或新建词条/视角/诠释者页（新建同样进队列）。 */
+export const submissionKindEnum = pgEnum("submission_kind", [
+  "edit",
+  "new_term",
+  "new_perspective",
+  "new_interpreter",
+] as const);
+
+export type SubmissionKind = (typeof submissionKindEnum.enumValues)[number];
+
+export const submissions = pgTable(
+  "submissions",
+  {
+    id: serial("id").primaryKey(),
+    // 编辑目标页（kind=edit 必填）；新建类提议为空，建什么由 kind + 各字段决定
+    pageId: integer("page_id").references(() => pages.id, { onDelete: "cascade" }),
+    kind: submissionKindEnum("kind").notNull(),
+    // 全量提议内容（ADR-0004 #1）；词条/诠释者新建无正文，为空串
+    content: text("content").notNull().default(""),
+    // 新建页的标题（new_perspective 由「诠释者论词条」派生，提交时留空）
+    title: text("title"),
+    // 新建词条/诠释者的一句话简介（terms/interpreters 负载字段）
+    summary: text("summary"),
+    // new_perspective 的挂载目标
+    termId: integer("term_id").references(() => terms.pageId, { onDelete: "cascade" }),
+    interpreterId: integer("interpreter_id").references(() => interpreters.pageId, {
+      onDelete: "cascade",
+    }),
+    // 编辑起点的页面 head 修订（ADR-0004 #2 并发防护）；
+    // 受理时页面 head ≠ base → 该票无法通过，自动驳回并提示基于新版重新提交
+    baseRevisionId: integer("base_revision_id").references(() => revisions.id),
+    status: submissionStatusEnum("status").notNull().default("pending"),
+    // 受理所需批准票数：提交创建时快照的 min(2, 管理员数)（ADR-0004 #4）
+    quorum: integer("quorum").notNull(),
+    // 驳回理由：status=rejected 时必填（含 base 过期的系统驳回）
+    rejectionReason: text("rejection_reason"),
+    submittedBy: text("submitted_by").notNull().references(() => user.id),
+    // 修改重提的谱系：指向被驳回的前任提交（ADR-0004 #5，便于个人主页分组）
+    supersedesId: integer("supersedes_id").references((): AnyPgColumn => submissions.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("submissions_status_idx").on(t.status, t.id),
+    index("submissions_submitter_idx").on(t.submittedBy),
+  ],
+);
+
+export const submissionVoteEnum = pgEnum("submission_vote", ["approve", "reject"] as const);
+
+export const submissionVotes = pgTable(
+  "submission_votes",
+  {
+    id: serial("id").primaryKey(),
+    submissionId: integer("submission_id")
+      .notNull()
+      .references(() => submissions.id, { onDelete: "cascade" }),
+    adminId: text("admin_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    vote: submissionVoteEnum("vote").notNull(),
+    // 驳回理由（vote=reject 时必有；approve 为空）
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    // 一名管理员对一条提交至多一票：顺序批准、任一驳回即终态（ADR-0004 #3）
+    uniqueIndex("submission_votes_admin_unique").on(t.submissionId, t.adminId),
+    index("submission_votes_submission_idx").on(t.submissionId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // 认证与角色（T05）：better-auth 邮箱密码 + 数据库会话。
 // 表结构按 better-auth 的约定字段建模（src/lib/auth.ts 的 drizzleAdapter 指向这里），
 // 应用自有字段只有 user.role（additionalFields 声明，input:false 客户端不可写）。

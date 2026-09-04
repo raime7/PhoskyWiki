@@ -12,8 +12,9 @@ import {
 } from "@/lib/content";
 import { formatYears } from "@/lib/format";
 import { renderMarkdown, wikiLinkResolver } from "@/lib/markdown";
-import { pageIdFromKey, pagePath } from "@/lib/slug";
+import { pageIdFromKey, pageKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
+import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +40,10 @@ export default async function PerspectivePage({ params }: Params) {
   const content = await getHeadContent(page.id);
   if (content === null) notFound();
 
-  const [targets, backlinks] = await Promise.all([
+  const [targets, backlinks, sessionUser] = await Promise.all([
     getWikiLinkTargets(page.id),
     listBacklinks(page.id),
+    getSessionUser(),
   ]);
   const html = renderMarkdown(content, wikiLinkResolver(targets));
 
@@ -69,7 +71,17 @@ export default async function PerspectivePage({ params }: Params) {
       <div className="flex flex-col gap-10 lg:flex-row lg:gap-10">
         <div className="min-w-0 flex-1">
           <article>
-            <h1 className="text-3xl font-bold tracking-tight">{detail.title}</h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">{detail.title}</h1>
+              {sessionUser && (
+                <Link
+                  href={`/edit/${pageKey(detail.slug, detail.id)}`}
+                  className="rounded-md border border-border px-2.5 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  编辑
+                </Link>
+              )}
+            </div>
             <p className="mt-3 text-sm text-muted-foreground">
               <Link href={interpreterHref} className="underline-offset-4 hover:underline">
                 {detail.interpreterName}

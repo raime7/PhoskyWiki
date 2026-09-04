@@ -167,6 +167,29 @@ export async function getHeadContent(pageId: number): Promise<string | null> {
   return row?.content ?? null;
 }
 
+/** 页面当前（head）修订的 id；无修订返回 null（base_revision_id 的取值来源）。 */
+export async function getHeadRevisionId(pageId: number): Promise<number | null> {
+  const [row] = await getDb()
+    .select({ id: revisions.id })
+    .from(revisions)
+    .where(eq(revisions.pageId, pageId))
+    .orderBy(desc(revisions.id))
+    .limit(1);
+  return row?.id ?? null;
+}
+
+/** 全部在线诠释者（新建视角的选择器用）；编委会视角固定存在，不参与新建。 */
+export async function listInterpreters(): Promise<
+  { pageId: number; name: string; isBoard: boolean }[]
+> {
+  return getDb()
+    .select({ pageId: interpreters.pageId, name: pages.title, isBoard: interpreters.isEditorialBoard })
+    .from(interpreters)
+    .innerJoin(pages, eq(pages.id, interpreters.pageId))
+    .where(and(eq(pages.type, "interpreter"), isNull(pages.deletedAt)))
+    .orderBy(asc(pages.id));
+}
+
 /** 视角详情：所属词条 + 诠释者（含生卒年）。 */
 export async function getPerspectiveDetail(id: number) {
   const termPages = alias(pages, "term_pages");
