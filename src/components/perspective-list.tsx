@@ -38,7 +38,10 @@ export function PerspectiveList({ items, isAdmin }: PerspectiveListProps) {
                 {item.title}
               </Link>
               {item.pinned && (
-                <span className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-xs">
+                <span
+                  data-testid="pin-badge"
+                  className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-xs"
+                >
                   置顶
                 </span>
               )}
