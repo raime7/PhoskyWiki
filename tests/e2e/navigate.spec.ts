@@ -39,7 +39,7 @@ test("显式视角语法未命中：红链提示视角尚未创建、不可点�
   await page.getByRole("link", { name: "主体性", exact: true }).click();
   await page.getByRole("link", { name: "拉康论主体性" }).click();
 
-  const redLink = page.locator(".wiki-link--red", { hasText: "弗洛伊德论主体性" });
+  const redLink = page.locator(".wiki-link--red", { hasText: "德里达论主体性" });
   await expect(redLink).toBeVisible();
   await expect(redLink).toHaveAttribute("title", "视角尚未创建");
 });

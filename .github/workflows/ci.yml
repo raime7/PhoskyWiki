@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgres://phosky:phosky@localhost:5432/phoskywiki
+      BETTER_AUTH_SECRET: ci-better-auth-secret-0123456789abcdef0123456789abcdef
     services:
       postgres:
         image: postgres:18-alpine
@@ -42,6 +43,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgres://phosky:phosky@localhost:5432/phoskywiki
+      # 一次性 CI 库用的签名密钥；种子管理员密码每次运行随机生成，不进仓库
+      BETTER_AUTH_SECRET: ci-better-auth-secret-0123456789abcdef0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
     services:
       postgres:
         image: postgres:18-alpine
@@ -67,5 +71,6 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm build
       - run: pnpm db:migrate
+      - run: echo "SEED_ADMIN_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
       - run: pnpm db:seed
       - run: pnpm test:e2e

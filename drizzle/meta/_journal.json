@@ -19,8 +19,29 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1788505817056,
-      "tag": "0002_famous_genesis",
+      "when": 1788504366096,
+      "tag": "0002_careful_ted_forrester",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788504627893,
+      "tag": "0003_lyrical_black_bird",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788504949909,
+      "tag": "0004_watery_slyde",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788506788204,
+      "tag": "0005_overjoyed_sabretooth",
       "breakpoints": true
     }
   ]

@@ -252,7 +252,7 @@ describe("反链面板（T04：词条页与视角页共用 links 直查）", () 
       (p) => p.interpreterName === "拉康",
     )!;
     const targets = await getWikiLinkTargets(lacan.pageId);
-    expect(targets.get("主体性@弗洛伊德")).toEqual({ href: "", exists: false });
+    expect(targets.get("主体性@德里达")).toEqual({ href: "", exists: false });
   });
 
   it("软删除的引用方不进反链；恢复后重新出现", async () => {

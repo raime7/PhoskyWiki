@@ -19,8 +19,8 @@ cp .env.example .env
 pnpm install
 pnpm db:migrate
 
-# 4. 灌入演示内容（词条 / 诠释者 / 视角种子，幂等重灌）
-pnpm db:seed
+# 4. 灌入演示内容（词条 / 诠释者 / 视角种子 + 管理员账号，幂等重灌）
+pnpm db:seed          # 管理员凭据读 SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD，密码留空则随机生成并打印
 
 # 5. 启动应用
 pnpm dev            # http://localhost:3000
@@ -53,7 +53,15 @@ CI（GitHub Actions）在每次 push 时跑 lint + typecheck + Vitest + Playwrig
 |---|---|
 | `pnpm db:generate` | 从 `src/db/schema.ts` 生成迁移（drizzle-kit） |
 | `pnpm db:migrate` | 应用 `drizzle/` 下的迁移到数据库 |
-| `pnpm db:seed` | 清空内容表并重灌演示内容（开发/CI 用，勿在生产跑） |
+| `pnpm db:seed` | 清空内容表并重灌演示内容 + upsert 管理员（开发/CI 用，勿在生产跑） |
+
+## 认证与角色（T05）
+
+邮箱 + 密码注册（better-auth，数据库会话，cookie 持久 30 天滚动续期）；未登录即游客，浏览全站不受限。
+
+- 角色枚举 `user_role`：`editor`（注册默认）/ `admin`（受理提交等管理权限，随 T06 落地）/ `trusted`（二期免审编者预留位）；
+- 端点挂载在 `/api/auth/*`（better-auth 全套路由）；页头右侧展示登录态与登出按钮；
+- 管理员由 `pnpm db:seed` 灌入，凭据走 `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` 环境变量，不进仓库。
 
 ## 读路径（T02 / T04）
 

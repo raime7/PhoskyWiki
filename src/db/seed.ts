@@ -1,5 +1,7 @@
-// 种子数据：读路径的第一批演示内容（T02 验收：≥3 词条、≥3 诠释者、≥4 视角，
-// 含编委会通俗视角、跨词条双链、红链；T04 增补：显式视角链接、消歧义双义示例）。
+// 种子数据：读路径的第一批演示内容。
+// T02 验收：≥3 词条、≥3 诠释者、≥4 视角（含编委会通俗视角、跨词条双链、红链）。
+// T03 验收：≥2 学派（成员 + 派生核心词条就位）、分类树（多级 + 词条多挂）。
+// T04 增补：显式视角链接（含红链示例）、消歧义双义示例（「价值」）。
 //
 // seedDatabase() 幂等：TRUNCATE 全部内容表后按固定顺序重插（serial 因此确定），
 // 集成测试与 e2e 共用这一份 fixture。生产环境不该跑它。
@@ -7,7 +9,18 @@
 import { sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { interpreters, links, pages, perspectives, revisions, terms } from "@/db/schema";
+import {
+  categories,
+  interpreters,
+  links,
+  pages,
+  perspectives,
+  revisions,
+  schoolMembers,
+  schools,
+  termCategories,
+  terms,
+} from "@/db/schema";
 import { slugify } from "@/lib/slug";
 import { parseWikiLinks, wikiLinkKey } from "@/lib/wiki-links";
 
@@ -30,6 +43,24 @@ interface SeedInterpreter {
   birthYear?: number;
   deathYear?: number;
   isEditorialBoard?: boolean;
+}
+
+interface SeedSchool {
+  name: string;
+  summary: string;
+  /** 成员诠释者名。学派核心词条不在此挂载——由成员视角派生（强弱类型边界）。 */
+  members: string[];
+}
+
+interface SeedCategory {
+  name: string;
+  parent: string | null;
+}
+
+interface SeedTermCategory {
+  term: string;
+  /** 一个词条可挂多个分类（弱类型标签树）。 */
+  categories: string[];
 }
 
 interface SeedPerspective {
@@ -133,6 +164,60 @@ const SEED_INTERPRETERS: SeedInterpreter[] = [
     birthYear: 1925,
     deathYear: 1995,
   },
+  {
+    name: "弗洛伊德",
+    summary:
+      "奥地利神经学家、精神分析创始人（1856–1939）：无意识、压抑与梦的工作；「自我不是自己家里的主人」。",
+    birthYear: 1856,
+    deathYear: 1939,
+  },
+  {
+    name: "阿多诺",
+    summary:
+      "德国哲学家与社会学家（1903–1969），法兰克福学派核心：《否定辩证法》与《启蒙辩证法》，同一性批判与文化工业论。",
+    birthYear: 1903,
+    deathYear: 1969,
+  },
+  {
+    name: "马尔库塞",
+    summary:
+      "德裔美籍哲学家（1898–1979），法兰克福学派：《单向度的人》，发达工业社会的意识形态批判与爱欲解放论。",
+    birthYear: 1898,
+    deathYear: 1979,
+  },
+];
+
+const SEED_SCHOOLS: SeedSchool[] = [
+  {
+    name: "精神分析",
+    summary:
+      "弗洛伊德创立的学科与思想传统：无意识、压抑、转移与梦的解释。经拉康的结构主义重写，成为二十世纪主体理论最重要的资源之一。",
+    members: ["弗洛伊德", "拉康"],
+  },
+  {
+    name: "法兰克福学派",
+    summary:
+      "围绕社会研究所形成的批判理论传统：霍克海默、阿多诺、马尔库塞等人把马克思主义与精神分析、美学批判结合，诊断「启蒙的辩证法」与文化工业。",
+    members: ["阿多诺", "马尔库塞"],
+  },
+];
+
+const SEED_CATEGORIES: SeedCategory[] = [
+  { name: "哲学", parent: null },
+  { name: "主体理论", parent: "哲学" },
+  { name: "马克思主义", parent: null },
+  { name: "意识形态批判", parent: "马克思主义" },
+  { name: "异化理论", parent: "马克思主义" },
+  { name: "政治经济学", parent: null },
+];
+
+const SEED_TERM_CATEGORIES: SeedTermCategory[] = [
+  { term: "主体性", categories: ["主体理论", "马克思主义"] },
+  { term: "意识形态", categories: ["意识形态批判"] },
+  { term: "异化", categories: ["异化理论"] },
+  { term: "剩余价值", categories: ["政治经济学", "马克思主义"] },
+  { term: "价值（政治经济学）", categories: ["政治经济学"] },
+  { term: "价值（哲学）", categories: ["哲学"] },
 ];
 
 const SEED_PERSPECTIVES: SeedPerspective[] = [
@@ -154,7 +239,7 @@ const SEED_PERSPECTIVES: SeedPerspective[] = [
 
 进入象征界后，主体进一步被大他者（语言与法的秩序）所询唤，「我」只是能指链上不断滑动的效果。因此拉康的主体是分裂的主体：言说的「我」永远无法与被言说的「我」重合。
 
-在意识形态问题上，拉康的框架后来被阿尔都塞借用：意识形态把个体询唤为主体，正是一种镜像式的误认。可参照[[意识形态]]词条下阿尔都塞的视角；主体与对象颠倒的问题亦见[[异化]]。若想看[[镜像阶段]]作为独立概念的展开，该词条尚待撰写——这是一个写作缺口。同样尚待撰写的还有弗洛伊德本人的奠基性视角[[主体性|弗洛伊德论主体性@弗洛伊德]]。`,
+在意识形态问题上，拉康的框架后来被阿尔都塞借用：意识形态把个体询唤为主体，正是一种镜像式的误认。可参照[[意识形态]]词条下阿尔都塞的视角；主体与对象颠倒的问题亦见[[异化]]。若想看[[镜像阶段]]作为独立概念的展开，该词条尚待撰写——这是一个写作缺口。同样尚待撰写的还有德里达对拉康的解构式读法[[主体性|德里达论主体性@德里达]]。`,
   },
   {
     term: "主体性",
@@ -273,6 +358,33 @@ const SEED_PERSPECTIVES: SeedPerspective[] = [
 
 注意分流：政治经济学里的价值（凝结在商品中的社会必要劳动）是另一条问题链，见[[价值]]（消歧义页）。`,
   },
+  {
+    term: "主体性",
+    interpreter: "弗洛伊德",
+    content: `弗洛伊德对主体的第一个打击是地形学的：精神装置被划分为无意识、前意识与意识，「自我不是自己家里的主人」。你以为主宰着自己的念头，其实念头只是浮出水面的冰山一角，水面之下是愿望、压抑与防御的持续做工——梦、口误与症状就是那做工漏出的证据。
+
+第二个打击是结构性的：本我、自我与超我不是三种「东西」，而是同一装置里的三个审级。自我骑在本我这匹马的背上，常常只是替本我的诉求找一个体面的说法；超我则以父母与社会之声的内化，对主体进行永不休庭的传讯。
+
+因此弗洛伊德的主体天生是分裂的主体——这不是病理，而是精神的结构本身。文明以压抑为代价把欲望整理成「社会主体」，代价是神经症与持续的不满，这一思路与[[异化]]的问题域相邻。拉康后来把这一结构语言化；[[无意识]]作为独立词条尚待撰写。`,
+  },
+  {
+    term: "主体性",
+    interpreter: "阿多诺",
+    content: `阿多诺拒绝「从主体出发」的哲学传统：康德与现象学都把主体当作不动的起点，而《否定辩证法》要做的恰恰是对这种起点的批判——主体在认识中始终带着前历史，没有无客体的主体，也没有无主体的客体。
+
+关键命题是「客体的优先性」：不是主体综合客体，而是主体本身是客体的产物（社会、劳动、自然史）；但客体只有经由主体的反思才能被认识。主体与客体互为中介，谁也不是最终基础——阿多诺称之为「星丛」。把差异碾平为主体可支配的同一，这种同一性思维正是[[意识形态]]的认知根源。
+
+这一思路的社会学对应是文化工业：标准化的文化商品把主体生产成类型的消费者，「个性」本身成了被出售的伪装。与[[异化]]叙事里「复归本真主体」的期待不同，阿多诺不承诺和解——在错误的生活中没有正确的生活，批判比许诺诚实。`,
+  },
+  {
+    term: "意识形态",
+    interpreter: "马尔库塞",
+    content: `马尔库塞在《单向度的人》里给发达工业社会的意识形态下了功能主义的定义：它不再主要依靠强制或欺骗，而是靠「虚假的需求」与技术的合理性运转——住房、家电、汽车与娱乐把人们绑定在既定制度上，批判的尺度本身被生产的富裕消解。
+
+结果是「单向度」：技术理性吞掉否定性思维，对立的需求被吸收为体制内的选项，「自由」萎缩为品牌之间的选择。工人阶级不再凭其在生产中的位置就是否定者——这是对经典马克思主义最刺痛的修正，[[剩余价值]]的抽象机制仍在运转，却不再自动产生政治的对立面。
+
+出路因此诉诸体制外的边缘（被排斥者、异见的青年）与审美之维：艺术保有「大拒绝」的记忆，是意识形态闭环上的缺口。与阿尔都塞「意识形态无历史」的结构恒常论对照，马尔库塞仍保留了压迫性需求与真实需求的区分——也因此被批评为残留了[[主体性]]的人本主义地基。`,
+  },
 ];
 
 /** 清空内容表并重灌种子数据。返回计数摘要。 */
@@ -280,12 +392,14 @@ export async function seedDatabase(): Promise<{
   terms: number;
   disambiguations: number;
   interpreters: number;
+  schools: number;
   perspectives: number;
+  categories: number;
   links: { resolved: number; red: number };
 }> {
   const db = getDb();
   await db.execute(
-    sql`truncate table ${links}, ${revisions}, ${perspectives}, ${interpreters}, ${terms}, ${pages} restart identity cascade`,
+    sql`truncate table ${links}, ${revisions}, ${perspectives}, ${termCategories}, ${categories}, ${schoolMembers}, ${schools}, ${interpreters}, ${terms}, ${pages} restart identity cascade`,
   );
 
   // 词条与消歧义页：pages 壳 + 负载/修订（消歧义页无负载表，ADR-0003 #6）
@@ -335,6 +449,43 @@ export async function seedDatabase(): Promise<{
     interpreterIds.set(interpreter.name, page.id);
   }
 
+  // 学派：pages 壳 + 负载表 + 成员挂载（只挂诠释者；核心词条由成员视角派生）
+  const schoolIds = new Map<string, number>();
+  for (const school of SEED_SCHOOLS) {
+    const [page] = await db
+      .insert(pages)
+      .values({ type: "school", title: school.name, slug: slugify(school.name) })
+      .returning({ id: pages.id });
+    await db.insert(schools).values({ pageId: page.id, summary: school.summary });
+    schoolIds.set(school.name, page.id);
+    for (const member of school.members) {
+      await db.insert(schoolMembers).values({
+        schoolId: page.id,
+        interpreterId: interpreterIds.get(member)!,
+      });
+    }
+  }
+
+  // 分类树：弱类型标签（非页面），词条多挂
+  const categoryIds = new Map<string, number>();
+  for (const category of SEED_CATEGORIES) {
+    const [row] = await db
+      .insert(categories)
+      .values({
+        name: category.name,
+        slug: slugify(category.name),
+        parentId: category.parent ? categoryIds.get(category.parent)! : null,
+      })
+      .returning({ id: categories.id });
+    categoryIds.set(category.name, row.id);
+  }
+  for (const { term, categories: termCats } of SEED_TERM_CATEGORIES) {
+    const termId = titleToPageId.get(term)!;
+    for (const name of termCats) {
+      await db.insert(termCategories).values({ termId, categoryId: categoryIds.get(name)! });
+    }
+  }
+
   // 视角：pages 壳 + 负载表 + 首个修订（受理产生修订的种子等价物）
   const perspectiveIdByRef = new Map<string, number>();
   const perspectivePageIds: number[] = [];
@@ -379,7 +530,9 @@ export async function seedDatabase(): Promise<{
     terms: SEED_TERMS.length,
     disambiguations: SEED_DISAMBIGUATIONS.length,
     interpreters: SEED_INTERPRETERS.length,
+    schools: SEED_SCHOOLS.length,
     perspectives: SEED_PERSPECTIVES.length,
+    categories: SEED_CATEGORIES.length,
     links: { resolved: resolvedLinks, red: redLinks },
   };
 }
