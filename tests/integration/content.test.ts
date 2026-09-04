@@ -96,6 +96,35 @@ describe("种子完整性（T02 验收：≥3 词条、≥3 诠释者、≥4 视
       expect(rest[i - 1]).toBeGreaterThanOrEqual(rest[i]);
     }
   });
+
+  it("视角排序：被站内双链引用的视角排在同词条其他视角之前", async () => {
+    const db = getDb();
+    const subjectivity = await termIdByTitle("主体性");
+    const perspectives = await listPerspectivesOfTerm(subjectivity);
+    const byTitle = new Map(perspectives.map((p) => [p.title, p]));
+    const source = byTitle.get("拉康论主体性")!;
+    const hot = byTitle.get("德勒兹论主体性")!; // 种子里引用数为 0，排最末
+
+    // 造一条指向德勒兹视角的入链（显式视角语法的等价落库形态，T03 写路径前置）
+    await db.insert(links).values({
+      sourcePageId: source.pageId,
+      targetPageId: hot.pageId,
+      targetName: `德勒兹论主体性-${hot.pageId}`,
+    });
+    try {
+      const reordered = await listPerspectivesOfTerm(subjectivity);
+      expect(reordered[0].isBoard).toBe(true);
+      expect(reordered[1].title).toBe("德勒兹论主体性");
+      expect(reordered[1].linkCount).toBe(1);
+      expect(reordered.slice(2).map((p) => p.linkCount)).toEqual(
+        reordered.slice(2).map(() => 0),
+      );
+    } finally {
+      await db
+        .delete(links)
+        .where(eq(links.targetPageId, hot.pageId));
+    }
+  });
 });
 
 describe("页面解析与软删除", () => {

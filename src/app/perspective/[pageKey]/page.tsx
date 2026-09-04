@@ -8,8 +8,9 @@ import {
   getPerspectiveDetail,
   getWikiLinkTargets,
 } from "@/lib/content";
+import { formatYears } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
-import { decodePageKey, pagePath, parsePageKey } from "@/lib/slug";
+import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ pageKey: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const id = parsePageKey(decodePageKey((await params).pageKey));
+  const id = pageIdFromKey((await params).pageKey);
   if (!id) return {};
   const detail = await getPerspectiveDetail(id);
   return detail
@@ -26,12 +27,6 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
         description: `${detail.interpreterName}对「${detail.termTitle}」的诠释视角 · PhoskyWiki`,
       }
     : {};
-}
-
-function years(birth?: number | null, death?: number | null): string {
-  if (birth && death) return `${birth}–${death}`;
-  if (birth) return `${birth}–`;
-  return "—";
 }
 
 export default async function PerspectivePage({ params }: Params) {
@@ -110,13 +105,13 @@ export default async function PerspectivePage({ params }: Params) {
                 label: "生卒",
                 content: detail.isBoard
                   ? "—（站方集体）"
-                  : years(detail.interpreterBirthYear, detail.interpreterDeathYear),
+                  : formatYears(detail.interpreterBirthYear, detail.interpreterDeathYear),
               },
-              { label: "站内引用", content: `${targets.size} 条双链来源` },
+              { label: "正文双链", content: `${targets.size} 条（指向其他词条）` },
             ]}
           />
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            红色虚线标记的词条尚未创建——那是留给写作者的缺口。
+            红色虚线标记的词条尚未创建——那是留给编者的写作缺口。
           </p>
         </div>
       </div>

@@ -8,13 +8,14 @@ import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db";
 import { interpreters, links, pages, perspectives, revisions, terms } from "@/db/schema";
+import type { PageType } from "@/db/schema";
 import { pagePath } from "@/lib/slug";
 import type { WikiLinkTarget } from "@/lib/markdown";
 
 /** 在线页面（未软删除）的最小信息。 */
 export interface LivePage {
   id: number;
-  type: "term" | "perspective" | "interpreter" | "school" | "disambiguation";
+  type: PageType;
   title: string;
   slug: string;
 }

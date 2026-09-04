@@ -5,7 +5,7 @@ import { useState } from "react";
 
 export interface PerspectiveListProps {
   items: {
-    key: string;
+    pageId: number;
     title: string;
     href: string;
     interpreterName: string;
@@ -26,7 +26,7 @@ export function PerspectiveList({ items }: PerspectiveListProps) {
     <div>
       <ul className="divide-y divide-border rounded-lg border border-border">
         {visible.map((item) => (
-          <li key={item.key} className="flex items-baseline justify-between gap-3 px-4 py-3">
+          <li key={item.pageId} className="flex items-baseline justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
               <Link href={item.href} className="font-medium hover:underline">
                 {item.title}

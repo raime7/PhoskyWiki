@@ -11,7 +11,7 @@ import {
   listPerspectivesOfTerm,
 } from "@/lib/content";
 import { renderMarkdown } from "@/lib/markdown";
-import { decodePageKey, pagePath, parsePageKey } from "@/lib/slug";
+import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ pageKey: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const id = parsePageKey(decodePageKey((await params).pageKey));
+  const id = pageIdFromKey((await params).pageKey);
   if (!id) return {};
   const term = await getTermDetail(id);
   return term ? { title: term.title, description: term.summary } : {};
@@ -77,12 +77,12 @@ export default async function TermPage({ params }: Params) {
 
           <section aria-labelledby="perspectives-heading" className="mt-12">
             <h2 id="perspectives-heading" className="mb-4 text-xl font-semibold">
-              视角（{others.length}）
+              诠释者视角（{others.length}）
             </h2>
             {others.length > 0 ? (
               <PerspectiveList
                 items={others.map((p) => ({
-                  key: String(p.pageId),
+                  pageId: p.pageId,
                   title: p.title,
                   href: pagePath("perspective", p.slug, p.pageId),
                   interpreterName: p.interpreterName,
@@ -111,7 +111,7 @@ export default async function TermPage({ params }: Params) {
                 label: "别名",
                 content: term.aliases.length > 0 ? term.aliases.join("、") : "—",
               },
-              { label: "视角", content: `${perspectives.length} 个` },
+              { label: "视角", content: `${perspectives.length} 个（含通俗视角）` },
               {
                 label: "通俗视角",
                 content: board ? "已发布" : "暂缺",

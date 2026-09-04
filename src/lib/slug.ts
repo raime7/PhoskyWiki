@@ -2,6 +2,8 @@
 //   /<type>/<slug>-<id> —— id 永不改变、是唯一权威；slug 只是可读装饰，改名只换 slug。
 //   中文名 slug 生成失败（清洗后为空）时退化为纯 id。
 
+import type { PageType } from "@/db/schema";
+
 /** 由标题生成 slug：保留字母/数字/CJK，空格转连字符，其余标点删除。 */
 export function slugify(title: string): string {
   return title
@@ -20,7 +22,7 @@ export function pageKey(slug: string, id: number): string {
 }
 
 /** 规范路径：`/<type>/<slug>-<id>`。 */
-export function pagePath(type: string, slug: string, id: number): string {
+export function pagePath(type: PageType, slug: string, id: number): string {
   return `/${type}/${pageKey(slug, id)}`;
 }
 
@@ -42,4 +44,9 @@ export function decodePageKey(rawKey: string): string {
   } catch {
     return rawKey;
   }
+}
+
+/** 路由参数（可能编码）→ 页面 id；非法返回 null。generateMetadata / 页面组件共用。 */
+export function pageIdFromKey(rawKey: string): number | null {
+  return parsePageKey(decodePageKey(rawKey));
 }

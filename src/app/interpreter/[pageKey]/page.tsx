@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 
 import { Infobox } from "@/components/wiki-content";
 import { getInterpreterDetail, listPerspectivesOfInterpreter } from "@/lib/content";
-import { decodePageKey, pagePath, parsePageKey } from "@/lib/slug";
+import { formatYears } from "@/lib/format";
+import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ pageKey: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const id = parsePageKey(decodePageKey((await params).pageKey));
+  const id = pageIdFromKey((await params).pageKey);
   if (!id) return {};
   const interpreter = await getInterpreterDetail(id);
   return interpreter
@@ -91,9 +92,7 @@ export default async function InterpreterPage({ params }: Params) {
                 label: "生卒",
                 content: interpreter.isBoard
                   ? "—"
-                  : (interpreter.birthYear ?? interpreter.deathYear)
-                    ? `${interpreter.birthYear ?? "?"}–${interpreter.deathYear ?? "?"}`
-                    : "—",
+                  : formatYears(interpreter.birthYear, interpreter.deathYear),
               },
               { label: "视角", content: `${perspectives.length} 个` },
             ]}
