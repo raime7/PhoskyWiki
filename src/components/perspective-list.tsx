@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { PinControl } from "@/components/pin-control";
+
 export interface PerspectiveListProps {
   items: {
     pageId: number;
@@ -14,12 +16,14 @@ export interface PerspectiveListProps {
     pinned?: boolean;
     linkCount: number;
   }[];
+  /** 管理员登录时渲染每条的置顶开关（T04 置顶 × T05 角色） */
+  isAdmin?: boolean;
 }
 
 // 词条页视角列表默认露出条数（spec：默认露 5~8 条 + 展开全部）
 const DEFAULT_VISIBLE = 5;
 
-export function PerspectiveList({ items }: PerspectiveListProps) {
+export function PerspectiveList({ items, isAdmin }: PerspectiveListProps) {
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? items : items.slice(0, DEFAULT_VISIBLE);
   const hiddenCount = Math.max(0, items.length - DEFAULT_VISIBLE);
@@ -47,12 +51,15 @@ export function PerspectiveList({ items }: PerspectiveListProps) {
                 </Link>
               </span>
             </div>
-            <span
-              className="shrink-0 text-xs text-muted-foreground"
-              title="被站内双链引用的次数"
-            >
-              {item.linkCount} 次引用
-            </span>
+            <div className="flex shrink-0 items-center gap-3">
+              <span
+                className="text-xs text-muted-foreground"
+                title="被站内双链引用的次数"
+              >
+                {item.linkCount} 次引用
+              </span>
+              {isAdmin && <PinControl pageId={item.pageId} pinned={!!item.pinned} />}
+            </div>
           </li>
         ))}
       </ul>

@@ -1,5 +1,5 @@
 // 管理员置顶/取消置顶视角（T04）：POST = 置顶，DELETE = 取消，幂等。
-// 准入见 requireAdmin（T05 接入会话角色前的停摆方案）。
+// 准入见 requireAdmin（T05 会话角色：登录且 admin）。
 
 import { requireAdmin } from "@/lib/admin-auth";
 import { setPerspectivePinned } from "@/lib/pinning";
@@ -9,7 +9,7 @@ interface PinRouteContext {
 }
 
 async function handle(req: Request, ctx: PinRouteContext, pinned: boolean) {
-  const denied = requireAdmin(req);
+  const denied = await requireAdmin(req);
   if (denied) return denied;
 
   const pageId = Number((await ctx.params).pageId);

@@ -57,8 +57,9 @@ export async function listTerms(): Promise<
       slug: pages.slug,
       summary: terms.summary,
       perspectiveCount: sql<number>`(
-        select count(*) from ${perspectives}
-        where ${perspectives.termId} = ${pages.id}
+        select count(*) from ${perspectives} pc
+        join ${pages} pcPage on pcPage.id = pc.page_id
+        where pc.term_id = ${pages.id} and pcPage.deleted_at is null
       )`.mapWith(Number),
     })
     .from(pages)
@@ -108,12 +109,16 @@ export async function listPerspectivesOfTerm(
 ): Promise<PerspectiveListItem[]> {
   const db = getDb();
   const interpreterPages = alias(pages, "interpreter_pages");
+  const sourcePages = alias(pages, "source_pages");
+  // 热度 = 在线引用方的双链数（软删除的引用方不加热，与反链面板同一口径）
   const linkCounts = db
     .select({
       targetPageId: links.targetPageId,
       count: sql<number>`count(*)`.mapWith(Number).as("count"),
     })
     .from(links)
+    .innerJoin(sourcePages, eq(sourcePages.id, links.sourcePageId))
+    .where(isNull(sourcePages.deletedAt))
     .groupBy(links.targetPageId)
     .as("link_counts");
 
@@ -356,8 +361,9 @@ async function listDisambiguationMembers(base: string): Promise<DisambiguationMe
       slug: pages.slug,
       summary: terms.summary,
       perspectiveCount: sql<number>`(
-        select count(*) from ${perspectives}
-        where ${perspectives.termId} = ${pages.id}
+        select count(*) from ${perspectives} pc
+        join ${pages} pcPage on pcPage.id = pc.page_id
+        where pc.term_id = ${pages.id} and pcPage.deleted_at is null
       )`.mapWith(Number),
     })
     .from(pages)

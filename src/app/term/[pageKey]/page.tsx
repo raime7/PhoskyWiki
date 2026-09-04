@@ -18,6 +18,7 @@ import { categoryPath } from "@/lib/categories";
 import { renderMarkdown, wikiLinkResolver } from "@/lib/markdown";
 import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
+import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -35,12 +36,14 @@ export default async function TermPage({ params }: Params) {
   const term = await getTermDetail(page.id);
   if (!term) notFound();
 
-  const [perspectives, categories, backlinks, disambiguation] = await Promise.all([
-    listPerspectivesOfTerm(page.id),
-    listCategoriesOfTerm(page.id),
-    listBacklinks(page.id),
-    getTermDisambiguation(term.title),
-  ]);
+  const [perspectives, categories, backlinks, disambiguation, sessionUser] =
+    await Promise.all([
+      listPerspectivesOfTerm(page.id),
+      listCategoriesOfTerm(page.id),
+      listBacklinks(page.id),
+      getTermDisambiguation(term.title),
+      getSessionUser(),
+    ]);
   const board = perspectives.find((p) => p.isBoard);
   const others = perspectives.filter((p) => !p.isBoard);
   const [boardContent, boardTargets] = board
@@ -105,6 +108,7 @@ export default async function TermPage({ params }: Params) {
             </h2>
             {others.length > 0 ? (
               <PerspectiveList
+                isAdmin={sessionUser?.role === "admin"}
                 items={others.map((p) => ({
                   pageId: p.pageId,
                   title: p.title,
