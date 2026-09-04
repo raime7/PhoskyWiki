@@ -7,11 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-
-type ReviewOutcome =
-  | { outcome: "pending"; approveCount: number; quorum: number }
-  | { outcome: "approved" }
-  | { outcome: "rejected"; staleBase: boolean; message: string };
+import type { ReviewOutcome } from "@/lib/review-types";
 
 export function ReviewActions({ submissionId }: { submissionId: number }) {
   const router = useRouter();

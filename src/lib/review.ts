@@ -10,12 +10,10 @@
 import "server-only";
 
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
 
 import { getDb, type Db } from "@/db";
 import {
   interpreters,
-  links,
   pages,
   perspectives,
   revisions,
@@ -30,8 +28,11 @@ import type {
   SubmissionStatus,
   UserRole,
 } from "@/db/schema";
+import { rebuildPageLinks } from "@/lib/page-links";
 import { pagePath, slugify as slugifyTitle } from "@/lib/slug";
-import { parseWikiLinks, wikiLinkKey, type ParsedWikiLink } from "@/lib/wiki-links";
+import type { CreateSubmissionResult, ReviewOutcome } from "@/lib/review-types";
+
+export type { CreateSubmissionResult, ReviewOutcome } from "@/lib/review-types";
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type DbOrTx = Db | Tx;
@@ -58,6 +59,23 @@ export function isUniqueViolation(err: unknown): boolean {
   return candidates.some((candidate) =>
     (candidate as { code?: string } | undefined)?.code?.startsWith("23505"),
   );
+}
+
+/**
+ * 两个审核路由共用的错误映射。返回 null = 不是审核域的已知错误（向上抛）。
+ * ReviewError → 其状态码；唯一索引冲突（并发抢先创建）→ 409。
+ */
+export function reviewErrorResponse(err: unknown): Response | null {
+  if (err instanceof ReviewError) {
+    return Response.json({ error: err.message }, { status: err.status });
+  }
+  if (isUniqueViolation(err)) {
+    return Response.json(
+      { error: "提议的目标已存在（可能被其他提交抢先创建），请驳回该提交" },
+      { status: 409 },
+    );
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,10 +112,6 @@ interface ValidatedSubmission {
   baseRevisionId: number | null;
   supersedes: number | null;
 }
-
-export type CreateSubmissionResult =
-  | { outcome: "pending"; submissionId: number; quorum: number }
-  | { outcome: "direct"; pageId: number; href: string };
 
 function requiredInt(value: unknown, error: string): number {
   const n = typeof value === "number" ? value : Number(value);
@@ -314,11 +328,6 @@ export async function createSubmission(
 // 受理 / 驳回（状态机转移）
 // ---------------------------------------------------------------------------
 
-export type ReviewOutcome =
-  | { outcome: "pending"; approveCount: number; quorum: number }
-  | { outcome: "approved" }
-  | { outcome: "rejected"; staleBase: boolean; message: string };
-
 /** 页面当前 head 修订 id；无修订返回 null。 */
 async function headRevisionId(db: DbOrTx, pageId: number): Promise<number | null> {
   const [row] = await db
@@ -383,6 +392,8 @@ export async function reviewSubmission(
     if (existingVote) throw new ReviewError(409, "已对该提交投过票");
 
     if (action === "reject") {
+      // 驳回不做「不能审自己」限制：提交者晋升为管理员后驳回自己的旧提交
+      // 等价于撤回——那恰恰是唯一能终结名下悬挂提交的出口（之后可重提/直编）。
       const trimmed = reason?.trim() ?? "";
       if (!trimmed) throw new ReviewError(400, "驳回必须填写理由");
       await tx.insert(submissionVotes).values({
@@ -533,73 +544,6 @@ async function applySubmission(
       return { pageId: page.id };
     }
   }
-}
-
-/**
- * 重建一页的全部双链（保存时解析，ADR-0003 #4）：
- * 先清旧链，再按新正文解析落库——默认链接落词条枢纽（无同名词条时落消歧义页），
- * 显式视角链接按「词条 × 诠释者」定位视角页；未命中留名称快照即红链。
- */
-export async function rebuildPageLinks(
-  tx: Tx,
-  pageId: number,
-  content: string,
-): Promise<void> {
-  const refs = parseWikiLinks(content);
-  await tx.delete(links).where(eq(links.sourcePageId, pageId));
-  if (refs.length === 0) return;
-
-  const targetIds = await Promise.all(refs.map((ref) => resolveLinkTarget(tx, ref)));
-  await tx.insert(links).values(
-    refs.map((ref, index) => ({
-      sourcePageId: pageId,
-      targetPageId: targetIds[index],
-      targetName: wikiLinkKey(ref),
-    })),
-  );
-}
-
-async function resolveLinkTarget(
-  tx: Tx,
-  ref: ParsedWikiLink,
-): Promise<number | null> {
-  if (ref.interpreter === null) {
-    // 精确同名词条优先（主词条），否则消歧义页（同名多义的分流入口）
-    const [row] = await tx
-      .select({ id: pages.id })
-      .from(pages)
-      .where(
-        and(
-          eq(pages.title, ref.term),
-          isNull(pages.deletedAt),
-          inArray(pages.type, ["term", "disambiguation"]),
-        ),
-      )
-      .orderBy(desc(sql`${pages.type} = 'term'`))
-      .limit(1);
-    return row?.id ?? null;
-  }
-
-  const termPage = alias(pages, "link_term_page");
-  const interpreterPage = alias(pages, "link_interpreter_page");
-  const perspectivePage = alias(pages, "link_perspective_page");
-  const [row] = await tx
-    .select({ id: perspectives.pageId })
-    .from(perspectives)
-    .innerJoin(termPage, eq(termPage.id, perspectives.termId))
-    .innerJoin(interpreterPage, eq(interpreterPage.id, perspectives.interpreterId))
-    .innerJoin(perspectivePage, eq(perspectivePage.id, perspectives.pageId))
-    .where(
-      and(
-        eq(termPage.title, ref.term),
-        eq(interpreterPage.title, ref.interpreter),
-        isNull(termPage.deletedAt),
-        isNull(interpreterPage.deletedAt),
-        isNull(perspectivePage.deletedAt),
-      ),
-    )
-    .limit(1);
-  return row?.id ?? null;
 }
 
 // ---------------------------------------------------------------------------

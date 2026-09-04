@@ -10,14 +10,20 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { CreateSubmissionResult } from "@/lib/review-types";
 
-type CreateResult =
-  | { outcome: "pending"; submissionId: number; quorum: number }
-  | { outcome: "direct"; pageId: number; href: string };
-
-interface Option {
+type Option = {
   id: number;
   label: string;
+};
+
+/**
+ * 正文字段的本地草稿：与它所基于的页面修订绑定（ADR-0004 #6 草稿在客户端；
+ * base 前进后旧草稿不可信——恢复前校验 base 一致，弃用过期草稿）。
+ */
+interface ContentDraft {
+  content: string;
+  baseRevisionId: number | null;
 }
 
 export type SubmissionFormProps =
@@ -62,29 +68,45 @@ export function SubmissionForm(props: SubmissionFormProps) {
   const [interpreterId, setInterpreterId] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<CreateResult | null>(null);
+  const [result, setResult] = useState<CreateSubmissionResult | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const initialContent = variant === "edit" ? props.initialContent : null;
+  // 草稿基于的修订：编辑 = 表单加载时的 head；新建视角无修订概念，恒 null
+  const draftBase = variant === "edit" ? props.baseRevisionId : null;
 
-  // 恢复本地草稿（比首屏内容新即覆盖）：延后到 hydration 之后，render 期不读
-  // localStorage，服务端与客户端首帧渲染保持一致
+  // 恢复本地草稿：延后到 hydration 之后（render 期不读 localStorage）；
+  // 只在与当前 base 同源时可信，页面已前进则弃用
   useEffect(() => {
     if (!draftKey) return;
-    const saved = window.localStorage.getItem(draftKey);
-    if (!saved) return;
-    const timer = setTimeout(() => setContent(saved), 0);
+    const raw = window.localStorage.getItem(draftKey);
+    if (!raw) return;
+    let draft: ContentDraft | null = null;
+    try {
+      draft = JSON.parse(raw) as ContentDraft;
+    } catch {
+      draft = null;
+    }
+    if (!draft || typeof draft.content !== "string") return;
+    if (draft.baseRevisionId !== draftBase) {
+      window.localStorage.removeItem(draftKey);
+      return;
+    }
+    const timer = setTimeout(() => setContent(draft!.content), 0);
     return () => clearTimeout(timer);
-  }, [draftKey]);
+  }, [draftKey, draftBase]);
 
   // 自动保存草稿（防抖 500ms；提交成功后停笔）
   useEffect(() => {
     if (!draftKey || result || content === initialContent) return;
     const timer = setTimeout(() => {
-      window.localStorage.setItem(draftKey, content);
+      window.localStorage.setItem(
+        draftKey,
+        JSON.stringify({ content, baseRevisionId: draftBase } satisfies ContentDraft),
+      );
       setDraftSavedAt(new Date().toLocaleTimeString());
     }, 500);
     return () => clearTimeout(timer);
-  }, [content, draftKey, result, initialContent]);
+  }, [content, draftKey, draftBase, result, initialContent]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -114,7 +136,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
       body: JSON.stringify(payload),
     });
     const data = (await res.json().catch(() => null)) as
-      | (CreateResult & { error?: string })
+      | (CreateSubmissionResult & { error?: string })
       | null;
     setPending(false);
     if (!res.ok || !data || (data.outcome !== "pending" && data.outcome !== "direct")) {

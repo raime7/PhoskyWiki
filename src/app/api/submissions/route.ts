@@ -4,7 +4,7 @@
 import { auth } from "@/lib/auth";
 import {
   createSubmission,
-  isUniqueViolation,
+  reviewErrorResponse,
   ReviewError,
   type SubmissionInput,
 } from "@/lib/review";
@@ -17,22 +17,25 @@ function parseSubmissionInput(body: Record<string, unknown>): SubmissionInput {
   if (typeof kind !== "string" || !KINDS.includes(kind as SubmissionKind)) {
     throw new ReviewError(400, "非法的提交类型");
   }
-  const optionalInt = (value: unknown): number | undefined =>
-    value === undefined || value === null || value === ""
-      ? undefined
-      : Number.isSafeInteger(Number(value)) && Number(value) > 0
-        ? Number(value)
-        : -1; // 走 requiredInt 的报错路径
+  // 可省的数值字段：缺席为 undefined（走领域层的必填校验），在场则必须是正整数
+  const optionalInt = (value: unknown, field: string): number | undefined => {
+    if (value === undefined || value === null || value === "") return undefined;
+    const n = Number(value);
+    if (!Number.isSafeInteger(n) || n <= 0) {
+      throw new ReviewError(400, `${field} 必须是正整数`);
+    }
+    return n;
+  };
   return {
     kind: kind as SubmissionKind,
-    pageId: optionalInt(body.pageId),
+    pageId: optionalInt(body.pageId, "pageId"),
     content: typeof body.content === "string" ? body.content : undefined,
     title: typeof body.title === "string" ? body.title : undefined,
     summary: typeof body.summary === "string" ? body.summary : undefined,
-    termId: optionalInt(body.termId),
-    interpreterId: optionalInt(body.interpreterId),
-    baseRevisionId: optionalInt(body.baseRevisionId),
-    supersedes: optionalInt(body.supersedes),
+    termId: optionalInt(body.termId, "termId"),
+    interpreterId: optionalInt(body.interpreterId, "interpreterId"),
+    baseRevisionId: optionalInt(body.baseRevisionId, "baseRevisionId"),
+    supersedes: optionalInt(body.supersedes, "supersedes"),
   };
 }
 
@@ -60,16 +63,8 @@ export async function POST(req: Request) {
     });
     return Response.json(result, { status: 201 });
   } catch (err) {
-    if (err instanceof ReviewError) {
-      return Response.json({ error: err.message }, { status: err.status });
-    }
-    // 提交期预检与受理期应用之间被并发抢先（同名词典/同对视角）——唯一索引兜底
-    if (isUniqueViolation(err)) {
-      return Response.json(
-        { error: "提议的目标已存在（可能被其他提交抢先创建），请驳回该提交" },
-        { status: 409 },
-      );
-    }
+    const mapped = reviewErrorResponse(err);
+    if (mapped) return mapped;
     throw err;
   }
 }
