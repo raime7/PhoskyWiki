@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -131,4 +133,15 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Markdown 渲染器输出的 wiki-link（src/lib/markdown.ts）。
+   普通双链沿用 prose 的链接样式，仅补充下划线偏移；红链是 MediaWiki 式的缺口标记。 */
+.wiki-content .wiki-link {
+  @apply underline decoration-foreground/30 underline-offset-4;
+}
+
+.wiki-content .wiki-link--red {
+  @apply cursor-help text-red-700 no-underline dark:text-red-400;
+  border-bottom: 1px dashed currentColor;
 }

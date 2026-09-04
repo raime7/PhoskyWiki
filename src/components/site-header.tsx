@@ -1,8 +1,8 @@
 import Link from "next/link";
 
-// TODO(T02+): 三轴导航的真实路由（词条 / 诠释者 / 学派）落地后替换占位链接
+// TODO(T03+): 诠释者 / 学派的列表页落地后替换占位链接；词条暂以首页词条列表为入口
 const navItems = [
-  { href: "/", label: "词条" },
+  { href: "/#terms", label: "词条" },
   { href: "/", label: "诠释者" },
   { href: "/", label: "学派" },
 ];

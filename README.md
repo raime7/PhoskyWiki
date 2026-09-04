@@ -19,15 +19,18 @@ cp .env.example .env
 pnpm install
 pnpm db:migrate
 
-# 4. 启动应用
+# 4. 灌入演示内容（词条 / 诠释者 / 视角种子，幂等重灌）
+pnpm db:seed
+
+# 5. 启动应用
 pnpm dev            # http://localhost:3000
 ```
 
 ## 测试
 
 ```bash
-pnpm test           # Vitest：单元 + 集成（集成测试连真实 PG，需先 docker compose up）
-pnpm test:e2e       # Playwright：真实浏览器（自动起 dev server，已有则复用）
+pnpm test           # Vitest：单元 + 集成（集成测试连真实 PG，需先 docker compose up；内容集成测试自灌种子）
+pnpm test:e2e       # Playwright：真实浏览器（自动起 dev server，已有则复用；依赖 pnpm db:seed 的演示内容）
 pnpm lint           # ESLint
 pnpm typecheck      # tsc --noEmit
 ```
@@ -50,3 +53,13 @@ CI（GitHub Actions）在每次 push 时跑 lint + typecheck + Vitest + Playwrig
 |---|---|
 | `pnpm db:generate` | 从 `src/db/schema.ts` 生成迁移（drizzle-kit） |
 | `pnpm db:migrate` | 应用 `drizzle/` 下的迁移到数据库 |
+| `pnpm db:seed` | 清空内容表并重灌演示内容（开发/CI 用，勿在生产跑） |
+
+## 读路径（T02）
+
+游客即可完整浏览，无需登录：
+
+- 词条页 `/<term>/<slug>-<id>`：编委会通俗视角全文置顶，其余视角列表默认露 5 条、可展开全部，右侧信息框；
+- 视角页 `/<perspective>/<slug>-<id>`：Markdown 渲染，正文 `[[词条]]` 双链落词条枢纽，未创建词条渲染为红链（不可点击的缺口标记）；
+- 诠释者页 `/<interpreter>/<slug>-<id>`：信息框（生卒年等）+ 全部视角索引；
+- URL 只认尾随 id：`/<type>/<id>` 与旧 slug 访问都会 307 到规范路径 `/term/主体性-1`，页面改名不断链。
