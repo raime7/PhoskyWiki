@@ -33,6 +33,24 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 30,
     updateAge: 60 * 60 * 24,
   },
+  advanced: {
+    // better-auth 在测试环境默认跳过来源检查（isTest()）——显式关掉跳过，
+    // 让 dev/test/prod 的 CSRF 姿态一致，也让下面的 trustedOrigins 有意义。
+    disableOriginCheck: false,
+  },
+  // dev/test 额外信任任意本地端口：e2e 用 PW_PORT 可把应用起在 3000 之外的
+  // 端口，而 BETTER_AUTH_URL 固定 3000——没有这两条，非 3000 端口登录一律 403。
+  // 生产保持只信 BETTER_AUTH_URL（部署若需多域名用 BETTER_AUTH_TRUSTED_ORIGINS）。
+  ...(process.env.NODE_ENV === "production"
+    ? {}
+    : {
+        trustedOrigins: [
+          "http://localhost:*",
+          "http://127.0.0.1:*",
+          "http://localhost",
+          "http://127.0.0.1",
+        ],
+      }),
 });
 
 export type Session = typeof auth.$Infer.Session;

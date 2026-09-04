@@ -105,6 +105,33 @@ describe("登录（数据库会话）", () => {
   });
 });
 
+describe("来源信任（dev/test 信任任意本地端口）", () => {
+  // e2e 用 PW_PORT 可把应用起在任意本地端口，而 BETTER_AUTH_URL 固定 3000；
+  // 浏览器登录请求带 origin 头，来源检查必须放行本地端口（见 auth.ts trustedOrigins）。
+  it("非 baseURL 端口的 localhost origin 不再 403（走正常错误路径）", async () => {
+    const res = await auth.handler(
+      new Request("http://localhost:3456/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "http://localhost:3456" },
+        body: JSON.stringify({ email: "nobody@example.com", password: "wrong-pass" }),
+      }),
+    );
+    // 来源放行后进入业务路径：凭据无效 → 401（而非 403 INVALID_ORIGIN）
+    expect(res.status).toBe(401);
+  });
+
+  it("陌生外域 origin 仍被拒绝（403）", async () => {
+    const res = await auth.handler(
+      new Request("http://localhost:3000/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://evil.example.com" },
+        body: JSON.stringify({ email: "nobody@example.com", password: "wrong-pass" }),
+      }),
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("种子管理员", () => {
   it("凭环境无关的显式凭据创建 admin，可登录，且重复执行幂等", async () => {
     const email = `t05-admin-${randomUUID()}@example.com`;
