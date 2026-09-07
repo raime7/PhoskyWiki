@@ -33,10 +33,10 @@ function wikiCompletions(catalog: EditorCatalog): CompletionSource {
         apply(editor, completion, from, to) {
           // 在已有双链中补全时保留别名/显式视角，且不重复插入闭括号。
           const tail = editor.state.sliceDoc(to, editor.state.doc.lineAt(to).to);
-          const suffix = tail.match(/^[^[\]|\n]*(?=\]|\|)/)?.[0] ?? "";
-          const end = to + suffix.length;
-          const next = editor.state.sliceDoc(end, end + 2);
-          const closing = next.startsWith("|") || next === "]]" ? "" : next.startsWith("]") ? "]" : "]]";
+          const closedLink = tail.match(/^([^[\]|\n]*)(?:\|[^\[\]\n]*)?\]\]/);
+          const end = to + (closedLink?.[1].length ?? 0);
+          // 普通文本中的 | 不是别名；只有完整双链后缀才保留而不补闭括号。
+          const closing = closedLink ? "" : tail.startsWith("]") ? "]" : "]]";
           editor.dispatch({
             ...insertCompletionText(editor.state, completion.label + closing, from, end),
             annotations: pickedCompletion.of(completion),

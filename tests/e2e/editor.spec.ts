@@ -59,6 +59,19 @@ test("新建视角即时拒绝重复组合，换选后仍可提交审核", async
   await expect(page.getByTestId("submit-success")).toContainText("等待审核");
 });
 
+test("补全闭合新双链并保留后续普通竖线文本", async ({ page }) => {
+  await openNewPerspective(page);
+  const editor = page.getByRole("textbox", { name: "正文（Markdown）" });
+  await editor.fill("| [[主体 | 后续说明 |");
+  await editor.press("ControlOrMeta+Home");
+  for (let i = 0; i < 6; i++) await editor.press("ArrowRight");
+  await editor.press("Control+Space");
+  await page.getByRole("listbox").getByRole("option", { name: "主体性", exact: true }).click();
+  await expect(editor).toHaveText("| [[主体性]] | 后续说明 |");
+  await expect(page.getByRole("region", { name: "实时预览" }).getByRole("link", { name: "主体性" }))
+    .toHaveAttribute("href", /^\/term\//);
+});
+
 test.describe("移动端编辑", () => {
   test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
 
