@@ -291,6 +291,15 @@ export const submissions = pgTable(
   ],
 );
 
+// 一条提交只产生一次终态通知；收件人、结果和理由来自不可变的终态提交。
+export const notifications = pgTable("notifications", {
+  submissionId: integer("submission_id")
+    .primaryKey()
+    .references(() => submissions.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  readAt: timestamp("read_at", { withTimezone: true }),
+});
+
 export const submissionVoteEnum = pgEnum("submission_vote", ["approve", "reject"] as const);
 
 export const submissionVotes = pgTable(

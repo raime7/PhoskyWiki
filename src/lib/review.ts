@@ -14,6 +14,7 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, type Db } from "@/db";
 import {
   interpreters,
+  notifications,
   pages,
   perspectives,
   revisions,
@@ -394,18 +395,18 @@ export async function reviewSubmission(
     if (action === "reject") {
       // 驳回不做「不能审自己」限制：提交者晋升为管理员后驳回自己的旧提交
       // 等价于撤回——那恰恰是唯一能终结名下悬挂提交的出口（之后可重提/直编）。
-      const trimmed = reason?.trim() ?? "";
-      if (!trimmed) throw new ReviewError(400, "驳回必须填写理由");
+      if (!reason?.trim()) throw new ReviewError(400, "驳回必须填写理由");
       await tx.insert(submissionVotes).values({
         submissionId,
         adminId: actor.id,
         vote: "reject",
-        reason: trimmed,
+        reason,
       });
       await tx
         .update(submissions)
-        .set({ status: "rejected", rejectionReason: trimmed, decidedAt: new Date() })
+        .set({ status: "rejected", rejectionReason: reason, decidedAt: new Date() })
         .where(eq(submissions.id, submissionId));
+      await tx.insert(notifications).values({ submissionId });
       return { outcome: "rejected", staleBase: false, message: "已驳回" };
     }
 
@@ -424,6 +425,7 @@ export async function reviewSubmission(
           .update(submissions)
           .set({ status: "rejected", rejectionReason: message, decidedAt: new Date() })
           .where(eq(submissions.id, submissionId));
+        await tx.insert(notifications).values({ submissionId });
         return { outcome: "rejected", staleBase: true, message };
       }
     }
@@ -442,6 +444,7 @@ export async function reviewSubmission(
       .update(submissions)
       .set({ status: "approved", decidedAt: new Date() })
       .where(eq(submissions.id, submissionId));
+    await tx.insert(notifications).values({ submissionId });
     return { outcome: "approved" };
   });
 }

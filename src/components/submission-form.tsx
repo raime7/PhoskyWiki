@@ -157,8 +157,11 @@ export function SubmissionForm(props: SubmissionFormProps) {
           <>
             <p className="font-medium">已提交，等待审核。</p>
             <p className="mt-2 text-muted-foreground">
-              需 {result.quorum} 位管理员受理后生效；结果将在个人主页的提交历史里通知（后续工单）。
+              需 {result.quorum} 位管理员受理后生效；可在个人主页查看提交进度与审核结果。
             </p>
+            <Link href="/profile" className="mt-2 inline-block text-primary underline-offset-4 hover:underline">
+              查看提交历史 →
+            </Link>
           </>
         ) : (
           <>
