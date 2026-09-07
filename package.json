@@ -27,6 +27,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "diff": "8.0.4",
+    "echarts": "^6.1.0",
     "lucide-react": "^1.40.0",
     "meilisearch": "^0.60.0",
     "next": "16.3.4",

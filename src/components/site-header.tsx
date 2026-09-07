@@ -14,6 +14,7 @@ const navItems = [
   { href: "/", label: "诠释者" },
   { href: "/schools", label: "学派" },
   { href: "/categories", label: "分类" },
+  { href: "/graph", label: "图谱" },
   { href: "/search", label: "搜索" },
 ];
 

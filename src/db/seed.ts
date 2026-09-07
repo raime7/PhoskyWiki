@@ -2,6 +2,7 @@
 // T02 验收：≥3 词条、≥3 诠释者、≥4 视角（含编委会通俗视角、跨词条双链、红链）。
 // T03 验收：≥2 学派（成员 + 派生核心词条就位）、分类树（多级 + 词条多挂）。
 // T04 增补：显式视角链接（含红链示例）、消歧义双义示例（「价值」）。
+// T11 增补：seedExtendedContent 扩容至 ≥100 词条/千级图元素（图谱性能验收）。
 //
 // seedDatabase() 幂等：TRUNCATE 全部内容表后按固定顺序重插（serial 因此确定），
 // 集成测试与 e2e 共用这一份 fixture。生产环境不该跑它。
@@ -9,6 +10,7 @@
 import { sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
+import { seedExtendedContent } from "@/db/seed-extended";
 import {
   categories,
   interpreters,
@@ -528,13 +530,19 @@ export async function seedDatabase(): Promise<{
     }
   }
 
+  // T11 扩容：新词条/诠释者/学派 + 生成视角与双链（复用并回填上述解析表）
+  const extended = await seedExtendedContent(db, { titleToPageId, interpreterIds });
+
   return {
-    terms: SEED_TERMS.length,
+    terms: SEED_TERMS.length + extended.terms,
     disambiguations: SEED_DISAMBIGUATIONS.length,
-    interpreters: SEED_INTERPRETERS.length,
-    schools: SEED_SCHOOLS.length,
-    perspectives: SEED_PERSPECTIVES.length,
-    categories: SEED_CATEGORIES.length,
-    links: { resolved: resolvedLinks, red: redLinks },
+    interpreters: SEED_INTERPRETERS.length + extended.interpreters,
+    schools: SEED_SCHOOLS.length + extended.schools,
+    perspectives: SEED_PERSPECTIVES.length + extended.perspectives,
+    categories: SEED_CATEGORIES.length + extended.categories,
+    links: {
+      resolved: resolvedLinks + extended.links.resolved,
+      red: redLinks + extended.links.red,
+    },
   };
 }

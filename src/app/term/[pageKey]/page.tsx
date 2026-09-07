@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 
 import { BacklinkPanel } from "@/components/backlink-panel";
 import { Infobox, InfoboxLinks, WikiContent } from "@/components/wiki-content";
+import { LocalGraph } from "@/components/local-graph";
 import { PerspectiveList } from "@/components/perspective-list";
 import {
   getTermDetail,
@@ -16,6 +17,7 @@ import {
   listPerspectivesOfTerm,
 } from "@/lib/content";
 import { categoryPath } from "@/lib/categories";
+import { getLocalGraph } from "@/lib/graph";
 import { renderMarkdown, wikiLinkResolver } from "@/lib/markdown";
 import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
@@ -37,13 +39,14 @@ export default async function TermPage({ params }: Params) {
   const term = await getTermDetail(page.id);
   if (!term) notFound();
 
-  const [perspectives, categories, backlinks, disambiguation, sessionUser] =
+  const [perspectives, categories, backlinks, disambiguation, sessionUser, localGraph] =
     await Promise.all([
       listPerspectivesOfTerm(page.id),
       listCategoriesOfTerm(page.id),
       listBacklinks(page.id),
       getTermDisambiguation(term.title),
       getSessionUser(),
+      getLocalGraph(page.id, 1),
     ]);
   const board = perspectives.find((p) => p.isBoard);
   const others = perspectives.filter((p) => !p.isBoard);
@@ -143,6 +146,10 @@ export default async function TermPage({ params }: Params) {
           </section>
 
           <BacklinkPanel items={backlinks} />
+
+          {localGraph && (
+            <LocalGraph termId={page.id} termTitle={term.title} initialData={localGraph} />
+          )}
         </div>
 
         <div className="shrink-0 lg:w-64">

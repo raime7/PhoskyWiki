@@ -11,6 +11,9 @@ export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 30_000,
   fullyParallel: true,
+  // 本地 dev server（按需编译）扛不住多 worker 并发首编译，T11 种子扩容后尤甚；
+  // CI 走产物服务器，保持默认并行
+  workers: process.env.CI ? undefined : 2,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
