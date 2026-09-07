@@ -1,10 +1,10 @@
-// 新建视角（T06）：选词条 × 诠释者 + textarea 正文，提交进审核队列。
+// 新建视角：选词条 × 诠释者，编辑正文后提交进审核队列。
 // 入口在词条页（「撰写视角」，带 term 预选）。
 
 import Link from "next/link";
 
 import { SubmissionForm } from "@/components/submission-form";
-import { listInterpreters, listTerms } from "@/lib/content";
+import { listInterpreters, listPerspectivePairs, listTerms } from "@/lib/content";
 import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,9 @@ export default async function NewPerspectivePage({ searchParams }: Params) {
     );
   }
 
-  const [terms, interpreters] = await Promise.all([listTerms(), listInterpreters()]);
+  const [terms, interpreters, existingPerspectives] = await Promise.all([
+    listTerms(), listInterpreters(), listPerspectivePairs(),
+  ]);
   const termParam = Number((await searchParams).term);
   const presetTermId =
     Number.isSafeInteger(termParam) && terms.some((term) => term.id === termParam)
@@ -72,6 +74,7 @@ export default async function NewPerspectivePage({ searchParams }: Params) {
             .filter((interpreter) => !interpreter.isBoard)
             .map((interpreter) => ({ id: interpreter.pageId, label: interpreter.name }))}
           presetTermId={presetTermId}
+          existingPerspectives={existingPerspectives}
         />
       </div>
     </main>

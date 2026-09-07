@@ -171,8 +171,8 @@ test("页面后续修订不改变我的提交差异，起始修订过期的自�
   });
 
   await page.goto(`/edit/${perspective.pageId}`);
-  await expect(page.getByTestId("content-textarea")).toHaveValue(original);
-  await page.getByTestId("content-textarea").fill(proposed);
+  await expect(page.getByRole("textbox", { name: "正文（Markdown）" })).toHaveText(original);
+  await page.getByRole("textbox", { name: "正文（Markdown）" }).fill(proposed);
   const submittedResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/submissions") && response.request().method() === "POST",
   );

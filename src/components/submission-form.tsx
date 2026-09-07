@@ -1,7 +1,6 @@
 "use client";
 
-// 提交表单（T06）：编者用 textarea 把编辑/新建提议送入审核队列。
-// 编辑器体验（CodeMirror + 实时预览 + 双链补全）是后续工单，这里刻意保持素 textarea。
+// 编辑/新建提议经同一审核流提交；正文使用 CodeMirror 编辑器。
 // 草稿在客户端 localStorage 自动保存（ADR-0004 #6：服务端只见 pending）；
 // 管理员提交不经审核直接生效（ADR-0004 #9）。
 
@@ -10,6 +9,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MarkdownEditor } from "@/components/markdown-editor";
 import type { CreateSubmissionResult } from "@/lib/review-types";
 
 type Option = {
@@ -42,10 +42,8 @@ export type SubmissionFormProps =
       terms: Option[];
       interpreters: Option[];
       presetTermId: number | null;
+      existingPerspectives: { termId: number; interpreterId: number }[];
     };
-
-const TEXTAREA_CLASS =
-  "flex min-h-80 w-full resize-y rounded-md border border-border bg-background px-3 py-2 font-mono text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export function SubmissionForm(props: SubmissionFormProps) {
   const { variant, isAdmin } = props;
@@ -66,6 +64,9 @@ export function SubmissionForm(props: SubmissionFormProps) {
     variant === "new_perspective" ? (props.presetTermId ?? "") : "",
   );
   const [interpreterId, setInterpreterId] = useState("");
+  const duplicatePerspective = variant === "new_perspective" && props.existingPerspectives.some(
+    (pair) => pair.termId === Number(termId) && pair.interpreterId === Number(interpreterId),
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CreateSubmissionResult | null>(null);
@@ -110,6 +111,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (duplicatePerspective) return;
     setPending(true);
     setError(null);
     const payload =
@@ -188,7 +190,9 @@ export function SubmissionForm(props: SubmissionFormProps) {
               name="term"
               required
               value={termId}
-              onChange={(e) => setTermId(e.target.value)}
+              onChange={(e) => { setTermId(e.target.value); setError(null); }}
+              aria-invalid={duplicatePerspective}
+              aria-describedby={duplicatePerspective ? "perspective-conflict" : undefined}
               className="h-9 rounded-md border border-border bg-background px-3 text-sm font-normal outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <option value="">选择词条…</option>
@@ -205,7 +209,9 @@ export function SubmissionForm(props: SubmissionFormProps) {
               name="interpreter"
               required
               value={interpreterId}
-              onChange={(e) => setInterpreterId(e.target.value)}
+              onChange={(e) => { setInterpreterId(e.target.value); setError(null); }}
+              aria-invalid={duplicatePerspective}
+              aria-describedby={duplicatePerspective ? "perspective-conflict" : undefined}
               className="h-9 rounded-md border border-border bg-background px-3 text-sm font-normal outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <option value="">选择诠释者…</option>
@@ -219,6 +225,11 @@ export function SubmissionForm(props: SubmissionFormProps) {
           <p className="text-xs text-muted-foreground">
             视角标题按「诠释者论词条」自动生成（如「德勒兹论主体性」）。
           </p>
+          {duplicatePerspective && (
+            <p id="perspective-conflict" role="alert" className="text-sm text-destructive">
+              该诠释者在此词条下已有视角，请编辑已有视角；若已删除，请联系管理员恢复。
+            </p>
+          )}
         </>
       )}
 
@@ -254,18 +265,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
       )}
 
       {(variant === "edit" || variant === "new_perspective") && (
-        <label className="flex flex-col gap-2 text-sm font-medium">
-          正文（Markdown）
-          <textarea
-            name="content"
-            required
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className={TEXTAREA_CLASS}
-            placeholder="支持双链：[[词条名]] 落词条枢纽；[[词条名|视角@诠释者]] 直落具体视角。"
-            data-testid="content-textarea"
-          />
-        </label>
+        <MarkdownEditor value={content} onChange={setContent} />
       )}
 
       {error && (
@@ -274,8 +274,8 @@ export function SubmissionForm(props: SubmissionFormProps) {
         </p>
       )}
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" size="lg" disabled={pending}>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" size="lg" disabled={pending || duplicatePerspective}>
           {pending ? "提交中…" : isAdmin ? "提交（直接生效）" : "提交审核"}
         </Button>
         {draftKey && draftSavedAt && !pending && (

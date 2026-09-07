@@ -70,6 +70,11 @@ export async function listTerms(): Promise<
     .orderBy(asc(pages.id));
 }
 
+/** 新建视角表单的占位组合；软删除视角仍受唯一约束，需恢复而非重建。 */
+export async function listPerspectivePairs() {
+  return getDb().select({ termId: perspectives.termId, interpreterId: perspectives.interpreterId }).from(perspectives);
+}
+
 /** 词条详情（信息框用）。 */
 export async function getTermDetail(id: number) {
   const [row] = await getDb()

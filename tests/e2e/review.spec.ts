@@ -63,9 +63,10 @@ test("编者提交 → 管理员受理 → 游客可见新内容", async ({ page
     page.getByRole("heading", { level: 1, name: "编辑：编委会论主体性" }),
   ).toBeVisible();
 
-  const textarea = page.getByTestId("content-textarea");
-  const original = await textarea.inputValue();
-  await textarea.fill(`${original}\n\n${marker}。`);
+  const editor = page.getByRole("textbox", { name: "正文（Markdown）" });
+  await editor.press("ControlOrMeta+End");
+  await editor.press("Enter");
+  await editor.pressSequentially(`${marker}。`);
   await page.getByRole("button", { name: "提交审核" }).click();
   await expect(page.getByTestId("submit-success")).toContainText("等待审核");
 
@@ -113,9 +114,10 @@ test("驳回必填理由：不填无法提交驳回", async ({ page }) => {
   const marker = `待驳回标记 ${Date.now()}`;
   await openLacanPerspective(page);
   await page.getByRole("link", { name: "编辑", exact: true }).click();
-  const textarea = page.getByTestId("content-textarea");
-  const original = await textarea.inputValue();
-  await textarea.fill(`${original}\n\n${marker}。`);
+  const editor = page.getByRole("textbox", { name: "正文（Markdown）" });
+  await editor.press("ControlOrMeta+End");
+  await editor.press("Enter");
+  await editor.pressSequentially(`${marker}。`);
   await page.getByRole("button", { name: "提交审核" }).click();
   await expect(page.getByTestId("submit-success")).toContainText("等待审核");
 
