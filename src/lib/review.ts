@@ -4,8 +4,8 @@
 //   - pending → approved/rejected 均终态；任一驳回即 rejected；修改重提 = 新建提交；
 //   - quorum = min(2, 提交创建时管理员数)，其后管理员人数变化不追溯；
 //   - 受理时页面 head ≠ base → 该票无法通过，自动驳回并提示基于新版重新提交；
-//   - 管理员本人提交跳过排队与投票，与受理路径共用「产生修订 → 重建 links」管线
-//     （搜索索引同步随 T10 的 SearchIndex 接口挂进同一管线）。
+//   - 管理员本人提交跳过排队与投票，与受理路径共用「产生修订 → 重建 links → 同步索引」
+//     管线（搜索索引同步见 lib/search/search-sync，ADR-0004 #9）。
 
 import "server-only";
 
@@ -30,6 +30,7 @@ import type {
   UserRole,
 } from "@/db/schema";
 import { rebuildPageLinks } from "@/lib/page-links";
+import { queueSearchSync, transactionWithSearchSync } from "@/lib/search/search-sync";
 import { pagePath, slugify as slugifyTitle } from "@/lib/slug";
 import type { CreateSubmissionResult, ReviewOutcome } from "@/lib/review-types";
 
@@ -286,7 +287,7 @@ export async function createSubmission(
   const validated = await validateSubmissionInput(db, input);
 
   if (actor.role === "admin") {
-    const applied = await db.transaction(async (tx) =>
+    const applied = await transactionWithSearchSync(db, (tx) =>
       applySubmission(tx, { ...validated, submittedBy: actor.id }),
     );
     const [page] = await db
@@ -367,7 +368,7 @@ export async function reviewSubmission(
   if (actor.role !== "admin") throw new ReviewError(403, "需要管理员角色");
   const db = getDb();
 
-  return db.transaction(async (tx) => {
+  return transactionWithSearchSync(db, async (tx) => {
     // 行锁串行化同一提交上的并发投票，杜绝两次凑票双双「成为决定票」
     const [sub] = await tx
       .select()
@@ -473,7 +474,7 @@ export async function lockLivePage(tx: Tx, pageId: number) {
   return page;
 }
 
-/** 产生一个全量修订快照并重建该页 links。返回新修订 id。 */
+/** 产生一个全量修订快照并重建该页 links，登记索引同步（提交后落索引）。返回新修订 id。 */
 export async function applyContentChange(
   tx: Tx,
   pageId: number,
@@ -486,6 +487,7 @@ export async function applyContentChange(
     .returning({ id: revisions.id });
   await rebuildPageLinks(tx, pageId, content);
   await tx.update(pages).set({ updatedAt: new Date() }).where(eq(pages.id, pageId));
+  queueSearchSync(tx, pageId);
   return revision.id;
 }
 
@@ -514,6 +516,7 @@ async function applySubmission(
         })
         .returning({ id: pages.id });
       await tx.insert(terms).values({ pageId: page.id, summary: sub.summary ?? "" });
+      queueSearchSync(tx, page.id);
       return { pageId: page.id };
     }
     case "new_interpreter": {
@@ -529,6 +532,7 @@ async function applySubmission(
       await tx
         .insert(interpreters)
         .values({ pageId: page.id, summary: sub.summary ?? "" });
+      queueSearchSync(tx, page.id);
       return { pageId: page.id };
     }
     case "new_perspective": {

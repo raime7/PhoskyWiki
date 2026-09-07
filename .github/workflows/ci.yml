@@ -11,6 +11,8 @@ jobs:
     env:
       DATABASE_URL: postgres://phosky:phosky@localhost:5432/phoskywiki
       BETTER_AUTH_SECRET: ci-better-auth-secret-0123456789abcdef0123456789abcdef
+      # 契约测试（search-meili.contract.test.ts）打这个真 Meili；主缝测试用 fake 不受影响
+      MEILI_MASTER_KEY: ci-meili-master-key
     services:
       postgres:
         image: postgres:18-alpine
@@ -22,6 +24,18 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U phosky -d phoskywiki"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      meilisearch:
+        image: getmeili/meilisearch:v1.15.0
+        env:
+          MEILI_ENV: development
+          MEILI_MASTER_KEY: ci-meili-master-key
+        ports:
+          - 7700:7700
+        options: >-
+          --health-cmd "curl -sf http://localhost:7700/health | grep -q available"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 12

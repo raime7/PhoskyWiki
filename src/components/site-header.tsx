@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { LogoutButton } from "@/components/logout-button";
 import { NotificationLink } from "@/components/notification-link";
+import { SearchBox } from "@/components/search-box";
 import { getUnreadNotificationCount } from "@/lib/notifications";
 import { getSessionUser } from "@/lib/session";
 import type { UserRole } from "@/db/schema";
@@ -13,6 +14,7 @@ const navItems = [
   { href: "/", label: "诠释者" },
   { href: "/schools", label: "学派" },
   { href: "/categories", label: "分类" },
+  { href: "/search", label: "搜索" },
 ];
 
 const roleLabels: Record<UserRole, string> = {
@@ -43,6 +45,9 @@ export async function SiteHeader() {
             </Link>
           ))}
         </nav>
+        <div className="order-last w-full sm:order-none sm:w-64">
+          <SearchBox />
+        </div>
         <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2 text-sm">
           {user ? (
             <>

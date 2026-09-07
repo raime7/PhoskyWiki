@@ -4,6 +4,7 @@ import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pages, revisions } from "@/db/schema";
 import { applyContentChange, lockLivePage, ReviewError, type Actor } from "@/lib/review";
+import { queueSearchSync, transactionWithSearchSync } from "@/lib/search/search-sync";
 import { diffLines } from "@/lib/diff";
 import { rebuildPageLinks } from "@/lib/page-links";
 import { getLivePage } from "@/lib/content";
@@ -41,7 +42,7 @@ export function compareRevisions(history: Awaited<ReturnType<typeof getPageHisto
 
 export async function rollbackPage(pageId: number, revisionId: number, actor: Actor) {
   if (actor.role !== "admin") throw new ReviewError(403, "需要管理员角色");
-  return getDb().transaction(async (tx) => {
+  return transactionWithSearchSync(getDb(), async (tx) => {
     await lockLivePage(tx, pageId);
     const [target] = await tx.select().from(revisions)
       .where(and(eq(revisions.pageId, pageId), eq(revisions.id, revisionId)));
@@ -54,7 +55,7 @@ export async function rollbackPage(pageId: number, revisionId: number, actor: Ac
 /** 只改可见性，不改变 head 或任何既有修订；所有页面类型共用。 */
 export async function setPageDeleted(pageId: number, deleted: boolean, actor: Actor) {
   if (actor.role !== "admin") throw new ReviewError(403, "需要管理员角色");
-  return getDb().transaction(async (tx) => {
+  return transactionWithSearchSync(getDb(), async (tx) => {
     const [page] = await tx.select().from(pages).where(eq(pages.id, pageId)).for("update");
     if (!page) throw new ReviewError(404, "页面不存在");
     if (Boolean(page.deletedAt) === deleted) return { deleted };
@@ -64,7 +65,8 @@ export async function setPageDeleted(pageId: number, deleted: boolean, actor: Ac
       .where(eq(revisions.pageId, pageId)).orderBy(desc(revisions.id)).limit(1);
     // 删除时移除出链，恢复时从保留的 head 重建；入链保留 id，读路径据 deletedAt 显示红链。
     await rebuildPageLinks(tx, pageId, deleted ? "" : head?.content ?? "");
-    // 搜索索引同步同受理管线，随 T10 的 SearchIndex 接口接入。
+    // 删除 → 索引移除；恢复 → 文档重建 upsert（同一同步入口，ADR-0004 #8）
+    queueSearchSync(tx, pageId);
     return { deleted };
   });
 }
