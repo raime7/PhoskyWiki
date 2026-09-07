@@ -21,7 +21,7 @@ export default async function SubmissionDetailPage({ params }: Props) {
   if (!/^[1-9]\d*$/.test(rawId)) notFound();
   const id = Number(rawId);
   if (!Number.isSafeInteger(id) || id > 2_147_483_647) notFound();
-  const submission = await getMySubmission(user.id, id);
+  const submission = await getMySubmission(user.id, id, user.role === "admin");
   if (!submission) notFound();
 
   const proposedText =
@@ -51,9 +51,11 @@ export default async function SubmissionDetailPage({ params }: Props) {
       <section aria-labelledby="submission-diff-heading" className="mt-8">
         <h2 id="submission-diff-heading" className="text-xl font-semibold">提交差异</h2>
         <p className="mt-2 mb-4 text-sm text-muted-foreground">
-          {submission.kind === "edit" ? "对比开始编辑时的修订与本次提案。" : "新建内容以空白为起点对比。"}
+          {submission.baseHidden ? "页面已不可见，历史正文不予展示；下方保留你提交的提案。" : submission.kind === "edit" ? "对比开始编辑时的修订与本次提案。" : "新建内容以空白为起点对比。"}
         </p>
-        <ContentDiff oldText={submission.baseContent ?? ""} newText={proposedText} />
+        {submission.baseHidden
+          ? <pre className="whitespace-pre-wrap break-words rounded bg-muted p-3 text-sm">{proposedText}</pre>
+          : <ContentDiff oldText={submission.baseContent ?? ""} newText={proposedText} />}
       </section>
     </main>
   );

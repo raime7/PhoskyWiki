@@ -2,7 +2,25 @@
 
 import { describe, expect, it } from "vitest";
 
-import { diffLines } from "@/lib/diff";
+import { diffLines, diffInline } from "@/lib/diff";
+
+describe("diffInline", () => {
+  it("长段落的单字改动仍只高亮改动，不退化成整段替换", () => {
+    const prefix = "正文".repeat(1500);
+    expect(diffInline(`${prefix}旧结论`, `${prefix}新结论`)).toEqual([
+      { type: "same", text: prefix }, { type: "del", text: "旧" },
+      { type: "add", text: "新" }, { type: "same", text: "结论" },
+    ]);
+  });
+  it("中文行内只高亮改变的字，保留两处改动间的公共文本与 emoji", () => {
+    expect(diffInline("旧论点😀与旧结论", "新论点😀与新结论")).toEqual([
+      { type: "del", text: "旧" }, { type: "add", text: "新" },
+      { type: "same", text: "论点😀与" },
+      { type: "del", text: "旧" }, { type: "add", text: "新" },
+      { type: "same", text: "结论" },
+    ]);
+  });
+});
 
 function joined(text: string): string {
   return diffLines(text, text)

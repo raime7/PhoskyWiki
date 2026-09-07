@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HistoryLink } from "@/components/history-link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
@@ -59,6 +60,7 @@ export default async function TermPage({ params }: Params) {
         <span className="mx-1.5">/</span>
         <span aria-current="page">{term.title}</span>
       </nav>
+      <HistoryLink pageId={page.id} />
 
       <div className="flex flex-col gap-10 lg:flex-row lg:gap-10">
         <div className="min-w-0 flex-1">

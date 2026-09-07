@@ -43,6 +43,8 @@ export async function getLivePage(id: number): Promise<LivePage | null> {
     .from(pages)
     .where(and(eq(pages.id, id), isNull(pages.deletedAt)))
     .limit(1);
+  // 视角的所属词条或诠释者被删除时，正文、历史及编辑入口采用相同可见性。
+  if (row?.type === "perspective" && !(await getPerspectiveDetail(id))) return null;
   return row ?? null;
 }
 

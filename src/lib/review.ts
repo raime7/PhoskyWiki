@@ -417,6 +417,7 @@ export async function reviewSubmission(
     // 并发防护（ADR-0004 #2）：受理时页面 head ≠ base → 该票无法通过，
     // 自动驳回并提示提交者基于新版重新提交（rebase）。系统驳回不记投票。
     if (sub.kind === "edit") {
+      await lockLivePage(tx, sub.pageId!);
       const headId = await headRevisionId(tx, sub.pageId!);
       if (headId !== sub.baseRevisionId) {
         const message =
@@ -462,17 +463,26 @@ interface AppliableSubmission {
   termId: number | null;
   interpreterId: number | null;
   submittedBy: string;
+  baseRevisionId: number | null;
+}
+
+/** 与回滚、软删除共用页面锁，锁内检查在线状态。 */
+export async function lockLivePage(tx: Tx, pageId: number) {
+  const [page] = await tx.select().from(pages).where(eq(pages.id, pageId)).for("update");
+  if (!page || page.deletedAt) throw new ReviewError(404, "目标页面不存在或已删除");
+  return page;
 }
 
 /** 产生一个全量修订快照并重建该页 links。返回新修订 id。 */
-async function applyContentChange(
+export async function applyContentChange(
   tx: Tx,
   pageId: number,
   content: string,
+  rollbackFromId: number | null = null,
 ): Promise<number> {
   const [revision] = await tx
     .insert(revisions)
-    .values({ pageId, content })
+    .values({ pageId, content, rollbackFromId, createdAt: new Date() })
     .returning({ id: revisions.id });
   await rebuildPageLinks(tx, pageId, content);
   await tx.update(pages).set({ updatedAt: new Date() }).where(eq(pages.id, pageId));
@@ -486,6 +496,10 @@ async function applySubmission(
 ): Promise<{ pageId: number }> {
   switch (sub.kind) {
     case "edit": {
+      await lockLivePage(tx, sub.pageId!);
+      if (await headRevisionId(tx, sub.pageId!) !== sub.baseRevisionId) {
+        throw new ReviewError(409, "页面已有新的修订，请基于当前修订重新编辑");
+      }
       await applyContentChange(tx, sub.pageId!, sub.content);
       return { pageId: sub.pageId! };
     }

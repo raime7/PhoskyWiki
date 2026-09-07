@@ -1,0 +1,2 @@
+ALTER TABLE "revisions" ADD COLUMN "rollback_from_id" integer;--> statement-breakpoint
+ALTER TABLE "revisions" ADD CONSTRAINT "revisions_rollback_from_id_revisions_id_fk" FOREIGN KEY ("rollback_from_id") REFERENCES "public"."revisions"("id") ON DELETE no action ON UPDATE no action;

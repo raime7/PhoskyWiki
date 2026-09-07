@@ -57,6 +57,13 @@
       "when": 1788746710068,
       "tag": "0007_submission_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788749243095,
+      "tag": "0008_revision_rollback_source",
+      "breakpoints": true
     }
   ]
 }

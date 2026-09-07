@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HistoryLink } from "@/components/history-link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
@@ -41,6 +42,7 @@ export default async function DisambiguationPage({ params }: Params) {
         <span className="mx-1.5">/</span>
         <span aria-current="page">{detail.title}（消歧义）</span>
       </nav>
+      <HistoryLink pageId={page.id} />
 
       <article>
         <h1 className="text-3xl font-bold tracking-tight">{detail.title}</h1>

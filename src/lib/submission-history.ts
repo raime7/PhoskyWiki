@@ -5,6 +5,7 @@ import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db";
 import { pages, revisions, submissions, type SubmissionStatus } from "@/db/schema";
+import { getLivePage } from "@/lib/content";
 
 const termPage = alias(pages, "submission_term");
 const interpreterPage = alias(pages, "submission_interpreter");
@@ -37,7 +38,7 @@ export async function listMySubmissions(userId: string, status?: SubmissionStatu
 }
 
 /** 历史差异始终基于提交时的修订；受理或后续编辑不会改变 diff 的旧侧。 */
-export async function getMySubmission(userId: string, id: number) {
+export async function getMySubmission(userId: string, id: number, isAdmin = false) {
   const [item] = await mySubmissions(userId, eq(submissions.id, id)).limit(1);
   if (!item) return null;
   const [proposal] = await getDb()
@@ -46,11 +47,14 @@ export async function getMySubmission(userId: string, id: number) {
       title: submissions.title,
       summary: submissions.summary,
       baseRevisionId: submissions.baseRevisionId,
+      pageId: submissions.pageId,
       baseContent: revisions.content,
     })
     .from(submissions)
     .leftJoin(revisions, eq(revisions.id, submissions.baseRevisionId))
     .where(and(eq(submissions.id, id), eq(submissions.submittedBy, userId)))
     .limit(1);
-  return proposal ? { ...item, ...proposal } : null;
+  if (!proposal) return null;
+  const baseHidden = !isAdmin && proposal.pageId !== null && !(await getLivePage(proposal.pageId));
+  return { ...item, ...proposal, baseHidden, baseContent: baseHidden ? null : proposal.baseContent };
 }

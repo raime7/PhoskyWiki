@@ -191,6 +191,8 @@ export const revisions = pgTable(
       .references(() => pages.id, { onDelete: "cascade" }),
     // Markdown 源文本，全量存储；diff 是展示期产物，不落库（ADR-0004）
     content: text("content").notNull(),
+    // 回滚创建新快照，来源指向同页既有修订（ADR-0004 #7）。
+    rollbackFromId: integer("rollback_from_id").references((): AnyPgColumn => revisions.id),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

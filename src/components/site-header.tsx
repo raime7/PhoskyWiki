@@ -49,6 +49,7 @@ export async function SiteHeader() {
               <ButtonLikeLink href="/new/term">创建词条</ButtonLikeLink>
               <ButtonLikeLink href="/new/interpreter">新诠释者</ButtonLikeLink>
               {user.role === "admin" && <ButtonLikeLink href="/review">审核队列</ButtonLikeLink>}
+              {user.role === "admin" && <ButtonLikeLink href="/admin/deleted">已删除页面</ButtonLikeLink>}
               <NotificationLink key={user.id} initialCount={unreadCount} />
               <Link href="/profile" data-testid="session-user" className="min-w-0 break-words text-muted-foreground hover:text-foreground">
                 {user.name}

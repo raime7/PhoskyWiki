@@ -63,6 +63,14 @@ CI（GitHub Actions）在每次 push 时跑 lint + typecheck + Vitest + Playwrig
 - 端点挂载在 `/api/auth/*`（better-auth 全套路由）；页头右侧展示登录态与登出按钮；
 - 管理员由 `pnpm db:seed` 灌入，凭据走 `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` 环境变量，不进仓库。
 
+## 修订历史与页面恢复（T08）
+
+五种页面均可从「修订历史」进入 `/history/<pageId>`：按时间倒序查看全部快照，选择任意两次修订进行左右对照，删除/新增行及行内改动分别高亮。管理员可回滚到任意历史修订；回滚新增快照并记录来源，原历史不变。
+
+历史页提供软删除操作，页头的「已删除页面」入口用于查看保留的历史与恢复页面。删除后页面及其历史对游客和普通编者不可见；恢复保留原页面 id 和全部修订。回滚、编辑、删除使用同一页面锁协调并发操作。
+
+升级先执行 `pnpm db:migrate`，新增 `revisions.rollback_from_id`。读接口为 `GET /api/pages/<pageId>/history`（可带 `from`、`to`），管理员写接口为 `POST /api/admin/pages/<pageId>`，操作为 `rollback`（带 `revisionId`）、`delete` 或 `restore`。回滚与删除/恢复均更新双链；搜索索引同步与原审核管线一起留待 T10 接入。
+
 ## 个人主页与审核通知（T09）
 
 登录后点击页头的编者名称进入 `/profile`：可按待审核、已受理、已驳回筛选自己的提交，并打开提交详情查看差异。历史差异以提交时的起始修订为基准；新建词条或诠释者展示标题与简介的新增内容。
