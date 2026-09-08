@@ -4,7 +4,7 @@ import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db";
-import { pages, revisions, submissions, type SubmissionStatus } from "@/db/schema";
+import { pages, revisions, submissions, submissionVotes, user, type SubmissionStatus } from "@/db/schema";
 import { getLivePage } from "@/lib/content";
 
 const termPage = alias(pages, "submission_term");
@@ -49,6 +49,10 @@ export async function getMySubmission(userId: string, id: number, isAdmin = fals
       aliases: submissions.aliases,
       baseRevisionId: submissions.baseRevisionId,
       pageId: submissions.pageId,
+      termId: submissions.termId,
+      interpreterId: submissions.interpreterId,
+      supersedesId: submissions.supersedesId,
+      quorum: submissions.quorum,
       baseContent: revisions.content,
       baseSnapshot: revisions.snapshot,
     })
@@ -58,5 +62,6 @@ export async function getMySubmission(userId: string, id: number, isAdmin = fals
     .limit(1);
   if (!proposal) return null;
   const baseHidden = !isAdmin && proposal.pageId !== null && !(await getLivePage(proposal.pageId));
-  return { ...item, ...proposal, baseHidden, baseContent: baseHidden ? null : proposal.baseContent, baseSnapshot: baseHidden ? null : proposal.baseSnapshot };
+  const votes = await getDb().select({ id: submissionVotes.id, vote: submissionVotes.vote, reason: submissionVotes.reason, name: user.name }).from(submissionVotes).innerJoin(user, eq(user.id, submissionVotes.adminId)).where(eq(submissionVotes.submissionId, id)).orderBy(submissionVotes.id);
+  return { ...item, ...proposal, votes, baseHidden, baseContent: baseHidden ? null : proposal.baseContent, baseSnapshot: baseHidden ? null : proposal.baseSnapshot };
 }

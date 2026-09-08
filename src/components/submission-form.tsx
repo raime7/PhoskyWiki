@@ -30,9 +30,14 @@ interface ContentDraft {
   title?: string;
   summary?: string;
   aliases?: string;
+  termId?: string;
+  interpreterId?: string;
 }
 
-export type SubmissionFormProps =
+export type SubmissionFormProps = { resubmission?: {
+  id: number; ownerId: string; reason: string; stale: boolean; unavailable?: string;
+  proposal: { content: string; title: string | null; summary: string | null; aliases: string[]; termId: number | null; interpreterId: number | null };
+} } & (
   | { variant: "edit_term"; isAdmin: boolean; pageId: number; initialMetadata: TermSnapshot; baseRevisionId: number }
   | {
       variant: "edit";
@@ -51,31 +56,34 @@ export type SubmissionFormProps =
       interpreters: Option[];
       presetTermId: number | null;
       existingPerspectives: { termId: number; interpreterId: number }[];
-    };
+    });
 
 export function SubmissionForm(props: SubmissionFormProps) {
   const { variant, isAdmin } = props;
+  const retry = props.resubmission;
   const metadataEdit = variant === "edit_term";
   // 编辑/新视角保存正文；词条向导同时保存信息框。
   const draftKey =
-    variant === "edit" || variant === "edit_term"
+    retry ? `phoskywiki:draft:resubmit:${retry.ownerId}:${retry.id}` : variant === "edit" || variant === "edit_term"
       ? `phoskywiki:draft:${variant}:${props.pageId}`
       : variant === "new_perspective"
         ? "phoskywiki:draft:new-perspective"
         : variant === "new_term"
           ? "phoskywiki:draft:new-term"
-        : null;
+        : "phoskywiki:draft:new-interpreter";
 
   const [content, setContent] = useState(
-    variant === "edit" ? props.initialContent : variant === "new_term" ? TERM_CONTENT_TEMPLATE : "",
+    retry ? retry.proposal.content : variant === "edit" ? props.initialContent : variant === "new_term" ? TERM_CONTENT_TEMPLATE : "",
   );
-  const [title, setTitle] = useState(metadataEdit ? props.initialMetadata.title : "");
-  const [summary, setSummary] = useState(metadataEdit ? props.initialMetadata.summary : "");
-  const [aliases, setAliases] = useState(metadataEdit ? props.initialMetadata.aliases.join("、") : "");
+  const [title, setTitle] = useState(retry ? retry.proposal.title ?? "" : metadataEdit ? props.initialMetadata.title : "");
+  const [summary, setSummary] = useState(retry ? retry.proposal.summary ?? "" : metadataEdit ? props.initialMetadata.summary : "");
+  const [aliases, setAliases] = useState(retry ? retry.proposal.aliases.join(",") : metadataEdit ? props.initialMetadata.aliases.join("、") : "");
   const [termId, setTermId] = useState(
-    variant === "new_perspective" ? (props.presetTermId ?? "") : "",
+    retry ? String(retry.proposal.termId ?? "") : variant === "new_perspective" ? (props.presetTermId ?? "") : "",
   );
-  const [interpreterId, setInterpreterId] = useState("");
+  const [interpreterId, setInterpreterId] = useState(String(retry?.proposal.interpreterId ?? ""));
+  const [needsConfirmation, setNeedsConfirmation] = useState(retry?.stale ?? false);
+  const [confirmed, setConfirmed] = useState(false);
   const duplicatePerspective = variant === "new_perspective" && props.existingPerspectives.some(
     (pair) => pair.termId === Number(termId) && pair.interpreterId === Number(interpreterId),
   );
@@ -87,7 +95,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
   const initialContent = variant === "edit" ? props.initialContent : null;
   // 草稿基于的修订：编辑 = 表单加载时的 head；新建视角无修订概念，恒 null
   const draftBase = variant === "edit" || variant === "edit_term" ? props.baseRevisionId : null;
-  const draftSnapshot = JSON.stringify({ content, baseRevisionId: draftBase, ...(variant === "new_term" || metadataEdit ? { title, summary, aliases } : {}) } satisfies ContentDraft);
+  const draftSnapshot = JSON.stringify({ content, baseRevisionId: draftBase, title, summary, aliases, termId: String(termId), interpreterId } satisfies ContentDraft);
 
   // 恢复本地草稿：延后到 hydration 之后（render 期不读 localStorage）；
   // 只在与当前 base 同源时可信，页面已前进则弃用
@@ -104,25 +112,30 @@ export function SubmissionForm(props: SubmissionFormProps) {
     }
     if (!draft || typeof draft.content !== "string") return;
     if (variant === "edit_term" && (typeof draft.title !== "string" || typeof draft.summary !== "string" || typeof draft.aliases !== "string")) return;
-    if (draft.baseRevisionId !== draftBase) {
+    if (draft.baseRevisionId !== draftBase && !retry) {
       try { window.localStorage.removeItem(draftKey); } catch { /* Storage may be unavailable. */ }
       return;
     }
     const restored = draft;
     const timer = setTimeout(() => {
       setContent(restored.content);
-      if (variant === "new_term" || variant === "edit_term") {
+      if (retry && restored.baseRevisionId !== draftBase) setNeedsConfirmation(true);
+      if (variant === "new_term" || variant === "edit_term" || variant === "new_interpreter") {
         setTitle(typeof restored.title === "string" ? restored.title : "");
         setSummary(typeof restored.summary === "string" ? restored.summary : "");
         setAliases(typeof restored.aliases === "string" ? restored.aliases : "");
       }
+      if (variant === "new_perspective") {
+        if (typeof restored.termId === "string") setTermId(restored.termId);
+        if (typeof restored.interpreterId === "string") setInterpreterId(restored.interpreterId);
+      }
     }, 0);
     return () => clearTimeout(timer);
-  }, [draftKey, draftBase, variant]);
+  }, [draftKey, draftBase, variant, retry]);
 
   // 自动保存草稿（防抖 500ms；提交成功后停笔）
   useEffect(() => {
-    if (!draftKey || result || (!metadataEdit && content === initialContent)) return;
+    if (!draftKey || result || (!retry && variant === "edit" && content === initialContent)) return;
     const timer = setTimeout(() => {
       try { window.localStorage.setItem(
         draftKey,
@@ -132,11 +145,12 @@ export function SubmissionForm(props: SubmissionFormProps) {
       setSavedDraft(draftSnapshot);
     }, 500);
     return () => clearTimeout(timer);
-  }, [content, draftKey, draftSnapshot, result, initialContent, metadataEdit]);
+  }, [content, draftKey, draftSnapshot, result, initialContent, variant, retry]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (duplicatePerspective) return;
+    if (duplicatePerspective || (needsConfirmation && !confirmed) || (retry?.unavailable && variant !== "new_perspective")) return;
+    try { window.localStorage.setItem(draftKey, draftSnapshot); } catch { /* Storage may be unavailable. */ }
     setPending(true);
     setError(null);
     const payload =
@@ -159,10 +173,11 @@ export function SubmissionForm(props: SubmissionFormProps) {
                 interpreterId: interpreterId === "" ? undefined : Number(interpreterId),
                 content,
               };
+    try {
     const res = await fetch("/api/submissions", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, ...(retry ? { supersedes: retry.id, confirmedBaseRevisionId: confirmed ? draftBase : undefined } : {}) }),
     });
     const data = (await res.json().catch(() => null)) as
       | (CreateSubmissionResult & { error?: string })
@@ -174,6 +189,9 @@ export function SubmissionForm(props: SubmissionFormProps) {
     }
     if (draftKey) { try { window.localStorage.removeItem(draftKey); } catch { /* Submission still succeeded. */ } }
     setResult(data);
+    } catch {
+      setError("网络连接失败，草稿已保留，请重试。");
+    } finally { setPending(false); }
   }
 
   if (result) {
@@ -209,6 +227,9 @@ export function SubmissionForm(props: SubmissionFormProps) {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-5" noValidate>
+      {retry && <p className="text-sm">驳回理由：<span>{retry.reason}</span></p>}
+      {retry?.unavailable && <p role="alert">{retry.unavailable} 草稿会保留；请等待恢复{variant === "new_perspective" ? "或调整词条与诠释者" : "后再重提"}。</p>}
+      {needsConfirmation && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />我已对照最新版与原提案，人工整理并确认本次内容</label>}
       {variant === "new_perspective" && (
         <>
           <label className="flex flex-col gap-2 text-sm font-medium">
@@ -311,7 +332,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" size="lg" disabled={pending || duplicatePerspective}>
+        <Button type="submit" size="lg" disabled={pending || duplicatePerspective || (needsConfirmation && !confirmed) || Boolean(retry?.unavailable && variant !== "new_perspective")}>
           {pending ? "提交中…" : isAdmin ? "提交（直接生效）" : "提交审核"}
         </Button>
         {draftKey && draftSavedAt && savedDraft === draftSnapshot && !pending && (

@@ -49,6 +49,12 @@ export default async function SubmissionDetailPage({ params }: Props) {
         )}
       </p>
       {submission.status === "rejected" && <RejectionReason reason={submission.rejectionReason} />}
+      {submission.status === "rejected" && <Link href={`/profile/submissions/${id}/resubmit`} className="mt-4 inline-block text-primary underline">修改后重新提交</Link>}
+      {submission.supersedesId && <p className="mt-3 text-sm">修改自 <Link className="underline" href={`/profile/submissions/${submission.supersedesId}`}>原驳回提交 #{submission.supersedesId}</Link></p>}
+      <section aria-label="审核记录" className="mt-4 text-sm">
+        <p>本次提交需 {submission.quorum} 位管理员受理</p>
+        {submission.votes.map(vote => <p key={vote.id}>{vote.name}：{vote.vote === "approve" ? "批准" : "驳回"}{vote.reason && ` · ${vote.reason}`}</p>)}
+      </section>
 
       <section aria-labelledby="submission-diff-heading" className="mt-8">
         <h2 id="submission-diff-heading" className="text-xl font-semibold">提交差异</h2>

@@ -105,6 +105,8 @@ export interface SubmissionInput {
   baseRevisionId?: number;
   /** 修改重提的谱系：被驳回的前任提交 id（ADR-0004 #5） */
   supersedes?: number;
+  /** 编者已对照此修订人工整理过期提案。 */
+  confirmedBaseRevisionId?: number;
 }
 
 interface ValidatedSubmission {
@@ -129,6 +131,7 @@ function requiredInt(value: unknown, error: string): number {
 async function validateSubmissionInput(
   db: Tx,
   input: SubmissionInput,
+  actor: Actor,
 ): Promise<ValidatedSubmission> {
   const summary = input.summary?.trim() || null;
   const supersedes =
@@ -138,13 +141,34 @@ async function validateSubmissionInput(
 
   if (supersedes !== null) {
     const [prior] = await db
-      .select({ status: submissions.status })
+      .select()
       .from(submissions)
       .where(eq(submissions.id, supersedes))
       .limit(1);
     // 只有被驳回的提交才谈得上「修改重提」（approved 无需重提，pending 未结）
     if (!prior || prior.status !== "rejected") {
       throw new ReviewError(400, "supersedes 必须指向一条已驳回的提交");
+    }
+    if (prior.submittedBy !== actor.id) throw new ReviewError(403, "只能从自己的驳回记录重新提交");
+    if (prior.kind !== input.kind || (prior.kind === "edit" && prior.pageId !== input.pageId)) {
+      throw new ReviewError(400, "重提必须保留原提交类型与编辑目标");
+    }
+    if (prior.kind === "edit") {
+      const page = await lockLivePage(db, prior.pageId!);
+      if (page.type === "perspective") {
+        const [perspective] = await db.select().from(perspectives).where(eq(perspectives.pageId, page.id));
+        if (!perspective) throw new ReviewError(404, "目标视角不存在");
+        const parents = await lockPerspectiveParents(db, perspective.termId, perspective.interpreterId);
+        if (!parents.available) throw new ReviewError(404, parents.reason);
+      }
+      const headId = await headRevisionId(db, page.id);
+      if (!headId || headId !== input.baseRevisionId || (headId !== prior.baseRevisionId && input.confirmedBaseRevisionId !== headId)) {
+        throw new ReviewError(409, "页面已有新版，请重新打开重提页，对照最新版与原提案整理并确认。草稿已保留。");
+      }
+      if (page.type === "term") {
+        const [duplicate] = await db.select({ id: pages.id }).from(pages).where(and(eq(pages.type, "term"), eq(pages.title, input.title?.trim() ?? ""), sql`${pages.id} <> ${page.id}`)).limit(1);
+        if (duplicate) throw new ReviewError(409, "同名词条已存在，请修改标题后重试");
+      }
     }
   }
 
@@ -284,7 +308,7 @@ export async function createSubmission(
   actor: Actor,
 ): Promise<CreateSubmissionResult> {
   return transactionWithSearchSync(getDb(), async (db) => {
-    const validated = await validateSubmissionInput(db, input);
+    const validated = await validateSubmissionInput(db, input, actor);
     await validateImageReferences(db, validated.content, actor);
 
     if (actor.role === "admin") {
@@ -334,7 +358,7 @@ export async function importPages(inputs: SubmissionInput[], actor: Actor) {
     const results = [];
     for (const input of inputs) {
       if (input.kind !== "new_term" && input.kind !== "new_interpreter") throw new ReviewError(400, "只能导入词条与诠释者");
-      const validated = await validateSubmissionInput(tx, input);
+      const validated = await validateSubmissionInput(tx, input, actor);
       await validateImageReferences(tx, validated.content, actor);
       const applied = await applySubmission(tx, { ...validated, submittedBy: actor.id }, "direct");
       results.push({ pageId: applied.pageId, href: pagePath(input.kind === "new_term" ? "term" : "interpreter", slugifyTitle(validated.title!), applied.pageId) });
