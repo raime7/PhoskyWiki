@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AgentPanel } from "@/components/agent-panel";
 import { HistoryLink } from "@/components/history-link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -188,6 +189,7 @@ export default async function TermPage({ params }: Params) {
         </div>
 
         <div className="shrink-0 lg:w-64">
+          <AgentPanel key={page.id} termId={page.id} />
           <Infobox
             title={term.title}
             rows={[

@@ -111,6 +111,17 @@ async function aggregateTermPairs(): Promise<Map<number, Map<number, number>>> {
   return adjacency;
 }
 
+/** Agent 沿入链和出链取一跳，精确视角链接归属到词条；不采用图谱展示截断。 */
+export async function getOneHopTermIds(termId: number): Promise<number[]> {
+  const pairs = await aggregateTermPairs();
+  const neighbors = new Set(pairs.get(termId)?.keys());
+  for (const [source, targets] of pairs) {
+    if (targets.has(termId)) neighbors.add(source);
+  }
+  neighbors.delete(termId);
+  return [termId, ...[...neighbors].sort((a, b) => a - b)];
+}
+
 /** 全部在线词条的基础信息（视角数为在线视角计数；诠释者页软删除的视角不计，比首页列表更严）。 */
 async function listTermNodes(): Promise<
   { id: number; title: string; slug: string; perspectiveCount: number }[]

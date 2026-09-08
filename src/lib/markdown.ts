@@ -103,13 +103,28 @@ export function renderMarkdown(
   source: string,
   resolveWikiLink: ResolveWikiLink,
 ): string {
+  return markdownProcessor(resolveWikiLink).processSync(source).toString();
+}
+
+function markdownProcessor(resolveWikiLink: ResolveWikiLink) {
   return unified()
     .use(remarkParse)
     .use(remarkWikiLink, { aliasDivider: "|" })
     .use(rewriteWikiLinks, resolveWikiLink)
     .use(remarkRehype, { allowDangerousHtml: false })
     .use(rehypeSanitize, sanitizeSchema)
-    .use(rehypeStringify)
-    .processSync(source)
-    .toString();
+    .use(rehypeStringify);
+}
+
+/** Agent 上下文使用同一渲染管线的可见文本，保留段落边界。 */
+export function renderMarkdownText(source: string, resolve: ResolveWikiLink): string {
+  const processor = markdownProcessor(resolve);
+  const tree = processor.runSync(processor.parse(source));
+  function visibleText(node: Node): string {
+    if (node.type === "text") return (node as Node & { value: string }).value;
+    const text = ((node as Parent).children ?? []).map(visibleText).join("");
+    const tag = (node as Node & { tagName?: string }).tagName;
+    return tag && /^(p|h[1-6]|li|blockquote|pre|br|hr)$/.test(tag) ? `${text}\n` : text;
+  }
+  return visibleText(tree).replace(/\n{3,}/g, "\n\n").trim();
 }
