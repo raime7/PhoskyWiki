@@ -186,7 +186,7 @@ describe("POST /api/discussion/posts（发言权限与校验）", () => {
 });
 
 describe("一层嵌套回复", () => {
-  it("对楼层的回复 201 并嵌套在其下；「回复的回复」400", async () => {
+  it("对楼层的回复 201 并嵌套在其下；「回复的回复」400；回复不计入楼层数", async () => {
     const subjectivity = await termIdByTitle("主体性");
     const floor = await postFloor({ termId: subjectivity, content: "开个楼" });
     const reply = await postFloor({
@@ -195,6 +195,8 @@ describe("一层嵌套回复", () => {
       content: "一层回复",
     });
     expect(reply.status).toBe(201);
+    // 楼层数只数顶层开楼（与讨论区页内「N 楼」编号同口径）
+    expect(await countDiscussionPosts(subjectivity)).toBe(1);
 
     const nested = await postFloor({
       termId: subjectivity,

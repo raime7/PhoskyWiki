@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { authErrorMessage } from "@/lib/auth-errors";
 
-export function LoginForm() {
+export function LoginForm({ redirectTo = "/" }: { redirectTo?: string | null }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +29,8 @@ export function LoginForm() {
       setPending(false);
       return;
     }
-    router.push("/");
+    // 带回跳目标（如讨论区 ?perspective= 预填锚点），由登录页做站内路径白名单
+    router.push(redirectTo ?? "/");
     router.refresh();
   }
 

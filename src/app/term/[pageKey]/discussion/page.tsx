@@ -7,7 +7,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
-import { DiscussionComposer } from "@/components/discussion-composer";
+import { DiscussionComposer, type ComposerAnchor } from "@/components/discussion-composer";
 import { DiscussionReplyForm } from "@/components/discussion-reply-form";
 import {
   DeletePostButton,
@@ -19,7 +19,8 @@ import {
   isDiscussionLocked,
   listDiscussionFloors,
 } from "@/lib/discussion";
-import { pageIdFromKey, pagePath } from "@/lib/slug";
+import { formatWhen } from "@/lib/format";
+import { pageIdFromKey, pageKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
 import { getSessionUser } from "@/lib/session";
 
@@ -41,7 +42,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 async function resolveComposerAnchor(
   termId: number,
   raw: string | string[] | undefined,
-): Promise<{ pageId: number; title: string; href: string } | null> {
+): Promise<ComposerAnchor | null> {
   const value = Array.isArray(raw) ? raw[0] : raw;
   const perspectiveId = Number(value);
   if (value === undefined || !Number.isSafeInteger(perspectiveId) || perspectiveId <= 0) {
@@ -54,10 +55,6 @@ async function resolveComposerAnchor(
     title: detail.title,
     href: pagePath("perspective", detail.slug, detail.id),
   };
-}
-
-function formatTimestamp(date: Date): string {
-  return date.toLocaleString("zh-CN", { dateStyle: "medium", timeStyle: "short" });
 }
 
 export default async function TermDiscussionPage({ params, searchParams }: Params) {
@@ -73,6 +70,12 @@ export default async function TermDiscussionPage({ params, searchParams }: Param
   ]);
   const isAdmin = sessionUser?.role === "admin";
   const canPost = sessionUser !== null && !locked;
+  // 游客登录后回到本讨论区（带 ?perspective= 预填锚点一起带回）
+  const loginHref = `/login?redirect=${encodeURIComponent(
+    `/term/${pageKey(page.slug, page.id)}/discussion${
+      anchor ? `?perspective=${anchor.pageId}` : ""
+    }`,
+  )}`;
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
@@ -111,7 +114,7 @@ export default async function TermDiscussionPage({ params, searchParams }: Param
       ) : (
         sessionUser === null && (
           <p className="mb-6 rounded-md border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-            讨论区对所有人可读；<Link href="/login" className="text-foreground underline-offset-4 hover:underline">登录</Link>
+            讨论区对所有人可读；<Link href={loginHref} className="text-foreground underline-offset-4 hover:underline">登录</Link>
             后即可发言。
           </p>
         )
@@ -131,7 +134,7 @@ export default async function TermDiscussionPage({ params, searchParams }: Param
                   <span className="font-medium text-foreground">{index + 1} 楼</span>
                   <span>{floor.authorName}</span>
                   <time dateTime={floor.createdAt.toISOString()}>
-                    {formatTimestamp(floor.createdAt)}
+                    {formatWhen(floor.createdAt)}
                   </time>
                   {floor.perspective &&
                     (floor.perspective.live ? (
@@ -165,7 +168,11 @@ export default async function TermDiscussionPage({ params, searchParams }: Param
 
                 {canPost && !floor.deleted && (
                   <div className="mt-2">
-                    <DiscussionReplyForm termId={page.id} parentId={floor.id} />
+                    <DiscussionReplyForm
+                      termId={page.id}
+                      parentId={floor.id}
+                      maxLength={DISCUSSION_CONTENT_MAX_LENGTH}
+                    />
                   </div>
                 )}
 
@@ -176,7 +183,7 @@ export default async function TermDiscussionPage({ params, searchParams }: Param
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                           <span>{reply.authorName}</span>
                           <time dateTime={reply.createdAt.toISOString()}>
-                            {formatTimestamp(reply.createdAt)}
+                            {formatWhen(reply.createdAt)}
                           </time>
                           {isAdmin && !reply.deleted && (
                             <DeletePostButton postId={reply.id} />

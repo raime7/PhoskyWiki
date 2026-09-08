@@ -34,10 +34,15 @@ test("游客只读讨论区；管理员开楼并一层回复", async ({ page }) 
   const floorContent = `e2e 讨论楼层 ${Date.now()}`;
   const replyContent = `e2e 一层回复 ${Date.now()}`;
 
-  // 游客：能读讨论区，但没有发言框，只有登录引导
+  // 游客：能读讨论区，但没有发言框，只有登录引导；登录链接带回跳（含锚点预填）
   await openDiscussion(page);
   await expect(page.getByLabel("发言内容")).toHaveCount(0);
   await expect(page.getByText("登录后即可发言")).toBeVisible();
+  const loginHref = await page
+    .getByRole("main")
+    .getByRole("link", { name: "登录", exact: true })
+    .getAttribute("href");
+  expect(loginHref).toMatch(/^\/login\?redirect=%2Fterm%2F/);
 
   // 登录种子管理员
   await loginAdmin(page);

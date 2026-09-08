@@ -530,7 +530,7 @@ export const discussionPosts = pgTable(
   ],
 );
 
-/** 词条讨论区的版务状态：一行 = 一个词条的讨论区（首楼或锁定时懒创建，缺席即开放）。 */
+/** 词条讨论区的版务状态：一行 = 一个词条的讨论区（锁定时懒创建，缺席即开放；发言不建行）。 */
 export const termDiscussions = pgTable("term_discussions", {
   termId: integer("term_id")
     .primaryKey()

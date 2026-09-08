@@ -13,13 +13,8 @@ export const statusLabels: Record<SubmissionStatus, string> = {
   rejected: "已驳回",
 };
 
-export function formatWhen(date: Date): string {
-  return new Intl.DateTimeFormat("zh-CN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Shanghai",
-  }).format(date);
-}
+// 站内统一的时间戳格式化（lib/format）；在此转出口保持既有相对导入不变
+export { formatWhen } from "@/lib/format";
 
 export function RejectionReason({ reason }: { reason: string | null }) {
   if (reason === null) return null;

@@ -7,6 +7,7 @@ import { ContentDiff } from "@/components/content-diff";
 import { ReviewActions } from "@/components/review-actions";
 import type { QueueItem } from "@/lib/review";
 import type { SubmissionKind } from "@/db/schema";
+import { formatWhen } from "@/lib/format";
 import { listQueue } from "@/lib/review";
 import { getSessionUser } from "@/lib/session";
 
@@ -18,13 +19,6 @@ const kindLabels: Record<SubmissionKind, string> = {
   new_perspective: "新建视角",
   new_interpreter: "新建诠释者",
 };
-
-function formatWhen(date: Date): string {
-  return new Intl.DateTimeFormat("zh-CN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
 
 function QueueEntry({ item }: { item: QueueItem }) {
   const target =

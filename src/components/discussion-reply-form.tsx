@@ -10,9 +10,11 @@ import { Button } from "@/components/ui/button";
 export function DiscussionReplyForm({
   termId,
   parentId,
+  maxLength,
 }: {
   termId: number;
   parentId: number;
+  maxLength: number;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -70,6 +72,7 @@ export function DiscussionReplyForm({
         id={`reply-${parentId}`}
         value={content}
         onChange={(event) => setContent(event.target.value)}
+        maxLength={maxLength}
         rows={3}
         className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring"
       />

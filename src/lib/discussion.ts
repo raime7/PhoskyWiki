@@ -1,4 +1,4 @@
-// 讨论区域（T13）：词条级楼层 + 一层嵌套回复 + 视角锚点 + 版务。
+// 讨论区（T13）：词条级楼层 + 一层嵌套回复 + 视角锚点 + 版务。
 // 语义见 schema 的讨论区注释与 spec 用户故事 43–45：
 //   - 楼层即时可见（不经两票审核），内容保持纯文本——富格式（Markdown/双链）
 //     只留给受审的页面内容；
@@ -96,12 +96,21 @@ export async function isDiscussionLocked(termId: number): Promise<boolean> {
   return (row?.lockedAt ?? null) !== null;
 }
 
-/** 词条讨论区的未删除楼层数（词条页入口「讨论区（N 楼）」用）。 */
+/**
+ * 词条讨论区的未删除楼层数（词条页入口「讨论区（N 楼）」用）。
+ * 只数顶层楼层：回复不计入——与讨论区页内「N 楼」编号同口径。
+ */
 export async function countDiscussionPosts(termId: number): Promise<number> {
   const [row] = await getDb()
     .select({ count: sql<number>`count(*)::int` })
     .from(discussionPosts)
-    .where(and(eq(discussionPosts.termId, termId), isNull(discussionPosts.deletedAt)));
+    .where(
+      and(
+        eq(discussionPosts.termId, termId),
+        isNull(discussionPosts.parentId),
+        isNull(discussionPosts.deletedAt),
+      ),
+    );
   return row?.count ?? 0;
 }
 
