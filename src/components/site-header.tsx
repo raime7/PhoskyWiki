@@ -16,6 +16,7 @@ const navItems = [
   { href: "/categories", label: "分类" },
   { href: "/graph", label: "图谱" },
   { href: "/search", label: "搜索" },
+  { href: "/interests", label: "兴趣" },
 ];
 
 const roleLabels: Record<UserRole, string> = {

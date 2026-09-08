@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { PinControl } from "@/components/pin-control";
+import { useGuestInterests } from "@/lib/guest-interest-store";
+import { reorderPerspectivesByInterest } from "@/lib/interest-tags";
 
 export interface PerspectiveListProps {
   items: {
     pageId: number;
     title: string;
     href: string;
+    interpreterId: number;
     interpreterName: string;
     interpreterHref: string;
     /** 编者置顶（管理员标记）：显示置顶徽标 */
@@ -18,18 +21,41 @@ export interface PerspectiveListProps {
   }[];
   /** 管理员登录时渲染每条的置顶开关（T04 置顶 × T05 角色） */
   isAdmin?: boolean;
+  /**
+   * 服务端（登录态）兴趣重排用的诠释者 id 集：items 已按它排好，这里幂等地
+   * 再排一次即可；null/undefined = 游客路径，读本浏览器 localStorage 的兴趣重排
+   * （只看直接选择的诠释者——学派→成员的展开要查库，登录路径在服务端做）。
+   */
+  interestInterpreterIds?: number[] | null;
 }
 
 // 词条页视角列表默认露出条数（spec：默认露 5~8 条 + 展开全部）
 const DEFAULT_VISIBLE = 5;
 
-export function PerspectiveList({ items, isAdmin }: PerspectiveListProps) {
+export function PerspectiveList({ items, isAdmin, interestInterpreterIds = null }: PerspectiveListProps) {
   const [expanded, setExpanded] = useState(false);
-  const visible = expanded ? items : items.slice(0, DEFAULT_VISIBLE);
-  const hiddenCount = Math.max(0, items.length - DEFAULT_VISIBLE);
+  const guest = useGuestInterests();
+  const interestedIds = interestInterpreterIds ?? guest?.interpreters ?? null;
+
+  // 编委会 → 置顶 → 兴趣诠释者 → 其余；组内保持传入序（服务端已按热度排好）
+  const ordered = useMemo(() => {
+    if (!interestedIds || interestedIds.length === 0) return items;
+    return reorderPerspectivesByInterest(items, new Set(interestedIds));
+  }, [items, interestedIds]);
+
+  const visible = expanded ? ordered : ordered.slice(0, DEFAULT_VISIBLE);
+  const hiddenCount = Math.max(0, ordered.length - DEFAULT_VISIBLE);
 
   return (
     <div>
+      {interestedIds !== null && interestedIds.length > 0 && (
+        <p
+          data-testid="interest-reorder-hint"
+          className="mb-3 text-sm text-muted-foreground"
+        >
+          已按你的兴趣把相关诠释者的视角排前。
+        </p>
+      )}
       <ul className="divide-y divide-border rounded-lg border border-border">
         {visible.map((item) => (
           <li key={item.pageId} className="flex items-baseline justify-between gap-3 px-4 py-3">

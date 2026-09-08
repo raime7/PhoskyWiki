@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 
 import { MarkNotificationRead } from "@/components/mark-notification-read";
 import type { SubmissionStatus } from "@/db/schema";
+import { getInterestOptions, getInterestTags } from "@/lib/interests";
+import { hasAnyInterest } from "@/lib/interest-tags";
 import { getNotificationInbox } from "@/lib/notifications";
 import { getSessionUser } from "@/lib/session";
 import { listMySubmissions } from "@/lib/submission-history";
@@ -24,10 +26,16 @@ export default async function ProfilePage({ searchParams }: Props) {
     requestedStatus === "pending" || requestedStatus === "approved" || requestedStatus === "rejected"
       ? requestedStatus
       : undefined;
-  const [submissions, inbox] = await Promise.all([
+  const [submissions, inbox, interests, options] = await Promise.all([
     listMySubmissions(user.id, status),
     getNotificationInbox(user.id),
+    getInterestTags(user.id),
+    getInterestOptions(),
   ]);
+  // 兴趣 chip 展示名（id → 名称）；陈旧 id（目标已下线）在此自然缺席
+  const interpreterNames = new Map(options.interpreters.map((row) => [row.id, row.name]));
+  const schoolNames = new Map(options.schools.map((row) => [row.id, row.name]));
+  const categoryNames = new Map(options.categories.map((row) => [row.id, row.name]));
   const filters: { status: SubmissionStatus | undefined; label: string }[] = [
     { status: undefined, label: "全部" },
     { status: "pending", label: "待审核" },
@@ -81,6 +89,44 @@ export default async function ProfilePage({ searchParams }: Props) {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="interests-heading" className="mt-10">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 id="interests-heading" className="text-xl font-semibold">兴趣标签</h2>
+          <Link
+            href="/interests"
+            className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            管理兴趣 →
+          </Link>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          三类兴趣驱动词条页的视角重排与相关词条推荐。
+        </p>
+        {hasAnyInterest(interests) ? (
+          <ul className="mt-4 flex flex-wrap gap-2" data-testid="profile-interest-chips">
+            {interests.interpreters.map((id) => (
+              <li key={`interpreter-${id}`} className="rounded-full bg-secondary px-3 py-1.5 text-sm">
+                {interpreterNames.get(id) ?? `诠释者 #${id}`}
+              </li>
+            ))}
+            {interests.schools.map((id) => (
+              <li key={`school-${id}`} className="rounded-full bg-secondary px-3 py-1.5 text-sm">
+                {schoolNames.get(id) ?? `学派 #${id}`}
+              </li>
+            ))}
+            {interests.categories.map((id) => (
+              <li key={`category-${id}`} className="rounded-full bg-secondary px-3 py-1.5 text-sm">
+                {categoryNames.get(id) ?? `主题 #${id}`}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-4 text-sm text-muted-foreground" data-testid="profile-no-interests">
+            还没有设置兴趣——选择关注的诠释者、学派与主题，词条页会按你的兴趣重排。
+          </p>
         )}
       </section>
 

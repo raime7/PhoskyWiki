@@ -7,6 +7,7 @@ import { BacklinkPanel } from "@/components/backlink-panel";
 import { Infobox, InfoboxLinks, WikiContent } from "@/components/wiki-content";
 import { LocalGraph } from "@/components/local-graph";
 import { PerspectiveList } from "@/components/perspective-list";
+import { RelatedTermsPanel } from "@/components/related-terms";
 import {
   getTermDetail,
   getTermDisambiguation,
@@ -18,7 +19,10 @@ import {
 } from "@/lib/content";
 import { categoryPath } from "@/lib/categories";
 import { getLocalGraph } from "@/lib/graph";
+import { getInterestTags, expandInterestedInterpreters } from "@/lib/interests";
+import { hasAnyInterest, reorderPerspectivesByInterest } from "@/lib/interest-tags";
 import { renderMarkdown, wikiLinkResolver } from "@/lib/markdown";
+import { listRelatedTerms } from "@/lib/recommend";
 import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
 import { getSessionUser } from "@/lib/session";
@@ -50,6 +54,23 @@ export default async function TermPage({ params }: Params) {
     ]);
   const board = perspectives.find((p) => p.isBoard);
   const others = perspectives.filter((p) => !p.isBoard);
+
+  // 兴趣个性化（T12）：登录用户读账号兴趣（游客无服务端兴趣，客户端读 localStorage）。
+  // 相关词条与视角重排共用同一份展开，不重复查询。
+  const interests = sessionUser ? await getInterestTags(sessionUser.id) : null;
+  const interestedInterpreterIds =
+    interests && hasAnyInterest(interests)
+      ? await expandInterestedInterpreters(interests)
+      : new Set<number>();
+  const relatedTerms = localGraph
+    ? await listRelatedTerms(localGraph, interests, interestedInterpreterIds)
+    : [];
+  // 服务端预排（登录态 SSR 即个性化）；游客保持默认序，水合后客户端再排
+  const orderedOthers =
+    interestedInterpreterIds.size > 0
+      ? reorderPerspectivesByInterest(others, interestedInterpreterIds)
+      : others;
+
   const [boardContent, boardTargets] = board
     ? await Promise.all([getHeadContent(board.pageId), getWikiLinkTargets(board.pageId)])
     : [null, null];
@@ -124,10 +145,12 @@ export default async function TermPage({ params }: Params) {
             {others.length > 0 ? (
               <PerspectiveList
                 isAdmin={sessionUser?.role === "admin"}
-                items={others.map((p) => ({
+                interestInterpreterIds={sessionUser ? [...interestedInterpreterIds] : null}
+                items={orderedOthers.map((p) => ({
                   pageId: p.pageId,
                   title: p.title,
                   href: pagePath("perspective", p.slug, p.pageId),
+                  interpreterId: p.interpreterId,
                   interpreterName: p.interpreterName,
                   interpreterHref: pagePath(
                     "interpreter",
@@ -144,6 +167,8 @@ export default async function TermPage({ params }: Params) {
               </p>
             )}
           </section>
+
+          <RelatedTermsPanel items={relatedTerms} />
 
           <BacklinkPanel items={backlinks} />
 

@@ -15,6 +15,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   index,
   integer,
   pgEnum,
@@ -23,6 +24,7 @@ import {
   serial,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
@@ -439,4 +441,46 @@ export const verification = pgTable(
       .defaultNow(),
   },
   (t) => [index("verification_identifier_idx").on(t.identifier)],
+);
+
+// ---------------------------------------------------------------------------
+// 发现域（T12）：兴趣标签。三类自选关注维度——诠释者 / 学派 / 主题（主题轴
+// 即分类，CONTEXT.md「兴趣标签」），驱动词条页视角重排与相关词条推荐。
+// 游客的等价物只存浏览器 localStorage（lib/interest-tags.ts），登录后经
+// PUT /api/interests 全量替换同步进账号——未登录不落库，不存在游客行。
+// ---------------------------------------------------------------------------
+
+/**
+ * 一行 = 用户的一个兴趣。三个目标列恰好一个非空（CHECK 保证），非空列即兴趣类型
+ * ——沿用 school_members / term_categories 的边界哲学：每列各自只指向本类型的表，
+ * 跨类型挂载被外键拒绝；主题轴挂 categories.id（分类不是页面，无软删除）。
+ */
+export const interestTags = pgTable(
+  "interest_tags",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // 编委会视角固定第一，选它作兴趣无意义：应用层不出现在可选项里
+    interpreterId: integer("interpreter_id").references(() => interpreters.pageId, {
+      onDelete: "cascade",
+    }),
+    schoolId: integer("school_id").references(() => schools.pageId, {
+      onDelete: "cascade",
+    }),
+    categoryId: integer("category_id").references(() => categories.id, {
+      onDelete: "cascade",
+    }),
+  },
+  (t) => [
+    check(
+      "interest_tags_exactly_one_target",
+      sql`num_nonnulls(${t.interpreterId}, ${t.schoolId}, ${t.categoryId}) = 1`,
+    ),
+    // NULL 视为相等：同一用户对同一目标只有一行（PG 15+ 的 NULLS NOT DISTINCT）
+    unique("interest_tags_unique")
+      .on(t.userId, t.interpreterId, t.schoolId, t.categoryId)
+      .nullsNotDistinct(),
+    index("interest_tags_user_idx").on(t.userId),
+  ],
 );
