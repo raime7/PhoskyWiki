@@ -112,4 +112,3 @@ for (const hidden of ["perspective", "term", "interpreter"] as const) {
     } finally { await manage(request, hiddenId, "restore"); }
   });
 }
-
