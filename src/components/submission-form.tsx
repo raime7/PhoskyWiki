@@ -14,11 +14,13 @@ import type { CreateSubmissionResult } from "@/lib/review-types";
 import { TERM_CONTENT_TEMPLATE } from "@/lib/content-template";
 import type { WikiLinkTarget } from "@/lib/markdown";
 import type { TermSnapshot } from "@/lib/revision-snapshot";
+import { formatAliasInput, parseAliasInput } from "@/lib/alias-input";
 
 type Option = {
   id: number;
   label: string;
 };
+const NO_ALIASES: string[] = [];
 
 /**
  * 正文字段的本地草稿：与它所基于的页面修订绑定（ADR-0004 #6 草稿在客户端；
@@ -30,6 +32,7 @@ interface ContentDraft {
   title?: string;
   summary?: string;
   aliases?: string;
+  aliasesFormat?: "quoted-v1";
   termId?: string;
   interpreterId?: string;
 }
@@ -62,6 +65,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
   const { variant, isAdmin } = props;
   const retry = props.resubmission;
   const metadataEdit = variant === "edit_term";
+  const initialAliases = retry ? retry.proposal.aliases : metadataEdit ? props.initialMetadata.aliases : NO_ALIASES;
   // 编辑/新视角保存正文；词条向导同时保存信息框。
   const draftKey =
     retry ? `phoskywiki:draft:resubmit:${retry.ownerId}:${retry.id}` : variant === "edit" || variant === "edit_term"
@@ -77,7 +81,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
   );
   const [title, setTitle] = useState(retry ? retry.proposal.title ?? "" : metadataEdit ? props.initialMetadata.title : "");
   const [summary, setSummary] = useState(retry ? retry.proposal.summary ?? "" : metadataEdit ? props.initialMetadata.summary : "");
-  const [aliases, setAliases] = useState(retry ? retry.proposal.aliases.join(",") : metadataEdit ? props.initialMetadata.aliases.join("、") : "");
+  const [aliases, setAliases] = useState(formatAliasInput(initialAliases));
   const [termId, setTermId] = useState(
     retry ? String(retry.proposal.termId ?? "") : variant === "new_perspective" ? (props.presetTermId ?? "") : "",
   );
@@ -95,7 +99,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
   const initialContent = variant === "edit" ? props.initialContent : null;
   // 草稿基于的修订：编辑 = 表单加载时的 head；新建视角无修订概念，恒 null
   const draftBase = variant === "edit" || variant === "edit_term" ? props.baseRevisionId : null;
-  const draftSnapshot = JSON.stringify({ content, baseRevisionId: draftBase, title, summary, aliases, termId: String(termId), interpreterId } satisfies ContentDraft);
+  const draftSnapshot = JSON.stringify({ content, baseRevisionId: draftBase, title, summary, aliases, aliasesFormat: "quoted-v1", termId: String(termId), interpreterId } satisfies ContentDraft);
 
   // 恢复本地草稿：延后到 hydration 之后（render 期不读 localStorage）；
   // 只在与当前 base 同源时可信，页面已前进则弃用
@@ -123,7 +127,12 @@ export function SubmissionForm(props: SubmissionFormProps) {
       if (variant === "new_term" || variant === "edit_term" || variant === "new_interpreter") {
         setTitle(typeof restored.title === "string" ? restored.title : "");
         setSummary(typeof restored.summary === "string" ? restored.summary : "");
-        setAliases(typeof restored.aliases === "string" ? restored.aliases : "");
+        const storedAliases = typeof restored.aliases === "string" ? restored.aliases : "";
+        const originalText = initialAliases.join(retry ? "," : "、");
+        // Old drafts used lossy joins. Unchanged prefill can recover its exact original array.
+        setAliases(restored.aliasesFormat === "quoted-v1" ? storedAliases : formatAliasInput(
+          storedAliases === originalText ? initialAliases : storedAliases.split(variant === "edit_term" ? /[、，,\n]/ : /[，,\n]/).map(s => s.trim()).filter(Boolean),
+        ));
       }
       if (variant === "new_perspective") {
         if (typeof restored.termId === "string") setTermId(restored.termId);
@@ -131,7 +140,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [draftKey, draftBase, variant, retry]);
+  }, [draftKey, draftBase, variant, retry, initialAliases]);
 
   // 自动保存草稿（防抖 500ms；提交成功后停笔）
   useEffect(() => {
@@ -151,11 +160,16 @@ export function SubmissionForm(props: SubmissionFormProps) {
     event.preventDefault();
     if (duplicatePerspective || (needsConfirmation && !confirmed) || (retry?.unavailable && variant !== "new_perspective")) return;
     try { window.localStorage.setItem(draftKey, draftSnapshot); } catch { /* Storage may be unavailable. */ }
-    setPending(true);
     setError(null);
+    const parsedAliases = parseAliasInput(aliases);
+    if ((metadataEdit || variant === "new_term") && parsedAliases.error) {
+      setError(parsedAliases.error);
+      return;
+    }
+    setPending(true);
     const payload =
       variant === "edit_term"
-        ? { kind: "edit", pageId: props.pageId, baseRevisionId: props.baseRevisionId, title, summary, aliases: aliases.split(/[、，,\n]/).map((s) => s.trim()).filter(Boolean) }
+        ? { kind: "edit", pageId: props.pageId, baseRevisionId: props.baseRevisionId, title, summary, aliases: parsedAliases.aliases }
         : variant === "edit"
         ? {
             kind: "edit",
@@ -164,7 +178,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
             baseRevisionId: props.baseRevisionId,
           }
         : variant === "new_term"
-          ? { kind: "new_term", title, summary, aliases: aliases.split(/[，,\n]/).map((s) => s.trim()).filter(Boolean), content }
+          ? { kind: "new_term", title, summary, aliases: parsedAliases.aliases, content }
           : variant === "new_interpreter"
             ? { kind: "new_interpreter", title, summary }
             : {
@@ -316,8 +330,9 @@ export function SubmissionForm(props: SubmissionFormProps) {
         <>
           <label className="flex flex-col gap-2 text-sm font-medium">
             别名（信息框用，以逗号分隔）
-            <Input name="aliases" value={aliases} onChange={(e) => setAliases(e.target.value)} />
+            <Input name="aliases" value={aliases} onChange={(e) => setAliases(e.target.value)} aria-describedby="aliases-help" />
           </label>
+          <p id="aliases-help" className="text-xs text-muted-foreground">以中英文逗号分隔，顿号属于别名内容。含逗号的单个别名用英文双引号包住，例如 <code>{'"Alpha, Beta",甲、乙'}</code>；引号内用 <code>{'\\"'}</code> 表示双引号、<code>{'\\\\'}</code> 表示反斜杠。</p>
           {variant === "new_term" && <p className="text-sm text-muted-foreground">填写信息框后，完善下方通俗解读骨架。正文将成为编委会视角，与词条一起提交。</p>}
         </>
       )}
