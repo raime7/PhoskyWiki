@@ -28,6 +28,7 @@ import {
 } from "@/lib/categories";
 import { baseTermTitle, pagePath } from "@/lib/slug";
 import type { WikiLinkTarget } from "@/lib/markdown";
+import { isPageVisible } from "@/lib/page-visibility";
 
 /** 在线页面（未软删除）的最小信息。 */
 export interface LivePage {
@@ -41,10 +42,8 @@ export async function getLivePage(id: number): Promise<LivePage | null> {
   const [row] = await getDb()
     .select({ id: pages.id, type: pages.type, title: pages.title, slug: pages.slug })
     .from(pages)
-    .where(and(eq(pages.id, id), isNull(pages.deletedAt)))
+    .where(and(eq(pages.id, id), isPageVisible(pages.id)))
     .limit(1);
-  // 视角的所属词条或诠释者被删除时，正文、历史及编辑入口采用相同可见性。
-  if (row?.type === "perspective" && !(await getPerspectiveDetail(id))) return null;
   return row ?? null;
 }
 
@@ -62,12 +61,12 @@ export async function listTerms(): Promise<
         select count(*) from ${perspectives} pc
         join ${pages} pcPage on pcPage.id = pc.page_id
         join ${pages} piPage on piPage.id = pc.interpreter_id
-        where pc.term_id = ${pages.id} and pcPage.deleted_at is null and piPage.deleted_at is null
+        where pc.term_id = ${pages.id} and ${isPageVisible(sql`pcPage.id`)} and piPage.deleted_at is null
       )`.mapWith(Number),
     })
     .from(pages)
     .innerJoin(terms, eq(terms.pageId, pages.id))
-    .where(and(eq(pages.type, "term"), isNull(pages.deletedAt)))
+    .where(and(eq(pages.type, "term"), isPageVisible(pages.id)))
     .orderBy(asc(pages.id));
 }
 
@@ -89,7 +88,7 @@ export async function getTermDetail(id: number) {
     .from(pages)
     .innerJoin(terms, eq(terms.pageId, pages.id))
     .where(
-      and(eq(pages.id, id), eq(pages.type, "term"), isNull(pages.deletedAt)),
+      and(eq(pages.id, id), eq(pages.type, "term"), isPageVisible(pages.id)),
     )
     .limit(1);
   return row ?? null;
@@ -126,7 +125,7 @@ export async function listPerspectivesOfTerm(
     })
     .from(links)
     .innerJoin(sourcePages, eq(sourcePages.id, links.sourcePageId))
-    .where(isNull(sourcePages.deletedAt))
+    .where(isPageVisible(sourcePages.id))
     .groupBy(links.targetPageId)
     .as("link_counts");
 
@@ -150,7 +149,7 @@ export async function listPerspectivesOfTerm(
     .where(
       and(
         eq(perspectives.termId, termId),
-        isNull(pages.deletedAt),
+        isPageVisible(pages.id),
         isNull(interpreterPages.deletedAt),
       ),
     )
@@ -194,7 +193,7 @@ export async function listInterpreters(): Promise<
     .select({ pageId: interpreters.pageId, name: pages.title, slug: pages.slug, summary: interpreters.summary, isBoard: interpreters.isEditorialBoard })
     .from(interpreters)
     .innerJoin(pages, eq(pages.id, interpreters.pageId))
-    .where(and(eq(pages.type, "interpreter"), isNull(pages.deletedAt)))
+    .where(and(eq(pages.type, "interpreter"), isPageVisible(pages.id)))
     .orderBy(asc(pages.id));
 }
 
@@ -208,7 +207,7 @@ export async function listRecentPerspectives(limit = 6) {
     .innerJoin(pages, eq(pages.id, perspectives.pageId))
     .innerJoin(termPages, eq(termPages.id, perspectives.termId))
     .innerJoin(interpreterPages, eq(interpreterPages.id, perspectives.interpreterId))
-    .where(and(isNull(pages.deletedAt), isNull(termPages.deletedAt), isNull(interpreterPages.deletedAt)))
+    .where(and(isPageVisible(pages.id), isNull(termPages.deletedAt), isNull(interpreterPages.deletedAt)))
     .orderBy(desc(pages.createdAt), desc(pages.id))
     .limit(limit);
 }
@@ -241,7 +240,7 @@ export async function getPerspectiveDetail(id: number) {
     .where(
       and(
         eq(perspectives.pageId, id),
-        isNull(pages.deletedAt),
+        isPageVisible(pages.id),
         isNull(termPages.deletedAt),
         isNull(interpreterPages.deletedAt),
       ),
@@ -268,7 +267,7 @@ export async function getInterpreterDetail(id: number) {
       and(
         eq(pages.id, id),
         eq(pages.type, "interpreter"),
-        isNull(pages.deletedAt),
+        isPageVisible(pages.id),
       ),
     )
     .limit(1);
@@ -298,7 +297,7 @@ export async function listPerspectivesOfInterpreter(
     .where(
       and(
         eq(perspectives.interpreterId, interpreterId),
-        isNull(pages.deletedAt),
+        isPageVisible(pages.id),
         isNull(termPages.deletedAt),
       ),
     )
@@ -308,7 +307,7 @@ export async function listPerspectivesOfInterpreter(
 /**
  * 页面双链的解析结果（受理时落库的即真相，ADR-0003 #4）：
  * links 行 join 目标页 → 名称 → 站内路径 / 红链。
- * 目标页软删除后视同红链（读路径不应导向 404）。
+ * 已解析目标暂不可用时保留身份，不导向 404，也不标作尚未创建。
  * 键为 wikiLinkKey 的规范形态：默认链接 = 词条名；显式视角链接 = 词条@诠释者。
  */
 export async function getWikiLinkTargets(
@@ -320,7 +319,7 @@ export async function getWikiLinkTargets(
       targetId: pages.id,
       type: pages.type,
       slug: pages.slug,
-      deletedAt: pages.deletedAt,
+      visible: isPageVisible(pages.id),
     })
     .from(links)
     .leftJoin(pages, eq(pages.id, links.targetPageId))
@@ -328,12 +327,12 @@ export async function getWikiLinkTargets(
 
   return new Map(
     rows.map((row) => {
-      const exists = row.targetId !== null && row.deletedAt === null;
+      const exists = row.targetId !== null && row.visible;
       return [
         row.name,
         exists
           ? { href: pagePath(row.type!, row.slug!, row.targetId!), exists: true }
-          : { href: "", exists: false },
+          : { href: "", exists: false, ...(row.targetId !== null ? { unavailable: true } : {}) },
       ];
     }),
   );
@@ -374,7 +373,7 @@ export async function listBacklinks(targetPageId: number): Promise<BacklinkItem[
     .where(
       and(
         eq(links.targetPageId, targetPageId),
-        isNull(sourcePages.deletedAt),
+        isPageVisible(sourcePages.id),
         isNull(termPages.deletedAt),
       ),
     )
@@ -409,7 +408,7 @@ async function listDisambiguationMembers(base: string): Promise<DisambiguationMe
       perspectiveCount: sql<number>`(
         select count(*) from ${perspectives} pc
         join ${pages} pcPage on pcPage.id = pc.page_id
-        where pc.term_id = ${pages.id} and pcPage.deleted_at is null
+        where pc.term_id = ${pages.id} and ${isPageVisible(sql`pcPage.id`)}
       )`.mapWith(Number),
     })
     .from(pages)
@@ -417,7 +416,7 @@ async function listDisambiguationMembers(base: string): Promise<DisambiguationMe
     .where(
       and(
         eq(pages.type, "term"),
-        isNull(pages.deletedAt),
+        isPageVisible(pages.id),
         like(pages.title, `${escapeLike(base)}\uFF08%\uFF09`),
       ),
     )
@@ -433,7 +432,7 @@ export async function getDisambiguationDetail(id: number) {
       and(
         eq(pages.id, id),
         eq(pages.type, "disambiguation"),
-        isNull(pages.deletedAt),
+        isPageVisible(pages.id),
       ),
     )
     .limit(1);
@@ -455,7 +454,7 @@ export async function getTermDisambiguation(termTitle: string) {
       and(
         eq(pages.type, "disambiguation"),
         eq(pages.title, base),
-        isNull(pages.deletedAt),
+        isPageVisible(pages.id),
       ),
     )
     .limit(1);
@@ -491,7 +490,7 @@ export async function listSchools(): Promise<
     })
     .from(pages)
     .innerJoin(schools, eq(schools.pageId, pages.id))
-    .where(and(eq(pages.type, "school"), isNull(pages.deletedAt)))
+    .where(and(eq(pages.type, "school"), isPageVisible(pages.id)))
     .orderBy(asc(pages.id));
 }
 
@@ -501,7 +500,7 @@ export async function getSchoolDetail(id: number) {
     .select({ id: pages.id, title: pages.title, slug: pages.slug, summary: schools.summary })
     .from(pages)
     .innerJoin(schools, eq(schools.pageId, pages.id))
-    .where(and(eq(pages.id, id), eq(pages.type, "school"), isNull(pages.deletedAt)))
+    .where(and(eq(pages.id, id), eq(pages.type, "school"), isPageVisible(pages.id)))
     .limit(1);
   return row ?? null;
 }
@@ -569,7 +568,7 @@ export async function listSchoolCoreTerms(
       and(
         eq(schoolMembers.schoolId, schoolId),
         isNull(memberPages.deletedAt),
-        isNull(pages.deletedAt),
+        isPageVisible(pages.id),
         isNull(termPages.deletedAt),
       ),
     )
@@ -586,7 +585,7 @@ export async function listSchoolsOfInterpreter(
     .from(schoolMembers)
     .innerJoin(schools, eq(schools.pageId, schoolMembers.schoolId))
     .innerJoin(pages, eq(pages.id, schools.pageId))
-    .where(and(eq(schoolMembers.interpreterId, interpreterId), isNull(pages.deletedAt)))
+    .where(and(eq(schoolMembers.interpreterId, interpreterId), isPageVisible(pages.id)))
     .orderBy(asc(pages.id));
 }
 
@@ -616,7 +615,7 @@ export async function listCategoryRows(): Promise<CategoryRow[]> {
       })
       .from(termCategories)
       .innerJoin(pages, eq(pages.id, termCategories.termId))
-      .where(isNull(pages.deletedAt))
+      .where(isPageVisible(pages.id))
       .groupBy(termCategories.categoryId),
   ]);
   const countByCategory = new Map(counts.map((row) => [row.categoryId, row.count]));
@@ -649,7 +648,7 @@ export async function getCategoryDetailBySlug(slug: string): Promise<CategoryDet
     .from(termCategories)
     .innerJoin(terms, eq(terms.pageId, termCategories.termId))
     .innerJoin(pages, eq(pages.id, terms.pageId))
-    .where(and(eq(termCategories.categoryId, category.id), isNull(pages.deletedAt)))
+    .where(and(eq(termCategories.categoryId, category.id), isPageVisible(pages.id)))
     .orderBy(asc(pages.id));
 
   return {
@@ -671,6 +670,6 @@ export async function listCategoriesOfTerm(
     .from(termCategories)
     .innerJoin(categories, eq(categories.id, termCategories.categoryId))
     .innerJoin(pages, eq(pages.id, termCategories.termId))
-    .where(and(eq(termCategories.termId, termId), isNull(pages.deletedAt)))
+    .where(and(eq(termCategories.termId, termId), isPageVisible(pages.id)))
     .orderBy(asc(categories.id));
 }

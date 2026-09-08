@@ -5,7 +5,7 @@
 import Link from "next/link";
 
 import { SearchBox } from "@/components/search-box";
-import { getSearchIndex } from "@/lib/search/search-service";
+import { searchPublicPages } from "@/lib/search/public-search";
 import {
   SEARCH_TYPES,
   SEARCH_TYPE_LABELS,
@@ -103,7 +103,7 @@ async function runSearch(parsed: ParsedSearchParams): Promise<
   { error: false; hits: SearchHit[]; total: number; facets: SearchFacets } | { error: true }
 > {
   try {
-    const result = await getSearchIndex().search(parsed.q, {
+    const result = await searchPublicPages(parsed.q, {
       type: parsed.type,
       limit: parsed.limit,
       offset: parsed.offset,

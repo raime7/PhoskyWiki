@@ -6,6 +6,8 @@
 
 import "server-only";
 
+import { isPageVisible } from "@/lib/page-visibility";
+
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -119,7 +121,7 @@ async function countInterestMatches(
           and(
             inArray(perspectives.termId, termIds),
             inArray(perspectives.interpreterId, interpreterIds),
-            isNull(perspectivePages.deletedAt),
+            isPageVisible(perspectivePages.id),
             isNull(interpreterPages.deletedAt),
           ),
         )

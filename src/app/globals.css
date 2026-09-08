@@ -145,3 +145,8 @@
   @apply cursor-help text-red-700 no-underline dark:text-red-400;
   border-bottom: 1px dashed currentColor;
 }
+
+.wiki-content .wiki-link--unavailable {
+  @apply cursor-help text-muted-foreground no-underline;
+  border-bottom: 1px dotted currentColor;
+}

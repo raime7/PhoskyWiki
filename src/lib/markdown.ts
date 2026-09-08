@@ -21,6 +21,8 @@ export interface WikiLinkTarget {
   href: string;
   /** false = 目标页不存在（红链） */
   exists: boolean;
+  /** 已解析的页面因软删除或父页面删除而暂不可用，不是写作缺口。 */
+  unavailable?: boolean;
 }
 
 export type ResolveWikiLink = (ref: WikiLinkRef) => WikiLinkTarget;
@@ -62,14 +64,14 @@ function rewriteWikiLinks(resolve: ResolveWikiLink) {
       const parsed = parseWikiLink(node.value, node.data?.alias ?? null);
       // remark-wiki-link 保证 value 非空，解析失败仅可能来自空白名，防御性跳过
       if (!parsed) return;
-      const { href, exists } = resolve(parsed);
+      const { href, exists, unavailable } = resolve(parsed);
       if (exists) {
         node.data!.hProperties = { className: ["wiki-link"], href };
       } else {
         node.data!.hName = "span";
         node.data!.hProperties = {
-          className: ["wiki-link", "wiki-link--red"],
-          title: parsed.interpreter === null ? "词条尚未创建" : "视角尚未创建",
+          className: ["wiki-link", unavailable ? "wiki-link--unavailable" : "wiki-link--red"],
+          title: unavailable ? "页面暂不可用" : parsed.interpreter === null ? "词条尚未创建" : "视角尚未创建",
         };
       }
       node.data!.hChildren = [{ type: "text", value: parsed.display }];

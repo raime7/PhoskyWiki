@@ -13,7 +13,7 @@ import { auth } from "@/lib/auth";
 import { seedDatabase } from "@/db/seed";
 import { seedAdminAccount } from "@/db/seed-admin";
 import { getDb } from "@/db";
-import { links, pages, terms, user } from "@/db/schema";
+import { links, pages, perspectives, terms, user } from "@/db/schema";
 import {
   getDisambiguationDetail,
   getHeadContent,
@@ -550,6 +550,14 @@ describe("软删除视角不出现在任何计数里", () => {
           })
           .returning({ id: pages.id });
         fixtureIds.push(fixture.id);
+        const [term] = await db.insert(pages).values({
+          type: "term", title: `热度夹具词条 ${fixture.id}`, slug: `heat-term-${fixture.id}`,
+        }).returning({ id: pages.id });
+        fixtureIds.push(term.id);
+        await db.insert(terms).values({ pageId: term.id });
+        await db.insert(perspectives).values({
+          pageId: fixture.id, termId: term.id, interpreterId: foucaultBefore.interpreterId,
+        });
         await db.insert(links).values({
           sourcePageId: fixture.id,
           targetPageId: foucaultBefore.pageId,

@@ -1,6 +1,7 @@
 // 搜索联想 API（即打即搜）：输入前缀返回小结果集，供搜索框下拉。
 
-import { getSearchIndex, searchErrorResponse } from "@/lib/search/search-service";
+import { searchErrorResponse } from "@/lib/search/search-service";
+import { suggestPublicPages } from "@/lib/search/public-search";
 import { SEARCH_QUERY_MAX_LENGTH } from "@/lib/search/search-types";
 
 const SUGGEST_LIMIT_DEFAULT = 8;
@@ -16,7 +17,7 @@ export async function GET(req: Request) {
       : SUGGEST_LIMIT_DEFAULT;
   if (!q) return Response.json({ suggestions: [] });
   try {
-    const suggestions = await getSearchIndex().suggest(q, limit);
+    const suggestions = await suggestPublicPages(q, limit);
     return Response.json({ suggestions });
   } catch (err) {
     return searchErrorResponse("搜索联想失败", err);

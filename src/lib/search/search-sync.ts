@@ -24,6 +24,7 @@ import {
 import { getSearchIndex } from "@/lib/search/search-service";
 import { discussionDocId, type SearchDocument } from "@/lib/search/search-types";
 import { pageKey } from "@/lib/slug";
+import { isPageVisible } from "@/lib/page-visibility";
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
@@ -210,6 +211,7 @@ export async function buildSearchDocuments(pageIds: number[]): Promise<{
       title: pages.title,
       slug: pages.slug,
       deletedAt: pages.deletedAt,
+      visible: isPageVisible(pages.id),
     })
     .from(pages)
     .where(inArray(pages.id, pageIds));
@@ -220,7 +222,7 @@ export async function buildSearchDocuments(pageIds: number[]): Promise<{
   const liveByType = new Map<PageType, PageRow[]>();
   for (const id of pageIds) {
     const row = rowById.get(id);
-    if (!row || row.deletedAt !== null || !INDEXED_TYPES.has(row.type)) {
+    if (!row || !row.visible || !INDEXED_TYPES.has(row.type)) {
       removeIds.push(id);
       continue;
     }

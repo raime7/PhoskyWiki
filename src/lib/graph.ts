@@ -10,13 +10,14 @@
 //     （并列取学派 id 较小者，保证确定性；无学派成员视角的词条不着色）。
 //
 // 可见性口径不宽于反链面板（引用方/目标页、两侧词条任一软删除即不可见），
-// 且更严：两侧诠释者页软删除也不进图（反链面板与首页列表未过滤诠释者软删除，
-// 图谱以「读者能顺着双链两端完整读到内容」为准取交集）。
+// 两侧视角及其词条、诠释者使用与正文和反链相同的可见性判定。
 //
 // 局部图谱复用全量聚合后在内存 BFS（词条量千级内单次聚合查询仅毫秒级，
 // 换取两个视图严格同一份边集）；结果取 BFS 节点集的诱导子图。
 
 import "server-only";
+
+import { isPageVisible } from "@/lib/page-visibility";
 
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -85,10 +86,10 @@ async function aggregateTermPairs(): Promise<Map<number, Map<number, number>>> {
     .where(
       and(
         inArray(targetPages.type, ["term", "perspective"]),
-        isNull(sourcePages.deletedAt),
+        isPageVisible(sourcePages.id),
         isNull(sourceTermPages.deletedAt),
         isNull(sourceInterpreterPages.deletedAt),
-        isNull(targetPages.deletedAt),
+        isPageVisible(targetPages.id),
         isNull(targetTermPages.deletedAt),
         // 目标是视角页时，其诠释者须在线（term 目标不适用）
         sql`(${targetPerspectives.pageId} is null or ${targetInterpreterPages.id} is null or ${targetInterpreterPages.deletedAt} is null)`,

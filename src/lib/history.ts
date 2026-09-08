@@ -6,7 +6,6 @@ import { pages, revisions } from "@/db/schema";
 import { applyContentChange, lockLivePage, ReviewError, type Actor } from "@/lib/review";
 import { queueSearchSync, transactionWithSearchSync } from "@/lib/search/search-sync";
 import { diffLines } from "@/lib/diff";
-import { rebuildPageLinks } from "@/lib/page-links";
 import { getLivePage } from "@/lib/content";
 
 export function historyId(value: unknown): number {
@@ -61,10 +60,8 @@ export async function setPageDeleted(pageId: number, deleted: boolean, actor: Ac
     if (Boolean(page.deletedAt) === deleted) return { deleted };
     await tx.update(pages).set({ deletedAt: deleted ? new Date() : null, updatedAt: new Date() })
       .where(eq(pages.id, pageId));
-    const [head] = await tx.select({ content: revisions.content }).from(revisions)
-      .where(eq(revisions.pageId, pageId)).orderBy(desc(revisions.id)).limit(1);
-    // 删除时移除出链，恢复时从保留的 head 重建；入链保留 id，读路径据 deletedAt 显示红链。
-    await rebuildPageLinks(tx, pageId, deleted ? "" : head?.content ?? "");
+    // 删除/恢复只改变可见性。出链与入链都保留保存时解析的 id，
+    // 读路径过滤隐藏来源/目标；按名称重建会在目标改名后破坏关系身份。
     // 删除 → 索引移除；恢复 → 文档重建 upsert（同一同步入口，ADR-0004 #8）
     queueSearchSync(tx, pageId);
     return { deleted };
