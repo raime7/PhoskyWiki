@@ -2,6 +2,8 @@
 // 的最后一步。事务内只 queueSearchSync 记页面 id；transactionWithSearchSync 在事务提交后
 // 从 PG（只读、已提交状态）重建文档再写索引。索引写失败只记日志不回滚写路径——
 // PG 是唯一内容存储，索引可随时由 reindexAll 重建。
+// 讨论楼层（T13）不是页面，走平行的 queueDiscussionSync / syncDiscussionPosts 管线，
+// 语义相同；词条可见性翻转（软删除/恢复）连带其全部楼层。
 // 改名（换 slug）尚未落地；接入时走同一管线即可获得索引同步。
 
 import "server-only";
@@ -11,6 +13,7 @@ import { alias } from "drizzle-orm/pg-core";
 
 import { getDb, type Db } from "@/db";
 import {
+  discussionPosts,
   interpreters,
   pages,
   perspectives,
@@ -19,14 +22,16 @@ import {
   type PageType,
 } from "@/db/schema";
 import { getSearchIndex } from "@/lib/search/search-service";
-import type { SearchDocument } from "@/lib/search/search-types";
+import { discussionDocId, type SearchDocument } from "@/lib/search/search-types";
+import { pageKey } from "@/lib/slug";
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
-/** 一期进索引的页面类型；讨论帖维度随讨论区（T13）数据出现，消歧义/学派页不进索引。 */
+/** 一期进索引的页面类型；讨论楼层不是页面，经独立的 discussion 管线进索引；消歧义/学派页不进索引。 */
 const INDEXED_TYPES: ReadonlySet<PageType> = new Set(["term", "interpreter", "perspective"]);
 
 const pendingPageIds = new WeakMap<object, Set<number>>();
+const pendingDiscussionPostIds = new WeakMap<object, Set<number>>();
 
 /** 生效管线内调用（事务中）：记录事务提交后待同步的页面。 */
 export function queueSearchSync(tx: Tx, ...pageIds: number[]): void {
@@ -38,22 +43,38 @@ export function queueSearchSync(tx: Tx, ...pageIds: number[]): void {
   for (const id of pageIds) set.add(id);
 }
 
+/** 讨论写路径内调用（事务中）：记录事务提交后待同步的楼层。 */
+export function queueDiscussionSync(tx: Tx, ...postIds: number[]): void {
+  let set = pendingDiscussionPostIds.get(tx);
+  if (!set) {
+    set = new Set();
+    pendingDiscussionPostIds.set(tx, set);
+  }
+  for (const id of postIds) set.add(id);
+}
+
 /**
- * 受理/直编/回滚/软删除/恢复共用的写路径事务：fn 内 queueSearchSync 记下的页面，
- * 在事务提交后统一同步索引；事务回滚则什么都不同步。
+ * 受理/直编/回滚/软删除/恢复共用的写路径事务：fn 内 queueSearchSync / queueDiscussionSync
+ * 记下的页面与楼层，在事务提交后统一同步索引；事务回滚则什么都不同步。
  */
 export async function transactionWithSearchSync<T>(
   db: Db,
   fn: (tx: Tx) => Promise<T>,
 ): Promise<T> {
   let pending: Set<number> | undefined;
+  let pendingDiscussion: Set<number> | undefined;
   const result = await db.transaction(async (tx) => {
     pending = new Set();
+    pendingDiscussion = new Set();
     pendingPageIds.set(tx, pending);
+    pendingDiscussionPostIds.set(tx, pendingDiscussion);
     return fn(tx);
   });
   if (pending && pending.size > 0) {
     await syncPages([...pending]);
+  }
+  if (pendingDiscussion && pendingDiscussion.size > 0) {
+    await syncDiscussionPosts([...pendingDiscussion]);
   }
   return result;
 }
@@ -62,12 +83,21 @@ export async function transactionWithSearchSync<T>(
 export async function syncPages(pageIds: number[]): Promise<void> {
   if (pageIds.length === 0) return;
   try {
-    // 词条/诠释者的可见性翻转连带其视角（读路径同口径），同步集合按依赖扩展
-    const allIds = await expandWithDependentPerspectives(pageIds);
+    // 词条/诠释者的可见性翻转连带其视角与讨论楼层（读路径同口径），同步集合按依赖扩展
+    const { pageIds: allIds, termIds } = await expandWithDependencies(pageIds);
     const { docs, removeIds } = await buildSearchDocuments(allIds);
     const index = getSearchIndex();
     if (removeIds.length > 0) await index.remove(removeIds);
     if (docs.length > 0) await index.upsert(docs);
+    if (termIds.length > 0) {
+      const postIds = (
+        await getDb()
+          .select({ id: discussionPosts.id })
+          .from(discussionPosts)
+          .where(inArray(discussionPosts.termId, termIds))
+      ).map((row) => row.id);
+      await syncDiscussionPosts(postIds);
+    }
   } catch (err) {
     console.error(
       `搜索索引增量同步失败（pages ${pageIds.join(", ")}），待全量校对修复：`,
@@ -76,8 +106,30 @@ export async function syncPages(pageIds: number[]): Promise<void> {
   }
 }
 
-/** 词条/诠释者的软删除与恢复会连带其全部视角的可见性：把这些视角并入同步集合。 */
-async function expandWithDependentPerspectives(pageIds: number[]): Promise<number[]> {
+/** 讨论楼层的提交后同步：在线楼层重建文档 upsert，软删除/词条不可见/已消失则 remove。 */
+export async function syncDiscussionPosts(postIds: number[]): Promise<void> {
+  if (postIds.length === 0) return;
+  try {
+    const { docs, removeIds } = await buildDiscussionDocuments(postIds);
+    const index = getSearchIndex();
+    if (removeIds.length > 0) await index.remove(removeIds);
+    if (docs.length > 0) await index.upsert(docs);
+  } catch (err) {
+    console.error(
+      `讨论帖索引增量同步失败（posts ${postIds.join(", ")}），待全量校对修复：`,
+      err,
+    );
+  }
+}
+
+/**
+ * 依赖扩展：词条/诠释者的软删除与恢复会连带其全部视角、词条连带其讨论楼层的可见性。
+ * 视角并入页面同步集合，讨论楼层交由 termIds 单独走楼层管线。
+ */
+async function expandWithDependencies(pageIds: number[]): Promise<{
+  pageIds: number[];
+  termIds: number[];
+}> {
   const db = getDb();
   const parents = await db
     .select({ id: pages.id, type: pages.type })
@@ -87,7 +139,7 @@ async function expandWithDependentPerspectives(pageIds: number[]): Promise<numbe
   const interpreterIds = parents
     .filter((row) => row.type === "interpreter")
     .map((row) => row.id);
-  if (termIds.length === 0 && interpreterIds.length === 0) return pageIds;
+  if (termIds.length === 0 && interpreterIds.length === 0) return { pageIds, termIds };
 
   const dependents = new Set(pageIds);
   if (termIds.length > 0) {
@@ -106,12 +158,12 @@ async function expandWithDependentPerspectives(pageIds: number[]): Promise<numbe
       dependents.add(row.pageId);
     }
   }
-  return [...dependents];
+  return { pageIds: [...dependents], termIds };
 }
 
 /** 全量校对（手动 / 定时兜底）：从 PG 重灌全部文档、清空索引，修复任何漂移。 */
 export async function reindexAll(): Promise<{ indexed: number }> {
-  const docs = await buildAllSearchDocuments();
+  const docs = [...(await buildAllSearchDocuments()), ...(await buildAllDiscussionDocuments())];
   await getSearchIndex().replaceAll(docs);
   return { indexed: docs.length };
 }
@@ -323,4 +375,84 @@ async function buildAllSearchDocuments(): Promise<SearchDocument[]> {
       body: row.headContent ?? "",
     })),
   ];
+}
+
+// ---------------------------------------------------------------------------
+// PG → 索引文档（讨论楼层，T13）
+// ---------------------------------------------------------------------------
+
+interface DiscussionRow {
+  id: number;
+  termId: number;
+  content: string;
+  deletedAt: Date | null;
+  termDeletedAt: Date | null;
+  termTitle: string;
+  termSlug: string;
+}
+
+function discussionDoc(row: DiscussionRow): SearchDocument {
+  return {
+    pageId: discussionDocId(row.id),
+    type: "discussion",
+    // 命中列表以词条为语境展示链接；slug 承载词条 pageKey，searchHitHref 据此拼讨论区路径
+    title: `「${row.termTitle}」的讨论`,
+    slug: pageKey(row.termSlug, row.termId),
+    body: row.content,
+  };
+}
+
+/** 楼层增量同步的文档构建：楼层软删除或词条不可见 → remove（与读路径同口径）。 */
+export async function buildDiscussionDocuments(postIds: number[]): Promise<{
+  docs: SearchDocument[];
+  removeIds: number[];
+}> {
+  const db = getDb();
+  const termPages = alias(pages, "search_discussion_term_pages");
+  const rows = await db
+    .select({
+      id: discussionPosts.id,
+      termId: discussionPosts.termId,
+      content: discussionPosts.content,
+      deletedAt: discussionPosts.deletedAt,
+      termDeletedAt: termPages.deletedAt,
+      termTitle: termPages.title,
+      termSlug: termPages.slug,
+    })
+    .from(discussionPosts)
+    .innerJoin(termPages, eq(termPages.id, discussionPosts.termId))
+    .where(inArray(discussionPosts.id, postIds));
+
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const docs: SearchDocument[] = [];
+  const removeIds: number[] = [];
+  for (const id of postIds) {
+    const row = byId.get(id);
+    if (!row || row.deletedAt !== null || row.termDeletedAt !== null) {
+      removeIds.push(discussionDocId(id));
+      continue;
+    }
+    docs.push(discussionDoc(row));
+  }
+  return { docs, removeIds };
+}
+
+/** 全量校对的讨论楼层构建：全部在线楼层一次取全（楼层软删除或词条不可见即缺席）。 */
+async function buildAllDiscussionDocuments(): Promise<SearchDocument[]> {
+  const db = getDb();
+  const termPages = alias(pages, "search_all_discussion_term_pages");
+  const rows = await db
+    .select({
+      id: discussionPosts.id,
+      termId: discussionPosts.termId,
+      content: discussionPosts.content,
+      deletedAt: discussionPosts.deletedAt,
+      termDeletedAt: termPages.deletedAt,
+      termTitle: termPages.title,
+      termSlug: termPages.slug,
+    })
+    .from(discussionPosts)
+    .innerJoin(termPages, eq(termPages.id, discussionPosts.termId))
+    .where(and(isNull(discussionPosts.deletedAt), isNull(termPages.deletedAt)));
+  return rows.map(discussionDoc);
 }

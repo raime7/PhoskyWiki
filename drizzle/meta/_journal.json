@@ -71,6 +71,13 @@
       "when": 1788830977214,
       "tag": "0009_productive_captain_america",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788833345999,
+      "tag": "0010_clever_old_lace",
+      "breakpoints": true
     }
   ]
 }

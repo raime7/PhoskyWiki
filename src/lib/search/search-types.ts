@@ -5,8 +5,8 @@
 import { pagePath } from "@/lib/slug";
 
 /**
- * 可搜索的类型维度。讨论帖是预留维度——讨论区（T13）落地前永远为空实现；
- * 消歧义/学派页一期不进索引（分面只做 词条/诠释者/视角 + 预留讨论）。
+ * 可搜索的类型维度。讨论帖以楼层为粒度进索引（T13：文档主键见 discussionDocId）；
+ * 消歧义/学派页不进索引（分面只做 词条/诠释者/视角/讨论）。
  */
 export const SEARCH_TYPES = ["term", "interpreter", "perspective", "discussion"] as const;
 
@@ -19,7 +19,7 @@ export const SEARCH_TYPE_LABELS: Record<SearchableType, string> = {
   discussion: "讨论",
 };
 
-/** 索引文档（PG → 索引的投影）：pageId 即 pages.id，作为索引主键。 */
+/** 索引文档（PG → 索引的投影）：pageId 即 pages.id，作为索引主键（讨论帖见 discussionDocId）。 */
 export interface SearchDocument {
   pageId: number;
   type: SearchableType;
@@ -74,9 +74,31 @@ export interface SearchIndex {
   replaceAll(docs: SearchDocument[]): Promise<void>;
 }
 
-/** 命中页面的站内路径；讨论维度在讨论区落地前无页面，返回空串。 */
+/**
+ * 讨论帖文档的 id 空间：讨论楼层不是页面（ADR-0003——讨论「挂」在词条上，不进
+ * pages 壳），自增 id 与 pages.id 必然撞号，而索引以单一数字主键 upsert/remove。
+ * 给楼层一个高偏移的独立区间；pages.id 是自增序列，到 2^30（十亿页面）之前都安全。
+ */
+export const DISCUSSION_DOC_ID_OFFSET = 2 ** 30;
+
+/** 楼层 id → 索引文档主键。 */
+export function discussionDocId(postId: number): number {
+  return DISCUSSION_DOC_ID_OFFSET + postId;
+}
+
+/** 索引文档主键 → 楼层 id（只对讨论文档有意义）。 */
+export function discussionPostId(docId: number): number {
+  return docId - DISCUSSION_DOC_ID_OFFSET;
+}
+
+/**
+ * 命中页面的站内路径。讨论帖文档的 slug 存其词条的 pageKey（`<slug>-<id>`），
+ * 命中跳到词条讨论区的对应楼层锚点。
+ */
 export function searchHitHref(hit: { type: SearchableType; slug: string; pageId: number }): string {
-  return hit.type === "discussion" ? "" : pagePath(hit.type, hit.slug, hit.pageId);
+  return hit.type === "discussion"
+    ? `/term/${hit.slug}/discussion#floor-${discussionPostId(hit.pageId)}`
+    : pagePath(hit.type, hit.slug, hit.pageId);
 }
 
 export interface ParsedSearchParams {

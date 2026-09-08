@@ -103,6 +103,18 @@ export default async function PerspectivePage({ params }: Params) {
             </div>
           </article>
 
+          <p className="mt-6 rounded-lg border border-border bg-card px-4 py-3 text-sm">
+            <Link
+              href={`/term/${pageKey(detail.termSlug, detail.termId)}/discussion?perspective=${detail.id}`}
+              className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              就这个视角发起讨论 →
+            </Link>
+            <span className="ml-2 text-xs text-muted-foreground">
+              （在「{detail.termTitle}」的讨论区带视角锚点开楼）
+            </span>
+          </p>
+
           <BacklinkPanel items={backlinks} />
         </div>
 

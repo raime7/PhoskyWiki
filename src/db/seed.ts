@@ -13,6 +13,7 @@ import { getDb } from "@/db";
 import { seedExtendedContent } from "@/db/seed-extended";
 import {
   categories,
+  discussionPosts,
   interpreters,
   links,
   pages,
@@ -23,6 +24,7 @@ import {
   submissionVotes,
   submissions,
   termCategories,
+  termDiscussions,
   terms,
 } from "@/db/schema";
 import { slugify } from "@/lib/slug";
@@ -403,7 +405,7 @@ export async function seedDatabase(): Promise<{
 }> {
   const db = getDb();
   await db.execute(
-    sql`truncate table ${submissionVotes}, ${submissions}, ${links}, ${revisions}, ${perspectives}, ${termCategories}, ${categories}, ${schoolMembers}, ${schools}, ${interpreters}, ${terms}, ${pages} restart identity cascade`,
+    sql`truncate table ${termDiscussions}, ${discussionPosts}, ${submissionVotes}, ${submissions}, ${links}, ${revisions}, ${perspectives}, ${termCategories}, ${categories}, ${schoolMembers}, ${schools}, ${interpreters}, ${terms}, ${pages} restart identity cascade`,
   );
 
   // 词条与消歧义页：pages 壳 + 负载/修订（消歧义页无负载表，ADR-0003 #6）

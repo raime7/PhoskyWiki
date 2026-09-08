@@ -31,7 +31,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
       <h1 className="text-2xl font-bold tracking-tight">全站搜索</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        覆盖词条名、诠释者名与视角正文；支持即打即搜联想。
+        覆盖词条名、诠释者名、视角正文与讨论帖；支持即打即搜联想。
       </p>
       <div className="mt-6">
         <SearchBox initialQuery={parsed.q} autoFocus size="lg" />

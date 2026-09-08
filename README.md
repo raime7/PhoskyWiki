@@ -92,3 +92,11 @@ CI（GitHub Actions）在每次 push 时跑 lint + typecheck + Vitest + Playwrig
 管理员置顶视角：`POST /api/admin/perspectives/<pageId>/pin`（置顶）/ `DELETE`（取消），幂等。
 准入在 T05 会话角色落地前为 fail-closed 停摆方案：仅在配置 `ADMIN_TOKEN` 环境变量时放行，
 凭 `x-admin-token` 请求头校验；未配置返回 503。
+
+## 讨论区（T13）
+
+每个词条一个讨论区：`/term/<slug>-<id>/discussion`。编者与管理员可开楼发言并对他楼做一层嵌套回复（纯文本、即时可见、单楼 2000 字上限——富格式仍只留给两票审核的页面内容）；游客全程只读，页面给出登录引导。视角页的「就这个视角发起讨论」跳到讨论区并带 `?perspective=<pageId>` 预填锚点，楼层上的锚点徽标可点击跳回该视角。
+
+版务（管理员）：软删楼层（`DELETE /api/discussion/posts/<postId>`，内容保留、渲染占位、可幂等重删）、锁定/解锁讨论区（`POST`/`DELETE /api/admin/discussion/<termId>/lock`，锁定后任何角色含管理员都不能发言）。发言走 `POST /api/discussion/posts`（游客 401）。
+
+讨论楼层不是页面（ADR-0003：讨论挂在词条上），以 `type: "discussion"` 进入派生搜索索引（ADR-0002）：索引主键用高偏移区段与 pages.id 区隔（见 `lib/search/search-types.ts` 的 `discussionDocId`），发楼/软删/词条软删除与恢复都走增量同步，全量校对一并重灌；搜索命中跳 `/term/<pageKey>/discussion#floor-<id>`。回复通知是二期项，暂不做。升级时先执行 `pnpm db:migrate` 创建讨论表。

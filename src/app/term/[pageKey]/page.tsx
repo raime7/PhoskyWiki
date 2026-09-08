@@ -18,12 +18,13 @@ import {
   listPerspectivesOfTerm,
 } from "@/lib/content";
 import { categoryPath } from "@/lib/categories";
+import { countDiscussionPosts } from "@/lib/discussion";
 import { getLocalGraph } from "@/lib/graph";
 import { getInterestTags, expandInterestedInterpreters } from "@/lib/interests";
 import { hasAnyInterest, reorderPerspectivesByInterest } from "@/lib/interest-tags";
 import { renderMarkdown, wikiLinkResolver } from "@/lib/markdown";
 import { listRelatedTerms } from "@/lib/recommend";
-import { pageIdFromKey, pagePath } from "@/lib/slug";
+import { pageIdFromKey, pageKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
 import { getSessionUser } from "@/lib/session";
 
@@ -43,7 +44,7 @@ export default async function TermPage({ params }: Params) {
   const term = await getTermDetail(page.id);
   if (!term) notFound();
 
-  const [perspectives, categories, backlinks, disambiguation, sessionUser, localGraph] =
+  const [perspectives, categories, backlinks, disambiguation, sessionUser, localGraph, discussionCount] =
     await Promise.all([
       listPerspectivesOfTerm(page.id),
       listCategoriesOfTerm(page.id),
@@ -51,6 +52,7 @@ export default async function TermPage({ params }: Params) {
       getTermDisambiguation(term.title),
       getSessionUser(),
       getLocalGraph(page.id, 1),
+      countDiscussionPosts(page.id),
     ]);
   const board = perspectives.find((p) => p.isBoard);
   const others = perspectives.filter((p) => !p.isBoard);
@@ -104,6 +106,14 @@ export default async function TermPage({ params }: Params) {
           <h1 className="text-3xl font-bold tracking-tight">{term.title}</h1>
           <p className="mt-3 text-lg leading-relaxed text-muted-foreground">
             {term.summary}
+          </p>
+          <p className="mt-2 text-sm">
+            <Link
+              href={`/term/${pageKey(page.slug, page.id)}/discussion`}
+              className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              讨论区（{discussionCount} 楼）→
+            </Link>
           </p>
 
           {board && boardContent !== null && (
