@@ -1,5 +1,4 @@
-// 编辑视角页（T06）：textarea 全量编辑 + 提交进审核队列（管理员直接生效）。
-// 编辑器体验（CodeMirror + 预览 + 补全）是后续工单，这里刻意素 textarea。
+// 词条编辑全量信息框，视角编辑 Markdown；各自基于本页独立修订。
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -14,6 +13,7 @@ import {
 } from "@/lib/content";
 import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { getSessionUser } from "@/lib/session";
+import { getTermEditingState } from "@/lib/review";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +23,8 @@ export default async function EditPage({ params }: Params) {
   const id = pageIdFromKey((await params).pageKey);
   if (!id) notFound();
   const page = await getLivePage(id);
-  // 一期编辑对象只有视角页：词条的正文在其通俗视角里（见 lib/review.ts 校验）
-  if (!page || page.type !== "perspective") notFound();
+  // 词条信息与视角正文共用提交管线，保持各自编辑边界。
+  if (!page || (page.type !== "perspective" && page.type !== "term")) notFound();
 
   const sessionUser = await getSessionUser();
   if (!sessionUser) {
@@ -50,6 +50,16 @@ export default async function EditPage({ params }: Params) {
         </div>
       </main>
     );
+  }
+
+  if (page.type === "term") {
+    const { snapshot, baseRevisionId } = await getTermEditingState(id);
+    return <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+      <Link href={pagePath("term", page.slug, id)} className="text-sm text-muted-foreground">返回词条 →</Link>
+      <h1 className="mt-4 text-2xl font-bold">编辑词条信息：{page.title}</h1>
+      <p className="my-4 text-sm text-muted-foreground">修改词条标题、简介和别名。正文请在通俗视角中编辑；别名仅用于展示。</p>
+      <SubmissionForm variant="edit_term" isAdmin={sessionUser.role === "admin"} pageId={id} initialMetadata={snapshot} baseRevisionId={baseRevisionId} />
+    </main>;
   }
 
   const detail = await getPerspectiveDetail(id);

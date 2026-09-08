@@ -13,11 +13,13 @@
 import { randomUUID } from "node:crypto";
 
 import { sql } from "drizzle-orm";
+import type { TermSnapshot, RevisionSource } from "@/lib/revision-snapshot";
 import {
   boolean,
   check,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -193,6 +195,10 @@ export const revisions = pgTable(
       .references(() => pages.id, { onDelete: "cascade" }),
     // Markdown 源文本，全量存储；diff 是展示期产物，不落库（ADR-0004）
     content: text("content").notNull(),
+    // Term metadata snapshots are independent of perspective Markdown; null marks legacy rows.
+    snapshot: jsonb("snapshot").$type<TermSnapshot>(),
+    source: text("source").$type<RevisionSource>().notNull().default("legacy"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     // 回滚创建新快照，来源指向同页既有修订（ADR-0004 #7）。
     rollbackFromId: integer("rollback_from_id").references((): AnyPgColumn => revisions.id),
     createdAt: timestamp("created_at", { withTimezone: true })

@@ -50,6 +50,7 @@ export async function getMySubmission(userId: string, id: number, isAdmin = fals
       baseRevisionId: submissions.baseRevisionId,
       pageId: submissions.pageId,
       baseContent: revisions.content,
+      baseSnapshot: revisions.snapshot,
     })
     .from(submissions)
     .leftJoin(revisions, eq(revisions.id, submissions.baseRevisionId))
@@ -57,5 +58,5 @@ export async function getMySubmission(userId: string, id: number, isAdmin = fals
     .limit(1);
   if (!proposal) return null;
   const baseHidden = !isAdmin && proposal.pageId !== null && !(await getLivePage(proposal.pageId));
-  return { ...item, ...proposal, baseHidden, baseContent: baseHidden ? null : proposal.baseContent };
+  return { ...item, ...proposal, baseHidden, baseContent: baseHidden ? null : proposal.baseContent, baseSnapshot: baseHidden ? null : proposal.baseSnapshot };
 }

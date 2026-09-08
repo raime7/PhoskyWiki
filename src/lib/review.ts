@@ -35,6 +35,7 @@ import type { CreateSubmissionResult, ReviewOutcome } from "@/lib/review-types";
 import { ImageError } from "@/lib/image-markdown";
 import { publishImageReferences, validateImageReferences } from "@/lib/images";
 import { lockPerspectiveParents } from "@/lib/perspective-parents";
+import { termSnapshot, type TermSnapshot, type RevisionSource } from "@/lib/revision-snapshot";
 
 export type { CreateSubmissionResult, ReviewOutcome } from "@/lib/review-types";
 
@@ -92,9 +93,9 @@ export interface SubmissionInput {
   pageId?: number;
   /** kind=edit/new_perspective：提议正文（Markdown 源文本） */
   content?: string;
-  /** kind=new_term/new_interpreter：新建页标题 */
+  /** 新建页或词条信息编辑：标题 */
   title?: string;
-  /** kind=new_term/new_interpreter：一句话简介 */
+  /** 新建页或词条信息编辑：一句话简介 */
   summary?: string;
   aliases?: string[];
   /** kind=new_perspective：挂载的词条与诠释者 */
@@ -151,7 +152,6 @@ async function validateSubmissionInput(
     case "edit": {
       const pageId = requiredInt(input.pageId, "缺少编辑目标页面");
       const content = (input.content ?? "").trim();
-      if (!content) throw new ReviewError(400, "正文不能为空");
       const [page] = await db
         .select({ type: pages.type, deletedAt: pages.deletedAt })
         .from(pages)
@@ -159,22 +159,31 @@ async function validateSubmissionInput(
         .limit(1);
       if (!page) throw new ReviewError(404, "目标页面不存在");
       if (page.deletedAt !== null) throw new ReviewError(404, "目标页面已被删除");
-      if (page.type !== "perspective") {
-        throw new ReviewError(400, "一期只支持编辑视角页正文（词条的正文在其通俗视角里）");
+      if (page.type !== "perspective" && page.type !== "term") {
+        throw new ReviewError(400, "只支持编辑词条信息和视角正文");
+      }
+      if (page.type === "perspective" && !content) throw new ReviewError(400, "正文不能为空");
+      if (page.type === "term") {
+        if (typeof input.title !== "string" || !input.title.trim()) throw new ReviewError(400, "标题不能为空");
+        if (typeof input.summary !== "string" || !Array.isArray(input.aliases) || input.aliases.length > 50 || input.aliases.some((a) => typeof a !== "string")) {
+          throw new ReviewError(400, "词条编辑必须提供完整简介和别名（最多 50 项）");
+        }
       }
       const baseRevisionId = requiredInt(input.baseRevisionId, "缺少 base 修订（编辑起点）");
       const [base] = await db
-        .select({ id: revisions.id })
+        .select({ id: revisions.id, snapshot: revisions.snapshot })
         .from(revisions)
         .where(and(eq(revisions.id, baseRevisionId), eq(revisions.pageId, pageId)))
         .limit(1);
       if (!base) throw new ReviewError(400, "base 修订不属于目标页面");
+      if (page.type === "term" && !base.snapshot) throw new ReviewError(400, "旧修订没有词条信息快照，请重新打开编辑页获取起始快照");
       return {
         kind: "edit",
         pageId,
-        content,
-        title: null,
-        summary: null,
+        content: page.type === "term" ? "" : content,
+        title: page.type === "term" ? input.title!.trim() : null,
+        summary: page.type === "term" ? input.summary!.trim() : null,
+        aliases: page.type === "term" ? [...new Set(input.aliases!.map((a) => a.trim()).filter(Boolean))] : [],
         termId: null,
         interpreterId: null,
         baseRevisionId,
@@ -279,7 +288,7 @@ export async function createSubmission(
     await validateImageReferences(db, validated.content, actor);
 
     if (actor.role === "admin") {
-      const applied = await applySubmission(db, { ...validated, submittedBy: actor.id });
+      const applied = await applySubmission(db, { ...validated, submittedBy: actor.id }, "direct");
       const [page] = await db
         .select({ type: pages.type, slug: pages.slug })
         .from(pages)
@@ -327,7 +336,7 @@ export async function importPages(inputs: SubmissionInput[], actor: Actor) {
       if (input.kind !== "new_term" && input.kind !== "new_interpreter") throw new ReviewError(400, "只能导入词条与诠释者");
       const validated = await validateSubmissionInput(tx, input);
       await validateImageReferences(tx, validated.content, actor);
-      const applied = await applySubmission(tx, { ...validated, submittedBy: actor.id });
+      const applied = await applySubmission(tx, { ...validated, submittedBy: actor.id }, "direct");
       results.push({ pageId: applied.pageId, href: pagePath(input.kind === "new_term" ? "term" : "interpreter", slugifyTitle(validated.title!), applied.pageId) });
     }
     // 本批页面都存在后再解析一次，避免先写视角留下指向后写词条的红链。
@@ -506,16 +515,50 @@ export async function applyContentChange(
   pageId: number,
   content: string,
   rollbackFromId: number | null = null,
+  attribution: { createdBy?: string; source?: RevisionSource } = {},
 ): Promise<number> {
   await publishImageReferences(tx, content);
   const [revision] = await tx
     .insert(revisions)
-    .values({ pageId, content, rollbackFromId, createdAt: new Date() })
+    .values({ pageId, content, rollbackFromId, ...attribution, source: rollbackFromId ? "rollback" : attribution.source ?? "legacy", createdAt: new Date() })
     .returning({ id: revisions.id });
   await rebuildPageLinks(tx, pageId, content);
   await tx.update(pages).set({ updatedAt: new Date() }).where(eq(pages.id, pageId));
   queueSearchSync(tx, pageId);
   return revision.id;
+}
+
+/** Apply metadata without interpreting it as Markdown. Caller holds the page lock. */
+export async function applyTermMetadataChange(
+  tx: Tx,
+  pageId: number,
+  snapshot: TermSnapshot,
+  rollbackFromId: number | null = null,
+  attribution: { createdBy?: string; source?: RevisionSource } = {},
+): Promise<number> {
+  await tx.update(pages).set({ title: snapshot.title, slug: slugifyTitle(snapshot.title), updatedAt: new Date() }).where(eq(pages.id, pageId));
+  await tx.update(terms).set({ summary: snapshot.summary, aliases: snapshot.aliases }).where(eq(terms.pageId, pageId));
+  // Keep a plain code-block projection for existing content readers; snapshot is authoritative.
+  const [revision] = await tx.insert(revisions).values({ pageId, content: infoboxSnapshot(snapshot), snapshot, rollbackFromId, ...attribution, source: rollbackFromId ? "rollback" : attribution.source ?? "direct", createdAt: new Date() }).returning({ id: revisions.id });
+  await rebuildPageLinks(tx, pageId, "");
+  queueSearchSync(tx, pageId);
+  // syncPages expands the term to its dependent perspective/discussion documents.
+  return revision.id;
+}
+
+/** Legacy/imported rows gain one honest baseline from current fields, under the page lock. */
+export async function getTermEditingState(pageId: number) {
+  return getDb().transaction(async (tx) => {
+    const page = await lockLivePage(tx, pageId);
+    if (page.type !== "term") throw new ReviewError(400, "目标必须是词条");
+    const [term] = await tx.select().from(terms).where(eq(terms.pageId, pageId));
+    if (!term) throw new ReviewError(404, "词条不存在");
+    const snapshot = termSnapshot({ title: page.title, summary: term.summary, aliases: term.aliases });
+    const [head] = await tx.select().from(revisions).where(eq(revisions.pageId, pageId)).orderBy(desc(revisions.id)).limit(1);
+    if (head?.snapshot) return { snapshot, baseRevisionId: head.id };
+    const [baseline] = await tx.insert(revisions).values({ pageId, content: "", snapshot, source: "baseline", createdAt: new Date() }).returning({ id: revisions.id });
+    return { snapshot, baseRevisionId: baseline.id };
+  });
 }
 
 /** 信息框是纯文本元数据，快照用 Markdown 代码块，不能被解释成正文图片或双链。 */
@@ -527,14 +570,19 @@ function infoboxSnapshot(value: { title: string | null; summary: string; aliases
 async function applySubmission(
   tx: Tx,
   sub: AppliableSubmission,
+  source: "direct" | "approval" = "approval",
 ): Promise<{ pageId: number }> {
   switch (sub.kind) {
     case "edit": {
-      await lockLivePage(tx, sub.pageId!);
+      const page = await lockLivePage(tx, sub.pageId!);
       if (await headRevisionId(tx, sub.pageId!) !== sub.baseRevisionId) {
         throw new ReviewError(409, "页面已有新的修订，请基于当前修订重新编辑");
       }
-      await applyContentChange(tx, sub.pageId!, sub.content);
+      if (page.type === "term") {
+        await applyTermMetadataChange(tx, sub.pageId!, termSnapshot({ title: sub.title!, summary: sub.summary ?? "", aliases: sub.aliases ?? [] }), null, { source, createdBy: sub.submittedBy });
+      } else {
+        await applyContentChange(tx, sub.pageId!, sub.content, null, { source, createdBy: sub.submittedBy });
+      }
       return { pageId: sub.pageId! };
     }
     case "new_term": {
@@ -548,7 +596,7 @@ async function applySubmission(
         })
         .returning({ id: pages.id });
       await tx.insert(terms).values({ pageId: page.id, summary: sub.summary ?? "", aliases: sub.aliases ?? [] });
-      await applyContentChange(tx, page.id, infoboxSnapshot({ title: sub.title, summary: sub.summary ?? "", aliases: sub.aliases ?? [] }));
+      await applyTermMetadataChange(tx, page.id, termSnapshot({ title: sub.title!, summary: sub.summary ?? "", aliases: sub.aliases ?? [] }), null, { source: "create", createdBy: sub.submittedBy });
       if (sub.content) {
         const [board] = await tx.select({ id: interpreters.pageId }).from(interpreters)
           .innerJoin(pages, eq(pages.id, interpreters.pageId))
@@ -571,7 +619,7 @@ async function applySubmission(
       await tx
         .insert(interpreters)
         .values({ pageId: page.id, summary: sub.summary ?? "" });
-      await applyContentChange(tx, page.id, infoboxSnapshot({ title: sub.title, summary: sub.summary ?? "" }));
+      await applyContentChange(tx, page.id, infoboxSnapshot({ title: sub.title, summary: sub.summary ?? "" }), null, { source: "create", createdBy: sub.submittedBy });
       return { pageId: page.id };
     }
     case "new_perspective": {
@@ -592,7 +640,7 @@ async function applySubmission(
         termId: sub.termId!,
         interpreterId: sub.interpreterId!,
       });
-      await applyContentChange(tx, page.id, sub.content);
+      await applyContentChange(tx, page.id, sub.content, null, { source: "create", createdBy: sub.submittedBy });
       return { pageId: page.id };
     }
   }
@@ -603,6 +651,7 @@ async function applySubmission(
 // ---------------------------------------------------------------------------
 
 export interface QueueItem {
+  currentMetadata: TermSnapshot | null;
   aliases: string[];
   id: number;
   kind: SubmissionKind;
@@ -709,6 +758,9 @@ export async function listQueue(): Promise<QueueItem[]> {
         )
     : [];
   const contentByRevision = new Map(headContents.map((row) => [row.id, row.content]));
+  const termRows = editPageIds.length ? await db.select({ pageId: terms.pageId, title: pages.title, summary: terms.summary, aliases: terms.aliases })
+    .from(terms).innerJoin(pages, eq(pages.id, terms.pageId)).where(inArray(terms.pageId, editPageIds)) : [];
+  const metadataByPage = new Map(termRows.map((row) => [row.pageId, termSnapshot(row)]));
 
   // new_perspective 的挂载名称
   const mountPageIds = rows
@@ -726,6 +778,7 @@ export async function listQueue(): Promise<QueueItem[]> {
     const page = row.pageId !== null ? pageById.get(row.pageId) : undefined;
     const headId = row.pageId !== null ? headByPage.get(row.pageId) : undefined;
     return {
+      currentMetadata: row.pageId ? metadataByPage.get(row.pageId) ?? null : null,
       id: row.id,
       kind: row.kind,
       status: row.status,

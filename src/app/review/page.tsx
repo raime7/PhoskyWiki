@@ -4,6 +4,8 @@
 import Link from "next/link";
 
 import { ContentDiff } from "@/components/content-diff";
+import { TermMetadataDiff } from "@/components/term-metadata-diff";
+import { termSnapshot } from "@/lib/revision-snapshot";
 import { WikiContent } from "@/components/wiki-content";
 import { renderMarkdown } from "@/lib/markdown";
 import { ReviewActions } from "@/components/review-actions";
@@ -39,7 +41,7 @@ function QueueEntry({ item }: { item: QueueItem }) {
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <span className="rounded bg-secondary px-1.5 py-0.5 text-xs">
-          {kindLabels[item.kind]}
+          {item.currentMetadata ? "编辑词条信息" : kindLabels[item.kind]}
         </span>
         <span className="font-medium">{target}</span>
         {item.targetHref && (
@@ -69,7 +71,9 @@ function QueueEntry({ item }: { item: QueueItem }) {
           对比当前版与提案
         </summary>
         <div className="mt-3">
-          {item.kind === "edit" && item.currentContent !== null ? (
+          {item.currentMetadata ? (
+            <TermMetadataDiff from={item.currentMetadata} to={termSnapshot({ title: item.title!, summary: item.summary ?? "", aliases: item.aliases })} />
+          ) : item.kind === "edit" && item.currentContent !== null ? (
             <ContentDiff oldText={item.currentContent} newText={item.content} />
           ) : (
             <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">

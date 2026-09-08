@@ -88,6 +88,10 @@ export default async function TermPage({ params }: Params) {
         <span aria-current="page">{term.title}</span>
       </nav>
       <HistoryLink pageId={page.id} />
+      {sessionUser && <div className="mb-4 flex gap-4 text-sm">
+        <Link href={`/edit/${pageKey(page.slug, page.id)}`} className="text-primary hover:underline">编辑词条信息</Link>
+        {board && <Link href={`/edit/${pageKey(board.slug, board.pageId)}`} className="text-primary hover:underline">编辑通俗视角</Link>}
+      </div>}
 
       <div className="flex flex-col gap-10 lg:flex-row lg:gap-10">
         <div className="min-w-0 flex-1">

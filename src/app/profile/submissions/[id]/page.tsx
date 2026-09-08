@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ContentDiff } from "@/components/content-diff";
+import { TermMetadataDiff } from "@/components/term-metadata-diff";
+import { termSnapshot } from "@/lib/revision-snapshot";
 import { getSessionUser } from "@/lib/session";
 import { getMySubmission } from "@/lib/submission-history";
 import { formatWhen, kindLabels, RejectionReason, statusLabels } from "../../_components";
@@ -25,7 +27,7 @@ export default async function SubmissionDetailPage({ params }: Props) {
   if (!submission) notFound();
 
   const proposedText =
-    submission.kind === "new_term" || submission.kind === "new_interpreter"
+    submission.kind === "new_term" || submission.kind === "new_interpreter" || (submission.kind === "edit" && submission.title !== null)
       ? `标题：${submission.title ?? ""}\n简介：${submission.summary ?? ""}\n别名：${submission.aliases.join("、")}\n\n${submission.content}`
       : submission.content;
 
@@ -36,7 +38,7 @@ export default async function SubmissionDetailPage({ params }: Props) {
       </Link>
       <h1 className="mt-4 text-2xl font-bold tracking-tight">提交详情</h1>
       <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-        <span className="rounded bg-secondary px-1.5 py-0.5 text-xs">{kindLabels[submission.kind]}</span>
+        <span className="rounded bg-secondary px-1.5 py-0.5 text-xs">{submission.kind === "edit" && submission.title !== null ? "编辑词条信息" : kindLabels[submission.kind]}</span>
         <span className="min-w-0 break-words font-medium">{submission.targetTitle}</span>
         <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{statusLabels[submission.status]}</span>
       </div>
@@ -55,7 +57,9 @@ export default async function SubmissionDetailPage({ params }: Props) {
         </p>
         {submission.baseHidden
           ? <pre className="whitespace-pre-wrap break-words rounded bg-muted p-3 text-sm">{proposedText}</pre>
-          : <ContentDiff oldText={submission.baseContent ?? ""} newText={proposedText} />}
+          : submission.baseSnapshot
+            ? <TermMetadataDiff from={submission.baseSnapshot} to={termSnapshot({ title: submission.title!, summary: submission.summary ?? "", aliases: submission.aliases })} />
+            : <ContentDiff oldText={submission.baseContent ?? ""} newText={proposedText} />}
       </section>
     </main>
   );

@@ -1,0 +1,147 @@
+import "dotenv/config";
+import { randomUUID } from "node:crypto";
+import { Pool } from "pg";
+import { expect, test, type APIRequestContext } from "@playwright/test";
+
+const password = process.env.SEED_ADMIN_PASSWORD!;
+async function create(request: APIRequestContext, data: object) {
+  const response = await request.post("/api/submissions", { data });
+  expect(response.status()).toBe(201);
+  return response.json();
+}
+
+test("词条草稿、独立编辑、两票逐字段审核、旧 URL 与普通及显式双链", async ({ page, browser, baseURL }) => {
+  test.setTimeout(120_000);
+  expect(password, "独立环境必须配置种子管理员").toBeTruthy();
+  const signed = await page.request.post("/api/auth/sign-in/email", { data: { email: process.env.SEED_ADMIN_EMAIL, password } });
+  expect(signed.ok()).toBe(true);
+  const token = randomUUID();
+  const originalTitle = `Metadata Old ${token}`;
+  const renamedTitle = `Metadata New ${token}`;
+  const term = await create(page.request, { kind: "new_term", title: originalTitle, summary: "原简介", aliases: ["原别名"], content: "通俗视角保持独立。" });
+  const interpreter = await create(page.request, { kind: "new_interpreter", title: `Reader ${token}` });
+  const targetPerspective = await create(page.request, { kind: "new_perspective", termId: term.pageId, interpreterId: interpreter.pageId, content: "精确指向的视角。" });
+  const source = await create(page.request, { kind: "new_term", title: `Source ${token}`, content: `普通 [[${originalTitle}]]，显式 [[${originalTitle}|精确链接@Reader ${token}]]，别名 [[新别名]]。` });
+  const historyUrl = `/api/pages/${term.pageId}/history`;
+  const perspectiveHistory = await (await page.request.get(`/api/pages/${targetPerspective.pageId}/history`)).json();
+  const editorContext = await browser.newContext({ baseURL });
+  const reviewerContext = await browser.newContext({ baseURL });
+  const visitorContext = await browser.newContext({ baseURL });
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  let secondAdminId: string | undefined;
+  try {
+    const editor = await editorContext.newPage();
+    expect((await editor.request.post("/api/auth/sign-up/email", { data: { email: `term-editor-${token}@example.com`, password: "password123", name: "词条编者" } })).ok()).toBe(true);
+    const adminSignup = await reviewerContext.request.post("/api/auth/sign-up/email", { data: { email: `term-admin-${token}@example.com`, password: "password123", name: "第二管理员" } });
+    secondAdminId = (await adminSignup.json()).user.id;
+    await pool.query('UPDATE "user" SET role = $1 WHERE id = $2', ["admin", secondAdminId]);
+    const visitor = await visitorContext.newPage();
+    await visitor.goto(term.href);
+    await expect(visitor.getByRole("link", { name: "编辑词条信息", exact: true })).toHaveCount(0);
+    await editor.goto(term.href);
+    await expect(editor.getByRole("link", { name: "编辑通俗视角", exact: true })).toBeVisible();
+    await editor.getByRole("link", { name: "编辑词条信息", exact: true }).click();
+    await expect(editor.getByRole("textbox", { name: "正文（Markdown）" })).toHaveCount(0);
+    await editor.getByLabel("词条标题", { exact: true }).fill(renamedTitle);
+    await editor.getByLabel("一句话简介（信息框用）").fill("新简介");
+    await editor.getByLabel("别名（信息框用，以逗号分隔）").fill("新别名,另一个别名");
+    await expect(editor.getByText(/草稿已自动保存/)).toBeVisible();
+    await editor.reload();
+    await expect(editor.getByLabel("词条标题", { exact: true })).toHaveValue(renamedTitle);
+    await expect(editor.getByLabel("一句话简介（信息框用）")).toHaveValue("新简介");
+    await expect(editor.getByLabel("别名（信息框用，以逗号分隔）")).toHaveValue("新别名,另一个别名");
+    const proposalResponse = editor.waitForResponse((r) => r.url().endsWith("/api/submissions") && r.request().method() === "POST");
+    await editor.getByRole("button", { name: "提交审核", exact: true }).click();
+    const proposal = await (await proposalResponse).json();
+    expect(proposal.quorum).toBe(2);
+    await expect(editor.getByTestId("submit-success")).toBeVisible();
+    expect(await editor.evaluate((id) => localStorage.getItem(`phoskywiki:draft:edit_term:${id}`), term.pageId)).toBeNull();
+    await editor.goto(`/profile/submissions/${proposal.submissionId}`);
+    await expect(editor.getByTestId("term-metadata-diff")).toContainText(renamedTitle);
+    await visitor.reload();
+    await expect(visitor.getByRole("heading", { level: 1 })).toHaveText(originalTitle);
+    await expect(visitor.getByText("原简介", { exact: true }).first()).toBeVisible();
+    await page.goto("/review");
+    const entry = page.locator(`[data-submission-id="${proposal.submissionId}"]`);
+    await expect(entry).toContainText("编辑词条信息");
+    await entry.locator("summary").click();
+    const diff = entry.getByTestId("term-metadata-diff");
+    await expect(diff.locator('[data-changed="true"]')).toHaveCount(3);
+    await expect(diff).toContainText("原简介");
+    await expect(diff).toContainText("新简介");
+    await entry.getByRole("button", { name: "受理", exact: true }).click();
+    await expect(entry).toContainText("批准 1/2");
+    await visitor.reload();
+    await expect(visitor.getByRole("heading", { level: 1 })).toHaveText(originalTitle);
+    const second = await reviewerContext.newPage();
+    await second.goto("/review");
+    await second.locator(`[data-submission-id="${proposal.submissionId}"]`).getByRole("button", { name: "受理", exact: true }).click();
+    await expect(second.locator(`[data-submission-id="${proposal.submissionId}"]`)).toHaveCount(0);
+    await visitor.goto(term.href);
+    await expect(visitor.getByRole("heading", { level: 1 })).toHaveText(renamedTitle);
+    await expect(visitor.getByText("新简介", { exact: true }).first()).toBeVisible();
+    await expect(visitor.getByText("新别名、另一个别名", { exact: true })).toBeVisible();
+    await expect(visitor.getByText("通俗视角保持独立。", { exact: true })).toBeVisible();
+    expect(visitor.url()).not.toContain("metadata-old");
+    const current = await (await page.request.get(historyUrl)).json();
+    expect(current.revisions).toHaveLength(2);
+    expect(current.revisions[0]).toMatchObject({ source: "approval", snapshot: { title: renamedTitle, aliases: ["新别名", "另一个别名"] } });
+    expect(await (await page.request.get(`/api/pages/${targetPerspective.pageId}/history`)).json()).toEqual(perspectiveHistory);
+    await visitor.goto(source.href);
+    await expect(visitor.locator(".wiki-link--red").filter({ hasText: "新别名" })).toBeVisible();
+    await visitor.locator(".wiki-content").getByRole("link", { name: originalTitle, exact: true }).click();
+    await expect(visitor.getByRole("heading", { level: 1 })).toHaveText(renamedTitle);
+    await visitor.goto(source.href);
+    await visitor.locator(".wiki-content").getByRole("link", { name: "精确链接", exact: true }).click();
+    await expect(visitor.getByText("精确指向的视角。", { exact: true })).toBeVisible();
+  } finally {
+    if (secondAdminId) await pool.query('UPDATE "user" SET role = $1 WHERE id = $2', ["editor", secondAdminId]);
+    await pool.end();
+    await Promise.all([editorContext.close(), reviewerContext.close(), visitorContext.close()]);
+  }
+});
+
+test("旧词条从真实字段建立一次起始快照，草稿过期与存储禁用不覆盖新版", async ({ page }) => {
+  test.setTimeout(90_000);
+  expect((await page.request.post("/api/auth/sign-in/email", { data: { email: process.env.SEED_ADMIN_EMAIL, password } })).ok()).toBe(true);
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const title = `Legacy ${randomUUID()}`;
+  let pageId: number;
+  try {
+    const result = await pool.query("INSERT INTO pages(type,title,slug) VALUES('term',$1,'legacy') RETURNING id", [title]);
+    pageId = result.rows[0].id;
+    await pool.query("INSERT INTO terms(page_id,summary,aliases) VALUES($1,$2,$3)", [pageId, "当前真实简介", ["真实别名"]]);
+    await pool.query("INSERT INTO revisions(page_id,content) VALUES($1,$2)", [pageId, "旧纯正文，不代表旧信息框"]);
+  } finally { await pool.end(); }
+  const api = `/api/pages/${pageId}/history`;
+  const before = await (await page.request.get(api)).json();
+  expect(before.revisions).toHaveLength(1);
+  expect(before.revisions[0].snapshot).toBeNull();
+  const legacyEdit = await page.request.post("/api/submissions", { data: { kind: "edit", pageId, baseRevisionId: before.revisions[0].id, title, summary: "不能猜测旧快照", aliases: [] } });
+  expect(legacyEdit.status()).toBe(400);
+  await page.goto(`/edit/${pageId}`);
+  await expect(page.getByLabel("词条标题", { exact: true })).toHaveValue(title);
+  const initial = await (await page.request.get(api)).json();
+  expect(initial.revisions).toHaveLength(2);
+  expect(initial.revisions[0]).toMatchObject({ source: "baseline", snapshot: { title, summary: "当前真实简介", aliases: ["真实别名"] } });
+  expect(initial.revisions[1]).toEqual(before.revisions[0]);
+  await page.getByLabel("一句话简介（信息框用）").fill("旧本地草稿");
+  await expect(page.getByText(/草稿已自动保存/)).toBeVisible();
+  await create(page.request, { kind: "edit", pageId, baseRevisionId: initial.revisions[0].id, title, summary: "已发布新版", aliases: [] });
+  await page.reload();
+  await expect(page.getByLabel("一句话简介（信息框用）")).toHaveValue("已发布新版");
+  expect((await (await page.request.get(api)).json()).revisions).toHaveLength(3);
+  await page.addInitScript(() => {
+    Storage.prototype.getItem = () => { throw new DOMException("Denied", "SecurityError"); };
+    Storage.prototype.setItem = () => { throw new DOMException("Denied", "SecurityError"); };
+    Storage.prototype.removeItem = () => { throw new DOMException("Denied", "SecurityError"); };
+  });
+  await page.reload();
+  await page.getByLabel("一句话简介（信息框用）").fill("禁用存储仍可提交");
+  await page.getByRole("button", { name: "提交（直接生效）", exact: true }).click();
+  await expect(page.getByTestId("submit-success")).toContainText("已直接生效");
+  const after = await (await page.request.get(api)).json();
+  expect(after.revisions).toHaveLength(4);
+  expect(after.revisions[0]).toMatchObject({ source: "direct", snapshot: { summary: "禁用存储仍可提交" } });
+  expect(after.revisions[3]).toEqual(before.revisions[0]);
+});

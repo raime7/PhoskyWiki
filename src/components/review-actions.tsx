@@ -35,6 +35,7 @@ export function ReviewActions({ submissionId }: { submissionId: number }) {
     }
     if (data.outcome === "pending") {
       setMessage(`已记录批准票（${data.approveCount}/${data.quorum}），等待下一位管理员。`);
+      router.refresh();
     } else if (data.outcome === "approved") {
       setMessage("已受理并生效。");
       router.refresh();
