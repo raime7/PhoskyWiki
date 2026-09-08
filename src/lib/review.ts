@@ -24,7 +24,6 @@ import {
   user,
 } from "@/db/schema";
 import type {
-  PageType,
   SubmissionKind,
   SubmissionStatus,
   UserRole,
@@ -35,6 +34,7 @@ import { pagePath, slugify as slugifyTitle } from "@/lib/slug";
 import type { CreateSubmissionResult, ReviewOutcome } from "@/lib/review-types";
 import { ImageError } from "@/lib/image-markdown";
 import { publishImageReferences, validateImageReferences } from "@/lib/images";
+import { lockPerspectiveParents } from "@/lib/perspective-parents";
 
 export type { CreateSubmissionResult, ReviewOutcome } from "@/lib/review-types";
 
@@ -125,21 +125,8 @@ function requiredInt(value: unknown, error: string): number {
   return n;
 }
 
-async function livePageOfType(
-  db: DbOrTx,
-  id: number,
-  type: PageType,
-): Promise<boolean> {
-  const [row] = await db
-    .select({ id: pages.id })
-    .from(pages)
-    .where(and(eq(pages.id, id), eq(pages.type, type), isNull(pages.deletedAt)))
-    .limit(1);
-  return Boolean(row);
-}
-
 async function validateSubmissionInput(
-  db: DbOrTx,
+  db: Tx,
   input: SubmissionInput,
 ): Promise<ValidatedSubmission> {
   const summary = input.summary?.trim() || null;
@@ -248,12 +235,8 @@ async function validateSubmissionInput(
       const interpreterId = requiredInt(input.interpreterId, "缺少诠释者");
       const content = (input.content ?? "").trim();
       if (!content) throw new ReviewError(400, "正文不能为空");
-      if (!(await livePageOfType(db, termId, "term"))) {
-        throw new ReviewError(404, "目标词条不存在");
-      }
-      if (!(await livePageOfType(db, interpreterId, "interpreter"))) {
-        throw new ReviewError(404, "诠释者不存在");
-      }
+      const parents = await lockPerspectiveParents(db, termId, interpreterId);
+      if (!parents.available) throw new ReviewError(404, parents.reason);
       // （词条 × 诠释者）唯一约束的提交期预检：软删除的视角仍占位（恢复而非重建）
       const [dup] = await db
         .select({ pageId: perspectives.pageId })
@@ -291,49 +274,48 @@ export async function createSubmission(
   input: SubmissionInput,
   actor: Actor,
 ): Promise<CreateSubmissionResult> {
-  const db = getDb();
-  const validated = await validateSubmissionInput(db, input);
-  await validateImageReferences(db, validated.content, actor);
+  return transactionWithSearchSync(getDb(), async (db) => {
+    const validated = await validateSubmissionInput(db, input);
+    await validateImageReferences(db, validated.content, actor);
 
-  if (actor.role === "admin") {
-    const applied = await transactionWithSearchSync(db, (tx) =>
-      applySubmission(tx, { ...validated, submittedBy: actor.id }),
-    );
-    const [page] = await db
-      .select({ type: pages.type, slug: pages.slug })
-      .from(pages)
-      .where(eq(pages.id, applied.pageId))
-      .limit(1);
-    return {
-      outcome: "direct",
-      pageId: applied.pageId,
-      href: pagePath(page.type, page.slug, applied.pageId),
-    };
-  }
+    if (actor.role === "admin") {
+      const applied = await applySubmission(db, { ...validated, submittedBy: actor.id });
+      const [page] = await db
+        .select({ type: pages.type, slug: pages.slug })
+        .from(pages)
+        .where(eq(pages.id, applied.pageId))
+        .limit(1);
+      return {
+        outcome: "direct",
+        pageId: applied.pageId,
+        href: pagePath(page.type, page.slug, applied.pageId),
+      };
+    }
 
-  const [adminCountRow] = await db
-    .select({ count: sql<number>`count(*)`.mapWith(Number) })
-    .from(user)
-    .where(eq(user.role, "admin"));
-  const quorum = Math.min(2, adminCountRow.count);
-  const [row] = await db
-    .insert(submissions)
-    .values({
-      pageId: validated.pageId,
-      kind: validated.kind,
-      content: validated.content,
-      title: validated.title,
-      summary: validated.summary,
-      aliases: validated.aliases ?? [],
-      termId: validated.termId,
-      interpreterId: validated.interpreterId,
-      baseRevisionId: validated.baseRevisionId,
-      quorum,
-      submittedBy: actor.id,
-      supersedesId: validated.supersedes,
-    })
-    .returning({ id: submissions.id });
-  return { outcome: "pending", submissionId: row.id, quorum };
+    const [adminCountRow] = await db
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
+      .from(user)
+      .where(eq(user.role, "admin"));
+    const quorum = Math.min(2, adminCountRow.count);
+    const [row] = await db
+      .insert(submissions)
+      .values({
+        pageId: validated.pageId,
+        kind: validated.kind,
+        content: validated.content,
+        title: validated.title,
+        summary: validated.summary,
+        aliases: validated.aliases ?? [],
+        termId: validated.termId,
+        interpreterId: validated.interpreterId,
+        baseRevisionId: validated.baseRevisionId,
+        quorum,
+        submittedBy: actor.id,
+        supersedesId: validated.supersedes,
+      })
+      .returning({ id: submissions.id });
+    return { outcome: "pending", submissionId: row.id, quorum };
+  });
 }
 
 /** 整批复用管理员直编管线；任何一项失败都不发布，提交后统一同步搜索。 */
@@ -444,6 +426,18 @@ export async function reviewSubmission(
 
     if (sub.submittedBy === actor.id) {
       throw new ReviewError(403, "不能受理自己提交的内容");
+    }
+
+    if (sub.kind === "new_perspective") {
+      const parents = await lockPerspectiveParents(tx, sub.termId!, sub.interpreterId!);
+      if (!parents.available) {
+        const message = `系统驳回：${parents.reason}`;
+        await tx.update(submissions)
+          .set({ status: "rejected", rejectionReason: message, decidedAt: new Date() })
+          .where(eq(submissions.id, submissionId));
+        await tx.insert(notifications).values({ submissionId });
+        return { outcome: "rejected", staleBase: false, message };
+      }
     }
 
     // 并发防护（ADR-0004 #2）：受理时页面 head ≠ base → 该票无法通过，
@@ -581,17 +575,9 @@ async function applySubmission(
       return { pageId: page.id };
     }
     case "new_perspective": {
-      const [termPage] = await tx
-        .select({ title: pages.title })
-        .from(pages)
-        .where(eq(pages.id, sub.termId!))
-        .limit(1);
-      const [interpreterPage] = await tx
-        .select({ title: pages.title })
-        .from(pages)
-        .where(eq(pages.id, sub.interpreterId!))
-        .limit(1);
-      const title = `${interpreterPage.title}论${termPage.title}`;
+      const parents = await lockPerspectiveParents(tx, sub.termId!, sub.interpreterId!);
+      if (!parents.available) throw new ReviewError(404, parents.reason);
+      const title = `${parents.interpreter.title}论${parents.term.title}`;
       const [page] = await tx
         .insert(pages)
         .values({
