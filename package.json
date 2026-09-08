@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:seed": "tsx scripts/seed.ts",
-    "search:reindex": "node --conditions react-server --import tsx scripts/reindex-search.ts"
+    "search:reindex": "node --conditions react-server --import tsx scripts/reindex-search.ts",
+    "links:reconcile": "node --conditions react-server --import tsx scripts/reconcile-links.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
