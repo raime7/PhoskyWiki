@@ -82,7 +82,8 @@ test("归并后公开正文、讨论回复、分类和双链仍可阅读", async
   const folder = await mkdtemp(join(tmpdir(), "phosky-browser-merge-"));
   await writeFile(join(folder, "groups.json"), JSON.stringify([{ title, sourceTitles: [`${title}（哲学）`, `${title}（经济学）`] }]));
   await writeFile(join(folder, "fixture.txt"), "disposable HTTP-created fixture");
-  await promisify(execFile)(process.execPath, ["--conditions", "react-server", "--import", "tsx", "scripts/consolidate-mvp.ts", "--database", new URL(process.env.DATABASE_URL!).pathname.slice(1), "--groups", join(folder, "groups.json"), "--apply", "--backup", join(folder, "fixture.txt")], { env: process.env });
+  // 子进程会重载 .env；置空 MEILI_HOST 防止 apply 末尾的 reindexAll 把隔离库内容写进开发索引（与集成测试的 run() 同法）
+  await promisify(execFile)(process.execPath, ["--conditions", "react-server", "--import", "tsx", "scripts/consolidate-mvp.ts", "--database", new URL(process.env.DATABASE_URL!).pathname.slice(1), "--groups", join(folder, "groups.json"), "--apply", "--backup", join(folder, "fixture.txt")], { env: { ...process.env, MEILI_HOST: "" } });
   await page.goto(`/term/${a.pageId}`);
   await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
   await expect(page.locator(".wiki-content")).toContainText("哲学公开解释");

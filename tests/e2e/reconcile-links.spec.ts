@@ -9,7 +9,8 @@ const execute = promisify(execFile);
 const database = decodeURIComponent(new URL(process.env.DATABASE_URL!).pathname.slice(1));
 async function reconcile(...args: string[]) {
   try {
-    const result = await execute(process.execPath, ["--conditions", "react-server", "--import", "tsx", "scripts/reconcile-links.ts", "--database", database, ...args]);
+    // 子进程会重载 .env；置空 MEILI_HOST 防止 queueSearchSync 把测试库内容写进开发索引（与集成测试的 consolidate run() 同法）
+    const result = await execute(process.execPath, ["--conditions", "react-server", "--import", "tsx", "scripts/reconcile-links.ts", "--database", database, ...args], { env: { ...process.env, MEILI_HOST: "" } });
     return { code: 0, report: JSON.parse(result.stdout) };
   } catch (error) {
     const result = error as { code: number; stdout: string; stderr: string };
