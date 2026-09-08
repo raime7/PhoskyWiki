@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:36600) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › tests\e2e\editor.spec.ts:78:7 › 移动端编辑 › 窄屏可触摸补全、使用工具栏、预览长文本并提交 (1.4s)
+
+  1 passed (2.5s)

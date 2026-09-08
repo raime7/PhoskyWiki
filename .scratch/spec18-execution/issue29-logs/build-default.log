@@ -1,0 +1,78 @@
+
+> phoskywiki@0.1.0 build D:\PhoskyWiki-worktrees\spec18-29
+> next build
+
+▲ Next.js 16.3.4 (Turbopack)
+- Environments: .env
+✓ Running next.config.ts took 37ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 7.6s
+  Running TypeScript ...
+  Finished TypeScript in 7.0s ...
+  Collecting page data using 31 workers ...
+  Generating static pages using 31 workers (0/18) ...
+  Generating static pages using 31 workers (4/18) 
+  Generating static pages using 31 workers (8/18) 
+  Generating static pages using 31 workers (13/18) 
+✓ Generating static pages using 31 workers (18/18) in 445ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /admin/deleted
+├ ƒ /admin/import
+├ ƒ /api/admin/discussion/[termId]/lock
+├ ƒ /api/admin/import
+├ ƒ /api/admin/pages/[pageId]
+├ ƒ /api/admin/perspectives/[pageId]/pin
+├ ƒ /api/admin/search/reindex
+├ ƒ /api/admin/submissions/[id]/review
+├ ƒ /api/agent/context
+├ ƒ /api/auth/[...all]
+├ ƒ /api/discussion/posts
+├ ƒ /api/discussion/posts/[postId]
+├ ƒ /api/editor/catalog
+├ ƒ /api/graph/local
+├ ƒ /api/graph/site
+├ ƒ /api/images
+├ ƒ /api/images/[id]
+├ ƒ /api/interests
+├ ƒ /api/notifications/[id]/read
+├ ƒ /api/notifications/unread-count
+├ ƒ /api/pages/[pageId]/history
+├ ƒ /api/search
+├ ƒ /api/search/suggest
+├ ƒ /api/submissions
+├ ƒ /api/terms/[id]/discovery
+├ ƒ /categories
+├ ƒ /categories/[slug]
+├ ƒ /disambiguation/[pageKey]
+├ ƒ /edit/[pageKey]
+├ ƒ /graph
+├ ƒ /healthz
+├ ƒ /history/[pageId]
+├ ƒ /interests
+├ ƒ /interpreter/[pageKey]
+├ ƒ /interpreters
+├ ƒ /login
+├ ƒ /new/interpreter
+├ ƒ /new/perspective
+├ ƒ /new/term
+├ ƒ /perspective/[pageKey]
+├ ƒ /profile
+├ ƒ /profile/submissions/[id]
+├ ƒ /profile/submissions/[id]/resubmit
+├ ƒ /register
+├ ƒ /review
+├ ƒ /school/[pageKey]
+├ ƒ /schools
+├ ƒ /search
+├ ƒ /term/[pageKey]
+├ ƒ /term/[pageKey]/discussion
+└ ƒ /terms
+
+
+ƒ  (Dynamic)  server-rendered on demand
+

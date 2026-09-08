@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:66748) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › tests\e2e\editor.spec.ts:62:5 › 补全闭合新双链并保留后续普通竖线文本 (995ms)
+
+  1 passed (2.2s)

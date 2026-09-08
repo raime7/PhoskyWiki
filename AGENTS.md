@@ -14,6 +14,10 @@ The five canonical triage labels are used as-is: `needs-triage`, `needs-info`, `
 
 Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+## Context management
+
+When context usage reaches 140k tokens, compact automatically (run `/compact`) to summarize the conversation before continuing. Do not wait for the context window to fill completely — compact proactively at the 140k threshold so long tasks are not interrupted.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

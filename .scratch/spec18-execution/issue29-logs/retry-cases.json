@@ -1,0 +1,94 @@
+[
+  {
+    "file": "tests/e2e/discussion.spec.ts",
+    "title": "视角页一键带锚点开楼；锚点可点击跳回该视角"
+  },
+  {
+    "file": "tests/e2e/editor.spec.ts",
+    "title": "补全闭合新双链并保留后续普通竖线文本"
+  },
+  {
+    "file": "tests/e2e/editor.spec.ts",
+    "title": "窄屏可触摸补全、使用工具栏、预览长文本并提交"
+  },
+  {
+    "file": "tests/e2e/interests.spec.ts",
+    "title": "登录：兴趣保存到账号并跨页持久，词条页视角按兴趣重排"
+  },
+  {
+    "file": "tests/e2e/production.spec.ts",
+    "title": "编者用词条骨架向导填写信息框与通俗解读并提交审核"
+  },
+  {
+    "file": "tests/e2e/production.spec.ts",
+    "title": "管理员从向导进入 JSON 导入后可打开新词条阅读编委会视角"
+  },
+  {
+    "file": "tests/e2e/profile.spec.ts",
+    "title": "页面后续修订不改变我的提交差异，起始修订过期的自动驳回也通知提交者"
+  },
+  {
+    "file": "tests/e2e/resubmission.spec.ts",
+    "title": "驳回词条从详情完整预填、网络失败保留独立草稿、重提两票公开"
+  },
+  {
+    "file": "tests/e2e/resubmission.spec.ts",
+    "title": "编者成为管理员后重提直接生效，仅清理该重提草稿"
+  },
+  {
+    "file": "tests/e2e/review-behavior.spec.ts",
+    "title": "队列显示票数、批准者、过期基准与两侧 diff；提交详情保留终态及理由，重提创建新提交"
+  },
+  {
+    "file": "tests/e2e/review-behavior.spec.ts",
+    "title": "受理追加完整修订并替换双链；反链与精确视角引用热度同步更新并重排"
+  },
+  {
+    "file": "tests/e2e/review-behavior.spec.ts",
+    "title": "词条、诠释者及视角新建均经审核后可读，重复名称与挂载仍拒绝"
+  },
+  {
+    "file": "tests/e2e/review.spec.ts",
+    "title": "编者提交 → 管理员受理 → 游客可见新内容"
+  },
+  {
+    "file": "tests/e2e/spec18-combined.spec.ts",
+    "title": "组合：游客兴趣推荐过滤 perspective 删除形成的不可见视角，恢复后重新出现"
+  },
+  {
+    "file": "tests/e2e/spec18-combined.spec.ts",
+    "title": "组合：游客兴趣推荐过滤 term 删除形成的不可见视角，恢复后重新出现"
+  },
+  {
+    "file": "tests/e2e/spec18-combined.spec.ts",
+    "title": "组合：游客兴趣推荐过滤 interpreter 删除形成的不可见视角，恢复后重新出现"
+  },
+  {
+    "file": "tests/e2e/term-edit.spec.ts",
+    "title": "词条草稿、独立编辑、两票逐字段审核、旧 URL 与普通及显式双链"
+  },
+  {
+    "file": "tests/e2e/term-edit.spec.ts",
+    "title": "旧词条从真实字段建立一次起始快照，草稿过期与存储禁用不覆盖新版"
+  },
+  {
+    "file": "tests/e2e/term-history.spec.ts",
+    "title": "词条两次编辑、非相邻字段比较、带来源回滚、id链接与撞名失败"
+  },
+  {
+    "file": "tests/e2e/visibility.spec.ts",
+    "title": "interpreter 删除与恢复保持显式双链、反链和图谱一致"
+  },
+  {
+    "file": "tests/e2e/wiki-link-semantics.spec.ts",
+    "title": "混合正文的预览、受理、直编与回滚只为真实双链生成导航关系"
+  },
+  {
+    "file": "tests/e2e/wiki-link-semantics.spec.ts",
+    "title": "普通双链源文仍用旧名时，预览、保存与回滚保留目标身份，隐藏目标恢复后仍可达"
+  },
+  {
+    "file": "tests/e2e/wiki-link-semantics.spec.ts",
+    "title": "显式视角源文仍用旧名时，预览、保存与回滚保留目标身份，隐藏目标恢复后仍可达"
+  }
+]

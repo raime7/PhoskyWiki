@@ -1,5 +1,7 @@
 # dependencies
 /node_modules
+/.agents
+skills-lock.json
 /.pnp
 .pnp.*
 .yarn/*
