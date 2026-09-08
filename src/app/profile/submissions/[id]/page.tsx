@@ -26,7 +26,7 @@ export default async function SubmissionDetailPage({ params }: Props) {
 
   const proposedText =
     submission.kind === "new_term" || submission.kind === "new_interpreter"
-      ? `标题：${submission.title ?? ""}\n简介：${submission.summary ?? ""}`
+      ? `标题：${submission.title ?? ""}\n简介：${submission.summary ?? ""}\n别名：${submission.aliases.join("、")}\n\n${submission.content}`
       : submission.content;
 
   return (

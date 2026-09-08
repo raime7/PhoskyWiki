@@ -33,6 +33,8 @@ import { rebuildPageLinks } from "@/lib/page-links";
 import { queueSearchSync, transactionWithSearchSync } from "@/lib/search/search-sync";
 import { pagePath, slugify as slugifyTitle } from "@/lib/slug";
 import type { CreateSubmissionResult, ReviewOutcome } from "@/lib/review-types";
+import { ImageError } from "@/lib/image-markdown";
+import { publishImageReferences, validateImageReferences } from "@/lib/images";
 
 export type { CreateSubmissionResult, ReviewOutcome } from "@/lib/review-types";
 
@@ -68,7 +70,7 @@ export function isUniqueViolation(err: unknown): boolean {
  * ReviewError → 其状态码；唯一索引冲突（并发抢先创建）→ 409。
  */
 export function reviewErrorResponse(err: unknown): Response | null {
-  if (err instanceof ReviewError) {
+  if (err instanceof ReviewError || err instanceof ImageError) {
     return Response.json({ error: err.message }, { status: err.status });
   }
   if (isUniqueViolation(err)) {
@@ -94,6 +96,7 @@ export interface SubmissionInput {
   title?: string;
   /** kind=new_term/new_interpreter：一句话简介 */
   summary?: string;
+  aliases?: string[];
   /** kind=new_perspective：挂载的词条与诠释者 */
   termId?: number;
   interpreterId?: number;
@@ -104,6 +107,7 @@ export interface SubmissionInput {
 }
 
 interface ValidatedSubmission {
+  aliases?: string[];
   kind: SubmissionKind;
   pageId: number | null;
   content: string;
@@ -135,7 +139,7 @@ async function livePageOfType(
 }
 
 async function validateSubmissionInput(
-  db: Db,
+  db: DbOrTx,
   input: SubmissionInput,
 ): Promise<ValidatedSubmission> {
   const summary = input.summary?.trim() || null;
@@ -192,6 +196,9 @@ async function validateSubmissionInput(
     }
     case "new_term":
     case "new_interpreter": {
+      if (input.aliases !== undefined && (!Array.isArray(input.aliases) || input.aliases.some((alias) => typeof alias !== "string") || input.aliases.length > 50)) {
+        throw new ReviewError(400, "别名必须是最多 50 项的字符串数组");
+      }
       const title = input.title?.trim() ?? "";
       if (!title) throw new ReviewError(400, "标题不能为空");
       // 撞名检查与唯一性口径：
@@ -226,7 +233,8 @@ async function validateSubmissionInput(
       return {
         kind: input.kind,
         pageId: null,
-        content: "",
+        content: input.kind === "new_term" ? (input.content ?? "").trim() : "",
+        aliases: input.kind === "new_term" ? [...new Set((input.aliases ?? []).map((a) => a.trim()).filter(Boolean))] : [],
         title,
         summary,
         termId: null,
@@ -285,6 +293,7 @@ export async function createSubmission(
 ): Promise<CreateSubmissionResult> {
   const db = getDb();
   const validated = await validateSubmissionInput(db, input);
+  await validateImageReferences(db, validated.content, actor);
 
   if (actor.role === "admin") {
     const applied = await transactionWithSearchSync(db, (tx) =>
@@ -315,6 +324,7 @@ export async function createSubmission(
       content: validated.content,
       title: validated.title,
       summary: validated.summary,
+      aliases: validated.aliases ?? [],
       termId: validated.termId,
       interpreterId: validated.interpreterId,
       baseRevisionId: validated.baseRevisionId,
@@ -324,6 +334,27 @@ export async function createSubmission(
     })
     .returning({ id: submissions.id });
   return { outcome: "pending", submissionId: row.id, quorum };
+}
+
+/** 整批复用管理员直编管线；任何一项失败都不发布，提交后统一同步搜索。 */
+export async function importPages(inputs: SubmissionInput[], actor: Actor) {
+  if (actor.role !== "admin") throw new ReviewError(403, "需要管理员角色");
+  return transactionWithSearchSync(getDb(), async (tx) => {
+    const results = [];
+    for (const input of inputs) {
+      if (input.kind !== "new_term" && input.kind !== "new_interpreter") throw new ReviewError(400, "只能导入词条与诠释者");
+      const validated = await validateSubmissionInput(tx, input);
+      await validateImageReferences(tx, validated.content, actor);
+      const applied = await applySubmission(tx, { ...validated, submittedBy: actor.id });
+      results.push({ pageId: applied.pageId, href: pagePath(input.kind === "new_term" ? "term" : "interpreter", slugifyTitle(validated.title!), applied.pageId) });
+    }
+    // 本批页面都存在后再解析一次，避免先写视角留下指向后写词条的红链。
+    const rootIds = results.map((result) => result.pageId);
+    const children = await tx.select({ id: perspectives.pageId }).from(perspectives).where(inArray(perspectives.termId, rootIds));
+    const snapshots = await tx.select().from(revisions).where(inArray(revisions.pageId, [...rootIds, ...children.map((child) => child.id)]));
+    for (const snapshot of snapshots) await rebuildPageLinks(tx, snapshot.pageId, snapshot.content);
+    return results;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -456,6 +487,7 @@ export async function reviewSubmission(
 // ---------------------------------------------------------------------------
 
 interface AppliableSubmission {
+  aliases?: string[];
   kind: SubmissionKind;
   pageId: number | null;
   content: string;
@@ -481,6 +513,7 @@ export async function applyContentChange(
   content: string,
   rollbackFromId: number | null = null,
 ): Promise<number> {
+  await publishImageReferences(tx, content);
   const [revision] = await tx
     .insert(revisions)
     .values({ pageId, content, rollbackFromId, createdAt: new Date() })
@@ -489,6 +522,11 @@ export async function applyContentChange(
   await tx.update(pages).set({ updatedAt: new Date() }).where(eq(pages.id, pageId));
   queueSearchSync(tx, pageId);
   return revision.id;
+}
+
+/** 信息框是纯文本元数据，快照用 Markdown 代码块，不能被解释成正文图片或双链。 */
+function infoboxSnapshot(value: { title: string | null; summary: string; aliases?: string[] }) {
+  return `\`\`\`json\n${JSON.stringify(value)}\n\`\`\``;
 }
 
 /** 把一条（已验证的）提议落为现实：建页/产生修订/重建 links。 */
@@ -515,8 +553,15 @@ async function applySubmission(
           createdBy: sub.submittedBy,
         })
         .returning({ id: pages.id });
-      await tx.insert(terms).values({ pageId: page.id, summary: sub.summary ?? "" });
-      queueSearchSync(tx, page.id);
+      await tx.insert(terms).values({ pageId: page.id, summary: sub.summary ?? "", aliases: sub.aliases ?? [] });
+      await applyContentChange(tx, page.id, infoboxSnapshot({ title: sub.title, summary: sub.summary ?? "", aliases: sub.aliases ?? [] }));
+      if (sub.content) {
+        const [board] = await tx.select({ id: interpreters.pageId }).from(interpreters)
+          .innerJoin(pages, eq(pages.id, interpreters.pageId))
+          .where(and(eq(interpreters.isEditorialBoard, true), isNull(pages.deletedAt))).limit(1);
+        if (!board) throw new ReviewError(409, "请先配置编委会诠释者");
+        await applySubmission(tx, { ...sub, kind: "new_perspective", termId: page.id, interpreterId: board.id });
+      }
       return { pageId: page.id };
     }
     case "new_interpreter": {
@@ -532,7 +577,7 @@ async function applySubmission(
       await tx
         .insert(interpreters)
         .values({ pageId: page.id, summary: sub.summary ?? "" });
-      queueSearchSync(tx, page.id);
+      await applyContentChange(tx, page.id, infoboxSnapshot({ title: sub.title, summary: sub.summary ?? "" }));
       return { pageId: page.id };
     }
     case "new_perspective": {
@@ -572,6 +617,7 @@ async function applySubmission(
 // ---------------------------------------------------------------------------
 
 export interface QueueItem {
+  aliases: string[];
   id: number;
   kind: SubmissionKind;
   status: SubmissionStatus;
@@ -612,6 +658,7 @@ export async function listQueue(): Promise<QueueItem[]> {
       content: submissions.content,
       title: submissions.title,
       summary: submissions.summary,
+      aliases: submissions.aliases,
       termId: submissions.termId,
       interpreterId: submissions.interpreterId,
     })
@@ -713,6 +760,7 @@ export async function listQueue(): Promise<QueueItem[]> {
       content: row.content,
       title: row.title,
       summary: row.summary,
+      aliases: row.aliases,
       termTitle: row.termId !== null ? titleById.get(row.termId) ?? null : null,
       interpreterName:
         row.interpreterId !== null

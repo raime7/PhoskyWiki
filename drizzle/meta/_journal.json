@@ -78,6 +78,20 @@
       "when": 1788833345999,
       "tag": "0010_clever_old_lace",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788835011763,
+      "tag": "0011_salty_kitty_pryde",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788835379426,
+      "tag": "0012_public_klaw",
+      "breakpoints": true
     }
   ]
 }

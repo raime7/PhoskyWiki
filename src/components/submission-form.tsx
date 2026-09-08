@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import type { CreateSubmissionResult } from "@/lib/review-types";
+import { TERM_CONTENT_TEMPLATE } from "@/lib/content-template";
 
 type Option = {
   id: number;
@@ -24,6 +25,9 @@ type Option = {
 interface ContentDraft {
   content: string;
   baseRevisionId: number | null;
+  title?: string;
+  summary?: string;
+  aliases?: string;
 }
 
 export type SubmissionFormProps =
@@ -47,19 +51,22 @@ export type SubmissionFormProps =
 
 export function SubmissionForm(props: SubmissionFormProps) {
   const { variant, isAdmin } = props;
-  // 草稿只覆盖正文字段（编辑/新视角）；标题类字段短，不做草稿
+  // 编辑/新视角保存正文；词条向导同时保存信息框。
   const draftKey =
     variant === "edit"
       ? `phoskywiki:draft:edit:${props.pageId}`
       : variant === "new_perspective"
         ? "phoskywiki:draft:new-perspective"
+        : variant === "new_term"
+          ? "phoskywiki:draft:new-term"
         : null;
 
   const [content, setContent] = useState(
-    variant === "edit" ? props.initialContent : "",
+    variant === "edit" ? props.initialContent : variant === "new_term" ? TERM_CONTENT_TEMPLATE : "",
   );
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
+  const [aliases, setAliases] = useState("");
   const [termId, setTermId] = useState(
     variant === "new_perspective" ? (props.presetTermId ?? "") : "",
   );
@@ -71,9 +78,11 @@ export function SubmissionForm(props: SubmissionFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CreateSubmissionResult | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [savedDraft, setSavedDraft] = useState<string | null>(null);
   const initialContent = variant === "edit" ? props.initialContent : null;
   // 草稿基于的修订：编辑 = 表单加载时的 head；新建视角无修订概念，恒 null
   const draftBase = variant === "edit" ? props.baseRevisionId : null;
+  const draftSnapshot = JSON.stringify({ content, baseRevisionId: draftBase, ...(variant === "new_term" ? { title, summary, aliases } : {}) } satisfies ContentDraft);
 
   // 恢复本地草稿：延后到 hydration 之后（render 期不读 localStorage）；
   // 只在与当前 base 同源时可信，页面已前进则弃用
@@ -92,9 +101,17 @@ export function SubmissionForm(props: SubmissionFormProps) {
       window.localStorage.removeItem(draftKey);
       return;
     }
-    const timer = setTimeout(() => setContent(draft!.content), 0);
+    const restored = draft;
+    const timer = setTimeout(() => {
+      setContent(restored.content);
+      if (variant === "new_term") {
+        setTitle(typeof restored.title === "string" ? restored.title : "");
+        setSummary(typeof restored.summary === "string" ? restored.summary : "");
+        setAliases(typeof restored.aliases === "string" ? restored.aliases : "");
+      }
+    }, 0);
     return () => clearTimeout(timer);
-  }, [draftKey, draftBase]);
+  }, [draftKey, draftBase, variant]);
 
   // 自动保存草稿（防抖 500ms；提交成功后停笔）
   useEffect(() => {
@@ -102,12 +119,13 @@ export function SubmissionForm(props: SubmissionFormProps) {
     const timer = setTimeout(() => {
       window.localStorage.setItem(
         draftKey,
-        JSON.stringify({ content, baseRevisionId: draftBase } satisfies ContentDraft),
+        draftSnapshot,
       );
       setDraftSavedAt(new Date().toLocaleTimeString());
+      setSavedDraft(draftSnapshot);
     }, 500);
     return () => clearTimeout(timer);
-  }, [content, draftKey, draftBase, result, initialContent]);
+  }, [content, draftKey, draftSnapshot, result, initialContent]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -123,7 +141,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
             baseRevisionId: props.baseRevisionId,
           }
         : variant === "new_term"
-          ? { kind: "new_term", title, summary }
+          ? { kind: "new_term", title, summary, aliases: aliases.split(/[，,\n]/).map((s) => s.trim()).filter(Boolean), content }
           : variant === "new_interpreter"
             ? { kind: "new_interpreter", title, summary }
             : {
@@ -264,7 +282,16 @@ export function SubmissionForm(props: SubmissionFormProps) {
         </label>
       )}
 
-      {(variant === "edit" || variant === "new_perspective") && (
+      {variant === "new_term" && (
+        <>
+          <label className="flex flex-col gap-2 text-sm font-medium">
+            别名（信息框用，以逗号分隔）
+            <Input name="aliases" value={aliases} onChange={(e) => setAliases(e.target.value)} />
+          </label>
+          <p className="text-sm text-muted-foreground">填写信息框后，完善下方通俗解读骨架。正文将成为编委会视角，与词条一起提交。</p>
+        </>
+      )}
+      {(variant === "edit" || variant === "new_perspective" || variant === "new_term") && (
         <MarkdownEditor value={content} onChange={setContent} />
       )}
 
@@ -278,7 +305,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
         <Button type="submit" size="lg" disabled={pending || duplicatePerspective}>
           {pending ? "提交中…" : isAdmin ? "提交（直接生效）" : "提交审核"}
         </Button>
-        {draftKey && draftSavedAt && !pending && (
+        {draftKey && draftSavedAt && savedDraft === draftSnapshot && !pending && (
           <span className="text-xs text-muted-foreground">草稿已自动保存 {draftSavedAt}</span>
         )}
       </div>

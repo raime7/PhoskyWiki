@@ -262,12 +262,13 @@ export const submissions = pgTable(
     // 编辑目标页（kind=edit 必填）；新建类提议为空，建什么由 kind + 各字段决定
     pageId: integer("page_id").references(() => pages.id, { onDelete: "cascade" }),
     kind: submissionKindEnum("kind").notNull(),
-    // 全量提议内容（ADR-0004 #1）；词条/诠释者新建无正文，为空串
+    // 全量提议内容；new_term 可携带编委会视角骨架，new_interpreter 无正文
     content: text("content").notNull().default(""),
     // 新建页的标题（new_perspective 由「诠释者论词条」派生，提交时留空）
     title: text("title"),
     // 新建词条/诠释者的一句话简介（terms/interpreters 负载字段）
     summary: text("summary"),
+    aliases: text("aliases").array().notNull().default(sql`'{}'::text[]`),
     // new_perspective 的挂载目标
     termId: integer("term_id").references(() => terms.pageId, { onDelete: "cascade" }),
     interpreterId: integer("interpreter_id").references(() => interpreters.pageId, {
@@ -539,3 +540,16 @@ export const termDiscussions = pgTable("term_discussions", {
   lockedAt: timestamp("locked_at", { withTimezone: true }),
   lockedBy: text("locked_by").references(() => user.id),
 });
+
+/** T15：上传先落暂存对象；完成后冻结至独立 key，受理只发布冻结对象。 */
+export const images = pgTable("images", {
+  id: text("id").primaryKey(),
+  uploadedBy: text("uploaded_by").notNull().references(() => user.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  contentType: text("content_type").notNull(),
+  size: integer("size").notNull(),
+  stagingKey: text("staging_key").notNull().unique(),
+  objectKey: text("object_key").unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+}, (t) => [index("images_uploader_idx").on(t.uploadedBy)]);

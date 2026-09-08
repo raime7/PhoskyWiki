@@ -32,6 +32,7 @@ function parseSubmissionInput(body: Record<string, unknown>): SubmissionInput {
     content: typeof body.content === "string" ? body.content : undefined,
     title: typeof body.title === "string" ? body.title : undefined,
     summary: typeof body.summary === "string" ? body.summary : undefined,
+    aliases: body.aliases as string[] | undefined,
     termId: optionalInt(body.termId, "termId"),
     interpreterId: optionalInt(body.interpreterId, "interpreterId"),
     baseRevisionId: optionalInt(body.baseRevisionId, "baseRevisionId"),

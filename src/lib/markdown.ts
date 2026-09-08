@@ -14,6 +14,7 @@ import { unified } from "unified";
 import type { Node, Parent } from "unist";
 
 import { parseWikiLink, wikiLinkKey, type WikiLinkRef } from "@/lib/wiki-links";
+import { filterRenderedImages } from "@/lib/image-markdown";
 
 export interface WikiLinkTarget {
   /** 已解析目标的站内路径（如 /term/主体性-3）；红链为空字符串 */
@@ -113,6 +114,7 @@ function markdownProcessor(resolveWikiLink: ResolveWikiLink) {
     .use(rewriteWikiLinks, resolveWikiLink)
     .use(remarkRehype, { allowDangerousHtml: false })
     .use(rehypeSanitize, sanitizeSchema)
+    .use(filterRenderedImages)
     .use(rehypeStringify);
 }
 

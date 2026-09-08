@@ -1,0 +1,52 @@
+import "dotenv/config";
+import { randomUUID } from "node:crypto";
+import { expect, test } from "@playwright/test";
+
+test("编者用词条骨架向导填写信息框与通俗解读并提交审核", async ({ page }) => {
+  await page.goto("/register");
+  await page.getByLabel("名称").fill("T15向导编者");
+  await page.getByLabel("邮箱").fill(`t15-wizard-${randomUUID()}@example.com`);
+  await page.getByLabel("密码（至少 8 位）").fill("password123");
+  await page.getByRole("button", { name: "注册并登录" }).click();
+  await expect(page.getByTestId("session-user")).toContainText("编者");
+  await page.goto("/new/term");
+  await page.getByLabel("词条标题").fill(`向导词条-${randomUUID()}`);
+  await page.getByLabel("一句话简介（信息框用）").fill("向导填写的简介");
+  await page.getByLabel("别名（信息框用，以逗号分隔）").fill("别名一,别名二");
+  const editor = page.getByRole("textbox", { name: "正文（Markdown）" });
+  await expect(editor).toContainText("## 通俗解读");
+  await expect(editor).toContainText("其他视角（待补充）");
+  await expect(editor).toContainText("引用与延伸阅读");
+  await editor.fill("## 通俗解读\n向导正文标记\n\n## 引用\n测试出处");
+  await expect(page.getByRole("region", { name: "实时预览" })).toContainText("向导正文标记");
+  await expect(page.getByText(/草稿已自动保存/)).toBeVisible();
+  await page.reload();
+  await expect(editor).toContainText("向导正文标记");
+  await expect(page.getByLabel("一句话简介（信息框用）")).toHaveValue("向导填写的简介");
+  await expect(page.getByLabel("别名（信息框用，以逗号分隔）")).toHaveValue("别名一,别名二");
+  await page.getByRole("button", { name: "提交审核" }).click();
+  await expect(page.getByTestId("submit-success")).toContainText("等待审核");
+  await page.getByRole("link", { name: "查看提交历史 →" }).click();
+  await page.getByRole("link", { name: /查看差异|查看详情|提交详情/ }).first().click();
+  await expect(page.getByTestId("content-diff")).toContainText("向导正文标记");
+  await expect(page.getByTestId("content-diff")).toContainText("别名一");
+});
+
+test("管理员从向导进入 JSON 导入后可打开新词条阅读编委会视角", async ({ page }) => {
+  test.skip(!process.env.SEED_ADMIN_PASSWORD, "需要种子管理员密码");
+  await page.goto("/login");
+  await page.getByLabel("邮箱").fill(process.env.SEED_ADMIN_EMAIL ?? "admin@phoskywiki.local");
+  await page.getByLabel("密码").fill(process.env.SEED_ADMIN_PASSWORD!);
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page.getByTestId("session-user")).toContainText("管理员");
+  await page.goto("/new/term");
+  await page.getByRole("link", { name: "批量导入 JSON →" }).click();
+  const title = `导入词条-${randomUUID()}`;
+  await page.getByLabel("导入 JSON").fill(JSON.stringify({ interpreters: [{ title: `导入诠释者-${randomUUID()}` }], terms: [{ title, aliases: ["导入别名"], content: "## 通俗解读\n浏览器导入正文" }] }));
+  await page.getByRole("button", { name: "导入并直接发布" }).click();
+  await expect(page.getByRole("status")).toContainText("已导入 2 个");
+  await page.getByRole("link", { name: new RegExp(title) }).click();
+  await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+  await expect(page.getByText("浏览器导入正文")).toBeVisible();
+  await expect(page.getByText("导入别名", { exact: true })).toBeVisible();
+});

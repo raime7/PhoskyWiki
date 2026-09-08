@@ -9,6 +9,7 @@ import { EditorView, keymap, placeholder } from "@codemirror/view";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { WikiContent } from "@/components/wiki-content";
+import { ImageUpload } from "@/components/image-upload";
 import { renderMarkdown, wikiLinkResolver } from "@/lib/markdown";
 import type { EditorCatalog } from "@/lib/editor-catalog";
 
@@ -172,6 +173,7 @@ export function MarkdownEditor({ value, onChange }: { value: string; onChange: (
         <div ref={host} />
       </div>
       <p className="text-xs text-muted-foreground">输入 [[ 补全词条；Tab 移至下一个控件。</p>
+      <ImageUpload onUploaded={(src) => insert("![", `](${src})`, "图片说明")} />
       <section aria-label="实时预览" className="min-w-0 rounded-md border border-border p-4 [overflow-wrap:anywhere]">
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">实时预览</h2>
         {catalogError ? (

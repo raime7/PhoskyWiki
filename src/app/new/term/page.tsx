@@ -1,5 +1,4 @@
-// 新建词条（T06）：标题 + 一句话简介，提交进审核队列（词条是聚合枢纽，
-// 知识内容写在其下的视角页里；骨架模板向导是后续内容生产工单的事）。
+// 新建词条向导：信息框 + 编委会视角骨架，共用直编/审核管线。
 
 import Link from "next/link";
 
@@ -44,7 +43,7 @@ export default async function NewTermPage() {
 
       <h1 className="text-2xl font-bold tracking-tight">新建词条</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        词条是概念名的聚合枢纽页：创建后在各诠释者的视角里写入知识内容。
+        依次填写信息框、通俗解读、其他视角计划与引用。提交后同时创建词条和编委会视角。
         {sessionUser.role === "admin"
           ? "管理员提交不经审核，直接生效。"
           : "提交进入审核队列，需管理员受理后生效。"}
@@ -53,6 +52,7 @@ export default async function NewTermPage() {
       <div className="mt-8">
         <SubmissionForm variant="new_term" isAdmin={sessionUser.role === "admin"} />
       </div>
+      {sessionUser.role === "admin" && <Link href="/admin/import" className="mt-6 inline-block text-sm underline">批量导入 JSON →</Link>}
     </main>
   );
 }
