@@ -63,11 +63,16 @@ test("存量校对保留真实改名前目标、清除代码假链，公开历�
     await pool.query("INSERT INTO links(source_page_id,target_page_id,target_name) VALUES($1,$2,$3),($1,$4,$5),($1,NULL,$6)", [source.pageId, example.pageId, exampleName, examplePerspective.pageId, `${exampleName}@${interpreterName}`, falseGap]);
   } finally { await pool.end(); }
   async function publicRelations(polluted: boolean) {
-    const graphResponse = await page.request.get(`/api/graph/local?termId=${sourceTerm.pageId}`);
-    expect(graphResponse.status()).toBe(200);
-    const graph = await graphResponse.json();
+    await page.goto(source.href);
+    // Prime and reuse the same URLs in the browser's real HTTP cache across the CLI run.
+    const [graph, site] = await page.evaluate(async (termId) => Promise.all([
+      fetch(`/api/graph/local?termId=${termId}`).then((response) => response.json()),
+      fetch("/api/graph/site").then((response) => response.json()),
+    ]), sourceTerm.pageId);
     expect(graph.nodes.some((node: { id: number }) => node.id === example.pageId)).toBe(polluted);
     expect(graph.edges).toContainEqual({ source: term.pageId, target: sourceTerm.pageId, weight: 2 });
+    expect(site.edges.some((edge: { source: number; target: number }) =>
+      [edge.source, edge.target].includes(example.pageId) && [edge.source, edge.target].includes(sourceTerm.pageId))).toBe(polluted);
     const discovery = await (await page.request.get(`/api/terms/${sourceTerm.pageId}/discovery`)).json();
     expect(discovery.relatedTerms.some((row: { id: number }) => row.id === example.pageId)).toBe(polluted);
     await page.goto(examplePerspective.href);

@@ -21,7 +21,7 @@ pnpm --silent links:reconcile --database phosky_spec18_28 --all 1> reconcile.jso
 
 标准输出是一份 JSON：`selected` 是选中页数，`processed` 是成功页数，`failed` 与 `failures` 逐项给出失败 `pageId`、数据库错误码和原因。`pages` 给出成功页的当前 `revisionId`、可见性、去重后的 `references`、实际剩余 `unresolvedLinks`。顶层 `unresolvedLinks` 只汇总本次成功校对且公开可见的来源页，是该范围的写作缺口引用数（同名缺口在不同来源页分别计数）；有失败时不能当作全库总数。无内容/可见性变动时，重复执行报告稳定。非零退出码表示校对失败或参数错误，成功页不会被其他失败页回滚。
 
-反链、视角引用热度、相关词条推荐与图谱都直接从当前关系读取；没有另一份聚合数据需要重灌。正文页面和发现接口按现有读取机制更新；图谱 HTTP 响应继续使用现有 `max-age=60, stale-while-revalidate=300`，浏览器/CDN 旧图谱可能在该期限内显示旧值，可在验收时重新请求源站或等缓存过期。
+反链、视角引用热度、相关词条推荐与图谱都直接从当前关系读取；没有另一份聚合数据需要重灌。正文页面和发现接口按现有读取机制更新；全站和局部图谱 HTTP 响应均使用 `Cache-Control: no-store`，局部图谱的 404 也禁止存储。删除、恢复或校对提交后，浏览器再次请求同一图谱 URL 即读取当前关系，无需添加随机参数或等待缓存过期。已显示的画布仍在其下一次数据请求时更新。
 
 每个成功事务沿用 `queueSearchSync` / `transactionWithSearchSync` 提交后同步，并沿用词条、诠释者的依赖扩展。搜索失败按现有机制写到 stderr，不回滚已完成关系校对；JSON 的 `searchSync` 只表示已请求同步，**不宣称索引成功**。查看 stderr，排除搜索故障后在同一环境运行 `pnpm search:reindex`；此命令只重建派生索引。未配置 `MEILI_HOST` 时 JSON 明确报告 disabled。
 

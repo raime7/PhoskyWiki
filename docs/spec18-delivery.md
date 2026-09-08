@@ -141,8 +141,18 @@ pnpm --silent links:reconcile --database phosky_spec18_29 --all 1> reconcile-sec
 
 每次检查退出码、JSON 的 `target`、`selected/processed/failed/failures` 和 stderr。无并发内容变化时两次报告应一致；有失败则依据 `pageId` 使用 `--page-id` 定点重试，成功页已提交无需撤回。校对只修改派生双链，不用种子清库替代校对。`--database` 仅校验库名，跨主机同名库仍需运维核对。
 
-搜索同步字段 `requested` 只证明请求过同步；检查 stderr 后按需在同一环境运行 `pnpm search:reindex`。未配置 `MEILI_HOST` 会明确报告 `disabled`。图谱沿用 60 秒新鲜期及 300 秒 stale-while-revalidate 缓存，验收应请求源站或等待缓存失效。生产迁移、校对和部署均未在本任务执行。
+搜索同步字段 `requested` 只证明请求过同步；检查 stderr 后按需在同一环境运行 `pnpm search:reindex`。未配置 `MEILI_HOST` 会明确报告 `disabled`。最终审查修复后，全站和局部图谱响应使用 `Cache-Control: no-store`（包括局部图谱 404）；删除、恢复与校对后的下一次同 URL 请求读取当前关系。已显示的画布在下一次数据请求时更新。搜索索引 `total/facets` 在同步故障期间仍可短暂滞后，遵循 ADR-0002 的派生索引语义。生产迁移、校对和部署均未在本任务执行。
 
 ## 审查交接
 
 #29 的组合回归与验收证据已完成，唯一未执行的服务契约为缺少凭据的真实 R2。按本次任务分工，主任务在接收此提交后统一进行 Standards / Spec 双轴 code-review；本报告不提前宣称该独立审查通过。不自动关闭父 Spec 或功能工单，也未推送或发布。
+
+## 最终审查补充：图谱缓存一致性（#21 / #28）
+
+此补充基于 `e5907c0`，保留上文各次验收的历史记录。最终 Spec 审查发现图谱 HTTP 缓存会在删除、恢复或存量校对后继续返回旧关系。本轮产品修改仅将两个图谱端点的缓存策略改为 `no-store`，局部图谱错误响应也使用该策略；画布与提示框行为保持不变。
+
+使用独立 `phosky_spec18_21` 数据库与 3121 端口，先由 Chromium 默认 `fetch` 读取并填充同一 URL 的 HTTP 缓存，再通过管理 HTTP 接口删除内容或运行真实校对 CLI，立即以同 URL 默认 `fetch` 重读；没有随机参数、请求端 `no-store` 或路由 mock。修复前，site/local 删除测试和校对关系测试共 3 条失败，均实际读到旧边或旧节点；两个 HTTP 响应头断言也失败。
+
+修复后，`graph-cache.spec.ts`、`graph.spec.ts`、`reconcile-links.spec.ts`、`visibility.spec.ts` 共 **11 条浏览器回归通过**（46.5 秒）。覆盖视角及父诠释者删除/恢复、目标词条节点删除/恢复、局部根词条 404 后恢复，以及校对后 site/local 的旧关系消失；画布缩放、搜索定位、节点跳转和局部跳数切换均通过。图谱与可见性 HTTP/集成定向回归 **10 条通过**，`pnpm typecheck`、`pnpm lint` 和 `git diff --check` 通过。
+
+本轮最后全套 Vitest：**245 通过、6 跳过**，32 个文件通过、2 个契约文件跳过（80.30 秒）。为避免并行任务操作同一 Meilisearch 契约索引，本轮将 `SEARCH_CONTRACT_HOST` 指向不可用的本机端口并明确跳过该契约；R2 仍未配置。此前真实 Meili 契约证据保持原记录。浏览器结束后确认 3121 端口已无服务监听。

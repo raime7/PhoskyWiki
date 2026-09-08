@@ -227,6 +227,7 @@ describe("GET /api/graph/site 与 /api/graph/local", () => {
   it("全站端点返回完整载荷（节点/边/学派图例）", async () => {
     const res = await getSiteRoute();
     expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
     const data = await res.json();
     expect(data.nodes.length).toBeGreaterThanOrEqual(100);
     expect(data.edges.length).toBeGreaterThan(0);
@@ -241,6 +242,7 @@ describe("GET /api/graph/site 与 /api/graph/local", () => {
       new Request(`http://localhost/api/graph/local?termId=${subjectivity}&hops=2`),
     );
     expect(ok.status).toBe(200);
+    expect(ok.headers.get("cache-control")).toBe("no-store");
     const data = await ok.json();
     expect(data.rootId).toBe(subjectivity);
     expect(data.hops).toBe(2);
