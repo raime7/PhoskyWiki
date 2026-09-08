@@ -69,8 +69,8 @@ test("归并后公开正文、讨论回复、分类和双链仍可阅读", async
   await page.request.post("/api/auth/sign-in/email", { data: { email: process.env.SEED_ADMIN_EMAIL, password: process.env.SEED_ADMIN_PASSWORD } });
   const title = `Merged ${randomUUID()}`;
   const create = async (data: object) => { const response = await page.request.post("/api/submissions", { data }); expect(response.status()).toBe(201); return response.json(); };
-  const a = await create({ kind: "new_term", title: `${title}（哲学）`, content: "哲学公开解释" });
-  const b = await create({ kind: "new_term", title: `${title}（经济学）`, content: "经济学公开解释" });
+  const a = await create({ kind: "new_term", title: `${title}（哲学）`, content: "哲学公开解释\n\n[哲学出处][ref]\n\n[ref]: https://example.org/philosophy" });
+  const b = await create({ kind: "new_term", title: `${title}（经济学）`, content: `经济学公开解释\n\n[经济出处][ref]\n\n[ref]: ${a.href}` });
   const thinker = await create({ kind: "new_interpreter", title: `独立诠释者 ${title}` });
   const unique = await create({ kind: "new_perspective", termId: b.pageId, interpreterId: thinker.pageId, content: "独立视角正文保留" });
   const source = await create({ kind: "new_term", title: `Source ${title}`, content: `普通 [[${title}（经济学）]]，精确 [[${title}（经济学）|合并视角@编委会]]` });
@@ -87,6 +87,9 @@ test("归并后公开正文、讨论回复、分类和双链仍可阅读", async
   await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
   await expect(page.locator(".wiki-content")).toContainText("哲学公开解释");
   await expect(page.locator(".wiki-content")).toContainText("经济学公开解释");
+  await expect(page.locator(".wiki-content").getByRole("link", { name: "哲学出处", exact: true })).toHaveAttribute("href", "https://example.org/philosophy");
+  await page.locator(".wiki-content").getByRole("link", { name: "经济出处", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
   await page.getByRole("link", { name: /讨论区（/ }).click();
   await expect(page.locator(`#floor-${floor.id}`)).toContainText("迁移公开楼层");
   await expect(page.locator(`#floor-${reply.id}`)).toContainText("迁移公开回复");

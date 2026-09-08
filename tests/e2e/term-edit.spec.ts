@@ -129,7 +129,13 @@ test("旧词条从真实字段建立一次起始快照，草稿过期与存储�
   await expect(page.getByText(/草稿已自动保存/)).toBeVisible();
   await create(page.request, { kind: "edit", pageId, baseRevisionId: initial.revisions[0].id, title, summary: "已发布新版", aliases: [] });
   await page.reload();
-  await expect(page.getByLabel("一句话简介（信息框用）")).toHaveValue("已发布新版");
+  await expect(page.getByLabel("一句话简介（信息框用）")).toHaveValue("旧本地草稿");
+  await expect(page.locator("details").filter({ hasText: "最新版（请与下方保留的草稿对照）" })).toContainText("已发布新版");
+  await expect(page.getByRole("button", { name: "提交（直接生效）", exact: true })).toBeDisabled();
+  await expect(page.getByText(/草稿已自动保存/)).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("一句话简介（信息框用）")).toHaveValue("旧本地草稿");
+  await expect(page.getByRole("button", { name: "提交（直接生效）", exact: true })).toBeDisabled();
   expect((await (await page.request.get(api)).json()).revisions).toHaveLength(3);
   await page.addInitScript(() => {
     Storage.prototype.getItem = () => { throw new DOMException("Denied", "SecurityError"); };

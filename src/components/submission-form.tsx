@@ -26,7 +26,7 @@ const NO_ALIASES: string[] = [];
 
 /**
  * 正文字段的本地草稿：与它所基于的页面修订绑定（ADR-0004 #6 草稿在客户端；
- * base 前进后旧草稿不可信——恢复前校验 base 一致，弃用过期草稿）。
+ * base 前进后保留旧草稿，并要求对照最新版人工确认后才能提交）。
  */
 interface ContentDraft {
   content: string;

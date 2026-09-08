@@ -16,6 +16,7 @@ export interface PreparedContent {
 
 /** AST 的 url 已解码，须按原始 Markdown 目的地址边界替换，而非搜索解码后的文字。 */
 function destinationRange(raw: string, node: Node, start: number) {
+  if (node.type === "link" && raw.startsWith("<") && raw.endsWith(">")) return { from: 0, to: raw.length };
   const lastChildEnd = (node as Parent).children?.at(-1)?.position?.end.offset;
   const definition = /^\[(?:\\.|[^\]\\])*\]:/.exec(raw);
   let from = node.type === "definition" ? definition?.[0].length ?? -1 : raw.indexOf("](", lastChildEnd === undefined ? 0 : lastChildEnd - start) + 2;
