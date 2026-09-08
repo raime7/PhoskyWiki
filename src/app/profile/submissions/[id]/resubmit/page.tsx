@@ -1,12 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
-import { getDb } from "@/db";
-import { revisions } from "@/db/schema";
 import { SubmissionForm, type SubmissionFormProps } from "@/components/submission-form";
 import { ContentDiff } from "@/components/content-diff";
 import { TermMetadataDiff } from "@/components/term-metadata-diff";
-import { getLivePage, getWikiLinkTargets, listTerms, listInterpreters, listPerspectivePairs } from "@/lib/content";
+import { getLivePage, getPerspectiveEditingState, listTerms, listInterpreters, listPerspectivePairs } from "@/lib/content";
 import { getSessionUser } from "@/lib/session";
 import { getMySubmission } from "@/lib/submission-history";
 import { getTermEditingState, getInterpreterEditingState, ReviewError } from "@/lib/review";
@@ -42,11 +39,12 @@ export default async function ResubmitPage({ params }: { params: Promise<{ id: s
       if (!retry.unavailable) comparison = <TermMetadataDiff from={current.snapshot} to={original} />;
       form = { ...common, variant: original.type === "term" ? "edit_term" : "edit_interpreter", pageId: proposal.pageId!, initialMetadata: original, baseRevisionId: current.baseRevisionId };
     } else {
-      const [head] = page ? await getDb().select().from(revisions).where(eq(revisions.pageId, page.id)).orderBy(desc(revisions.id)).limit(1) : [];
+      const state = page ? await getPerspectiveEditingState(page.id) : null;
+      const head = state ? { id: state.baseRevisionId, content: state.content } : null;
       if (!head) retry.unavailable ??= "目标页面缺少可编辑修订。";
       retry.stale = Boolean(head && head.id !== proposal.baseRevisionId);
       if (head) comparison = <ContentDiff oldText={head.content} newText={proposal.content} />;
-      const targets = page ? await getWikiLinkTargets(page.id) : new Map();
+      const targets = state?.linkTargets ?? new Map();
       form = { ...common, variant: "edit", pageId: proposal.pageId!, initialContent: proposal.content, baseRevisionId: head?.id ?? proposal.baseRevisionId!, resolvedWikiLinks: [...targets].filter(([, target]) => target.exists || target.unavailable) };
     }
   } else if (proposal.kind === "new_perspective") {

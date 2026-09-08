@@ -1,12 +1,11 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { getDb, type Db } from "@/db";
 import { discussionPosts, links, pages, perspectives, revisions, submissions, termCategories, termDiscussions, terms } from "@/db/schema";
 import { applyContentChange, applyTermMetadataChange } from "@/lib/review";
 import { isPageVisible } from "@/lib/page-visibility";
-import { markdownParser, visitWikiLinks } from "@/lib/markdown-ast";
-import { parseWikiLink } from "@/lib/wiki-links";
+import { prepareConsolidationLinks, preserveConsolidatedTargets } from "@/lib/consolidation-links";
 import { rebuildPageLinks } from "@/lib/page-links";
 import { slugify } from "@/lib/slug";
 import { reindexAll } from "@/lib/search/search-sync";
@@ -37,7 +36,12 @@ async function plan(tx: Tx, groups: MergeGroup[]) {
     return [{ title: group.title, keepId: keep.id, roots, perspectives }];
   });
   const obsoleteIds = inventory.filter(p => p.type === "disambiguation").map(p => p.id);
+  const claimedRoots = new Set<number>();
   for (const merge of merges) {
+    for (const root of merge.roots) {
+      if (claimedRoots.has(root.id)) throw new Error(`词条 ${root.id} 出现在多个归并组中，未执行整理`);
+      claimedRoots.add(root.id);
+    }
     obsoleteIds.push(...merge.roots.filter(p => p.id !== merge.keepId).map(p => p.id));
     for (const perspective of merge.perspectives) obsoleteIds.push(...perspective.items.slice(1).map(p => p.pageId));
   }
@@ -46,19 +50,6 @@ async function plan(tx: Tx, groups: MergeGroup[]) {
   const removedRevisions = removeIds.length ? await tx.select({ id: revisions.id }).from(revisions).where(inArray(revisions.pageId, removeIds)) : [];
   const removedSubmissions = removeIds.length ? await tx.select({ id: submissions.id }).from(submissions).where(or(inArray(submissions.pageId, removeIds), inArray(submissions.termId, removeIds), inArray(submissions.interpreterId, removeIds))) : [];
   return { merges, hiddenIds, obsoleteIds, removeIds, removedPosts: removedPosts.map(p => p.id), removedRevisions: removedRevisions.map(r => r.id), removedSubmissions: removedSubmissions.map(s => s.id) };
-}
-
-function rewriteLinks(content: string, names: Map<string, string>) {
-  const replacements: { start: number; end: number; value: string }[] = [];
-  visitWikiLinks(markdownParser().parse(content), node => {
-    const ref = parseWikiLink(node.value, node.data?.alias ?? null);
-    const title = ref && names.get(ref.term);
-    const start = node.position?.start.offset, end = node.position?.end.offset;
-    if (!title || start === undefined || end === undefined) return;
-    replacements.push({ start, end, value: `[[${title}${node.data?.alias ? `|${node.data.alias}` : ""}]]` });
-  });
-  for (const replacement of replacements.sort((a, b) => b.start - a.start)) content = content.slice(0, replacement.start) + replacement.value + content.slice(replacement.end);
-  return content;
 }
 
 async function purge(tx: Tx, ids: number[]) {
@@ -86,35 +77,54 @@ export async function consolidateMvp(apply = false, groups = mvpMergeGroups) {
     const planned = await plan(tx, groups);
     const report = { applied: apply, groups: planned.merges.map(g => ({ title: g.title, keepId: g.keepId, sourceIds: g.roots.map(p => p.id), perspectiveCount: g.perspectives.length })), hiddenPages: planned.hiddenIds.length, obsoletePages: planned.obsoleteIds.length, removedPages: planned.removeIds.length, removedPosts: planned.removedPosts.length, removedRevisions: planned.removedRevisions.length, removedSubmissions: planned.removedSubmissions.length };
     if (!apply) return report;
+    const names = new Map<string, string>();
+    const ids = new Map<number, number>();
+    const titles = new Map<number, string>();
+    for (const group of planned.merges) {
+      titles.set(group.keepId, group.title);
+      for (const root of group.roots) { names.set(root.title, group.title); ids.set(root.id, group.keepId); }
+      for (const perspective of group.perspectives) {
+        const [interpreter] = await tx.select().from(pages).where(eq(pages.id, perspective.items[0].interpreterId));
+        titles.set(perspective.keepId, `${interpreter.title}论${group.title}`);
+        for (const item of perspective.items) ids.set(item.pageId, perspective.keepId);
+      }
+    }
+    for (const old of await tx.select().from(pages).where(eq(pages.type, "disambiguation"))) {
+      const [term] = await tx.select().from(pages).where(and(eq(pages.type, "term"), eq(pages.title, old.title)));
+      const keepId = planned.merges.find(g => g.title === old.title)?.keepId ?? term?.id;
+      if (keepId !== undefined && !planned.removeIds.includes(keepId)) ids.set(old.id, keepId);
+    }
+    const prepared = await prepareConsolidationLinks(tx, ids, titles, names, new Set(planned.removeIds));
+    const combined = new Set<number>();
     if (planned.removedPosts.length) {
       // 被删楼层下的公开回复提升为楼层，保留文字；不复活被删除正文。
       await tx.update(discussionPosts).set({ parentId: null }).where(inArray(discussionPosts.parentId, planned.removedPosts));
       await tx.delete(discussionPosts).where(inArray(discussionPosts.id, planned.removedPosts));
     }
     await purge(tx, planned.hiddenIds);
-    const names = new Map<string, string>();
-    const ids = new Map<number, number>();
     for (const group of planned.merges) {
-      for (const root of group.roots) { names.set(root.title, group.title); ids.set(root.id, group.keepId); }
-      const disambiguations = await tx.select({ id: pages.id }).from(pages).where(and(eq(pages.type, "disambiguation"), eq(pages.title, group.title)));
-      for (const page of disambiguations) ids.set(page.id, group.keepId);
       const payloads = await tx.select().from(terms).where(inArray(terms.pageId, group.roots.map(p => p.id)));
       const keep = payloads.find(t => t.pageId === group.keepId)!;
       await applyTermMetadataChange(tx, group.keepId, termSnapshot({ title: group.title, summary: [...new Set(payloads.map(t => t.summary).filter(Boolean))].join("\n"), aliases: [...new Set(payloads.flatMap(t => t.aliases))], keyTexts: [...new Map(payloads.flatMap(t => t.keyTexts).map(t => [JSON.stringify(t), t])).values()] }));
       for (const perspective of group.perspectives) {
         let content = "";
+        const targets = new Map<string, number | null>();
         for (const item of perspective.items) {
-          ids.set(item.pageId, perspective.keepId);
-          const [head] = await tx.select().from(revisions).where(eq(revisions.pageId, item.pageId)).orderBy(desc(revisions.id)).limit(1);
-          if (!head) throw new Error(`视角 ${item.pageId} 缺少正文修订，未执行归并`);
-          content += `${content ? "\n\n" : ""}## ${group.roots.find(r => r.id === item.termId)!.title}\n\n${head.content}`;
+          const source = prepared.get(item.pageId);
+          if (!source) throw new Error(`视角 ${item.pageId} 缺少正文修订，未执行归并`);
+          for (const [name, id] of source.targets) targets.set(name, id);
+          content += `${content ? "\n\n" : ""}## ${group.roots.find(r => r.id === item.termId)!.title}\n\n${source.content}`;
           await tx.update(discussionPosts).set({ perspectiveId: perspective.keepId }).where(eq(discussionPosts.perspectiveId, item.pageId));
         }
         const [interpreter] = await tx.select().from(pages).where(eq(pages.id, perspective.items[0].interpreterId));
         const title = `${interpreter.title}论${group.title}`;
         await tx.update(pages).set({ title, slug: slugify(title) }).where(eq(pages.id, perspective.keepId));
         await tx.update(perspectives).set({ pinnedAt: perspective.items.find(p => p.pinnedAt)?.pinnedAt ?? null }).where(eq(perspectives.pageId, perspective.keepId));
-        if (perspective.items.length > 1) await applyContentChange(tx, perspective.keepId, content, null, { source: "direct" });
+        if (perspective.items.length > 1) {
+          await preserveConsolidatedTargets(tx, perspective.keepId, targets);
+          await applyContentChange(tx, perspective.keepId, content, null, { source: "direct" });
+          combined.add(perspective.keepId);
+        }
       }
       const rootIds = group.roots.map(r => r.id);
       const categories = await tx.select().from(termCategories).where(inArray(termCategories.termId, rootIds));
@@ -132,11 +142,11 @@ export async function consolidateMvp(apply = false, groups = mvpMergeGroups) {
     await purge(tx, planned.obsoleteIds);
     const remaining = await tx.select().from(pages).where(isPageVisible(pages.id));
     for (const page of remaining) {
-      const [head] = await tx.select().from(revisions).where(eq(revisions.pageId, page.id)).orderBy(desc(revisions.id)).limit(1);
-      if (!head || page.type !== "perspective") continue;
-      const content = rewriteLinks(head.content, names);
-      if (content !== head.content) await applyContentChange(tx, page.id, content, null, { source: "direct" });
-      else await rebuildPageLinks(tx, page.id, content);
+      const source = prepared.get(page.id);
+      if (!source || combined.has(page.id)) continue;
+      await preserveConsolidatedTargets(tx, page.id, source.targets);
+      if (source.content !== source.original) await applyContentChange(tx, page.id, source.content, null, { source: "direct" });
+      else await rebuildPageLinks(tx, page.id, source.content);
     }
     return report;
   }, { isolationLevel: "repeatable read" });

@@ -1,6 +1,11 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 test("可选作品信息框、诠释者编辑、讨论失效锚点与搜索回复定位", async ({ page }) => {
   test.setTimeout(120_000);
@@ -56,4 +61,77 @@ test("可选作品信息框、诠释者编辑、讨论失效锚点与搜索回�
   await page.request.post(`/api/admin/pages/${interpreter.pageId}`, { data: { action: "restore" } });
   await page.reload();
   await expect(page.locator(`#floor-${floor.id}`).locator(`a[href="${perspective.href}"]`)).toBeVisible();
+});
+
+test("归并后公开正文、讨论回复、分类和双链仍可阅读", async ({ page }) => {
+  test.skip(process.env.MVP_MIGRATION_E2E !== "1" || !new URL(process.env.DATABASE_URL!).pathname.startsWith("/phoskywiki_review_"), "归并验收仅允许显式选择的隔离数据库");
+  test.setTimeout(90_000);
+  await page.request.post("/api/auth/sign-in/email", { data: { email: process.env.SEED_ADMIN_EMAIL, password: process.env.SEED_ADMIN_PASSWORD } });
+  const title = `Merged ${randomUUID()}`;
+  const create = async (data: object) => { const response = await page.request.post("/api/submissions", { data }); expect(response.status()).toBe(201); return response.json(); };
+  const a = await create({ kind: "new_term", title: `${title}（哲学）`, content: "哲学公开解释" });
+  const b = await create({ kind: "new_term", title: `${title}（经济学）`, content: "经济学公开解释" });
+  const thinker = await create({ kind: "new_interpreter", title: `独立诠释者 ${title}` });
+  const unique = await create({ kind: "new_perspective", termId: b.pageId, interpreterId: thinker.pageId, content: "独立视角正文保留" });
+  const source = await create({ kind: "new_term", title: `Source ${title}`, content: `普通 [[${title}（经济学）]]，精确 [[${title}（经济学）|合并视角@编委会]]` });
+  const catalogue = await (await page.request.get("/api/editor/catalog")).json();
+  const boardHref = catalogue.targets.find((t: { key: string }) => t.key === `${title}（经济学）@编委会`).href;
+  const boardId = Number(boardHref.match(/(\d+)$/)[1]);
+  const floor = await (await page.request.post("/api/discussion/posts", { data: { termId: b.pageId, perspectiveId: boardId, content: "迁移公开楼层" } })).json();
+  const reply = await (await page.request.post("/api/discussion/posts", { data: { termId: b.pageId, parentId: floor.id, content: "迁移公开回复" } })).json();
+  const folder = await mkdtemp(join(tmpdir(), "phosky-browser-merge-"));
+  await writeFile(join(folder, "groups.json"), JSON.stringify([{ title, sourceTitles: [`${title}（哲学）`, `${title}（经济学）`] }]));
+  await writeFile(join(folder, "fixture.txt"), "disposable HTTP-created fixture");
+  await promisify(execFile)(process.execPath, ["--conditions", "react-server", "--import", "tsx", "scripts/consolidate-mvp.ts", "--database", new URL(process.env.DATABASE_URL!).pathname.slice(1), "--groups", join(folder, "groups.json"), "--apply", "--backup", join(folder, "fixture.txt")], { env: process.env });
+  await page.goto(`/term/${a.pageId}`);
+  await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+  await expect(page.locator(".wiki-content")).toContainText("哲学公开解释");
+  await expect(page.locator(".wiki-content")).toContainText("经济学公开解释");
+  await page.getByRole("link", { name: /讨论区（/ }).click();
+  await expect(page.locator(`#floor-${floor.id}`)).toContainText("迁移公开楼层");
+  await expect(page.locator(`#floor-${reply.id}`)).toContainText("迁移公开回复");
+  await page.locator(`#floor-${floor.id}`).getByRole("link", { name: `编委会论${title}` }).click();
+  await expect(page.locator(".wiki-content")).toContainText("经济学公开解释");
+  await page.goto(unique.href);
+  await expect(page.locator(".wiki-content")).toContainText("独立视角正文保留");
+  await page.goto(source.href);
+  await page.locator(".wiki-content").getByRole("link", { name: `${title}（经济学）`, exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+  await page.goto(source.href);
+  await page.getByRole("link", { name: "合并视角", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: `编委会论${title}` })).toBeVisible();
+  expect((await page.request.get(b.href)).status()).toBe(404);
+  const hits = await (await page.request.get(`/api/search?q=${encodeURIComponent(title)}&type=term`)).json();
+  expect(hits.hits.some((h: { pageId: number }) => h.pageId === b.pageId)).toBe(false);
+  expect(hits.hits.some((h: { pageId: number }) => h.pageId === a.pageId)).toBe(true);
+});
+
+test("并发发布期间编辑 SSR 的正文与提交基准始终属于同一修订", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.request.post("/api/auth/sign-in/email", { data: { email: process.env.SEED_ADMIN_EMAIL, password: process.env.SEED_ADMIN_PASSWORD } });
+  const title = `Snapshot ${randomUUID()}`;
+  expect((await page.request.post("/api/submissions", { data: { kind: "new_term", title, content: "Snapshot 0" } })).status()).toBe(201);
+  const catalogue = await (await page.request.get("/api/editor/catalog")).json();
+  const href = catalogue.targets.find((t: { key: string }) => t.key === `${title}@编委会`).href;
+  const id = Number(href.match(/(\d+)$/)[1]);
+  await page.goto(`/edit/${id}`);
+  await page.route("**/api/submissions", route => route.fulfill({ status: 409, json: { error: "观察提交载荷，保留草稿" } }));
+  for (let round = 0; round < 5; round++) {
+    await page.evaluate(() => localStorage.clear());
+    const write = (async () => {
+      for (let i = 0; i < 4; i++) {
+        const state = await (await page.request.get(`/api/pages/${id}/history`)).json();
+        const result = await page.request.post("/api/submissions", { data: { kind: "edit", pageId: id, baseRevisionId: state.revisions[0].id, content: `Snapshot ${round}-${i}` } });
+        expect(result.status()).toBe(201);
+      }
+    })();
+    await page.goto(`/edit/${id}`);
+    await expect(page.getByRole("textbox", { name: "正文（Markdown）" })).toBeVisible();
+    const submitted = page.waitForRequest(r => r.url().endsWith("/api/submissions") && r.method() === "POST");
+    await page.getByRole("button", { name: "提交（直接生效）", exact: true }).click();
+    const payload = (await submitted).postDataJSON();
+    await write;
+    const state = await (await page.request.get(`/api/pages/${id}/history`)).json();
+    expect(state.revisions.find((r: { id: number }) => r.id === payload.baseRevisionId).content).toBe(payload.content);
+  }
 });

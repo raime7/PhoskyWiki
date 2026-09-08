@@ -7,13 +7,14 @@ import { beforeAll, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
 import { getDb } from "@/db";
-import { pages, terms, perspectives, revisions, interpreters, user, discussionPosts, termCategories, categories, submissions } from "@/db/schema";
+import { pages, terms, perspectives, revisions, interpreters, user, discussionPosts, termCategories, categories, submissions, links } from "@/db/schema";
 import { GET as history } from "@/app/api/pages/[pageId]/history/route";
 import { GET as graph } from "@/app/api/graph/site/route";
 
 const execute = promisify(execFile);
 let directory: string;
 let kept: number, removed: number, first: number, second: number, hidden: number;
+let renamedTarget: number, reusedNameTarget: number;
 async function readHistory(id: number) {
   return history(new Request(`http://localhost/api/pages/${id}/history`), { params: Promise.resolve({ pageId: String(id) }) });
 }
@@ -40,8 +41,15 @@ beforeAll(async () => {
     await db.insert(perspectives).values({ pageId: p.id, termId, interpreterId: board.pageId });
     await db.insert(revisions).values({ pageId: p.id, content }); return p.id;
   }
-  first = await perspective(kept, "哲学解释完整保留 [[合并测试（经济学）|经济解释@编委会]]");
-  second = await perspective(removed, "经济解释完整保留 [[合并测试（哲学）]]");
+  renamedTarget = await term("第三方新名");
+  reusedNameTarget = await term("实际保留词条");
+  first = await perspective(kept, `哲学解释完整保留 [[合并测试（经济学）|经济解释@编委会]] [[合并测试（经济学）]] [普通站内链接](/term/old-${removed})`);
+  second = await perspective(removed, `经济解释完整保留 [[合并测试（哲学）]] [[第三方旧名]] [精确站内链接](/perspective/old-${first})`);
+  // 等价于保存后目标改名、旧名被新来源复用：既有链接仍以原 id 为准。
+  await getDb().insert(links).values([
+    { sourcePageId: first, targetName: "合并测试（经济学）", targetPageId: reusedNameTarget },
+    { sourcePageId: second, targetName: "第三方旧名", targetPageId: renamedTarget },
+  ]);
   hidden = await term("隐藏夹具");
   await db.update(pages).set({ deletedAt: new Date() }).where(eq(pages.id, hidden));
   await perspective(hidden, "应被清除");
@@ -68,8 +76,16 @@ it("运维预览不改变公开页面；归并保留正文历史、清理来源�
   expect(state.revisions[0].content).toContain("## 合并测试（经济学）");
   expect(state.revisions[0].content).toContain("[[合并测试|经济解释@编委会]]");
   expect(state.revisions[0].content).not.toContain("来源待审不能发布");
+  expect(state.revisions[0].content).toContain("[[第三方新名|第三方旧名]]");
+  expect(state.revisions[0].content).toContain("[[实际保留词条|合并测试（经济学）]]");
+  expect(state.revisions[0].content).toContain(`/term/合并测试-${kept}`);
+  expect(state.revisions[0].content).not.toContain(`/term/old-${removed}`);
   expect(state.revisions.at(-1).content).toContain("哲学解释完整保留");
   const network = await (await graph()).json();
   expect(network.nodes.filter((node: { title: string }) => node.title.startsWith("合并测试"))).toMatchObject([{ id: kept, title: "合并测试", perspectiveCount: 1 }]);
+  expect(network.edges).toEqual(expect.arrayContaining([
+    expect.objectContaining({ source: Math.min(kept, renamedTarget), target: Math.max(kept, renamedTarget) }),
+    expect.objectContaining({ source: Math.min(kept, reusedNameTarget), target: Math.max(kept, reusedNameTarget) }),
+  ]));
   expect(await run(true)).toMatchObject({ groups: [], removedPages: 0, removedPosts: 0, removedRevisions: 0, removedSubmissions: 0 });
 }, 60_000);
