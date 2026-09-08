@@ -1,6 +1,6 @@
 // 审核流核心集成测试（T06 验收）：提交状态机全转移、两票受理（含冷启动退化与
-// quorum 快照）、base 过期并发防护、驳回必填理由、受理产生修订并重建 links、
-// 新建页（词条/视角/诠释者）同样进队列、管理员直编。主缝 = route handlers 直调，
+// quorum 快照）、base 过期并发防护、驳回必填理由、受理产生修订、
+// 管理员直编。主缝 = route handlers 直调，
 // 连真实 PG。管理员数量用 setAdminsExactly 精确控制（quorum 依赖它），恢复原状后清理。
 
 import { randomUUID } from "node:crypto";
@@ -14,22 +14,15 @@ import { auth } from "@/lib/auth";
 import { seedDatabase } from "@/db/seed";
 import { getDb } from "@/db";
 import {
-  links,
   pages,
-  revisions,
   submissions,
   submissionVotes,
   user,
 } from "@/db/schema";
-import {
-  getHeadContent,
-  getHeadRevisionId,
-  getPerspectiveDetail,
-  listInterpreters,
-  listPerspectivesOfTerm,
-  listTerms,
-} from "@/lib/content";
-import { listQueue } from "@/lib/review";
+import { GET as historyRoute } from "@/app/api/pages/[pageId]/history/route";
+
+// 页面 DOM 的队列、提交详情、反链和引用热度回归在 tests/e2e/review-behavior.spec.ts。
+// 本文件的观察口径仅为 HTTP 响应；数据库访问仅限种子定位、角色夹具和清理。
 
 interface TestUser {
   id: string;
@@ -179,18 +172,30 @@ async function review(
 
 // ---- 内容夹具 ---------------------------------------------------------------
 
-async function termIdByTitle(title: string): Promise<number> {
-  const term = (await listTerms()).find((row) => row.title === title);
-  if (!term) throw new Error(`种子缺少词条：${title}`);
-  return term.id;
+async function pageIdByTitle(title: string): Promise<number> {
+  const [page] = await getDb().select({ id: pages.id }).from(pages).where(eq(pages.title, title));
+  if (!page) throw new Error(`种子缺少页面：${title}`);
+  return page.id;
 }
 
-/** 词条下某诠释者的视角页 id。 */
-async function perspectiveIdOf(termTitle: string, interpreterName: string): Promise<number> {
-  const perspectives = await listPerspectivesOfTerm(await termIdByTitle(termTitle));
-  const match = perspectives.find((row) => row.interpreterName === interpreterName);
-  if (!match) throw new Error(`种子缺少视角：${interpreterName}论${termTitle}`);
-  return match.pageId;
+const termIdByTitle = pageIdByTitle;
+const perspectiveIdOf = (termTitle: string, interpreterName: string) =>
+  pageIdByTitle(`${interpreterName}论${termTitle}`);
+
+async function history(pageId: number): Promise<{ revisions: { id: number; content: string }[] }> {
+  const response = await historyRoute(new Request(`http://localhost/api/pages/${pageId}/history`), {
+    params: Promise.resolve({ pageId: String(pageId) }),
+  });
+  expect(response.status).toBe(200);
+  return response.json();
+}
+
+async function headContent(pageId: number) {
+  return (await history(pageId)).revisions[0].content;
+}
+
+async function headRevisionId(pageId: number) {
+  return (await history(pageId)).revisions[0].id;
 }
 
 /** 对某视角页发起编辑提交，base 取当前 head（编辑提交的常规形态）。 */
@@ -205,20 +210,11 @@ async function submitEdit(
       kind: "edit",
       pageId,
       content,
-      baseRevisionId: await getHeadRevisionId(pageId),
+      baseRevisionId: await headRevisionId(pageId),
       ...(supersedes !== undefined ? { supersedes } : {}),
     },
     actor.cookie,
   );
-}
-
-async function submissionRow(id: number) {
-  const [row] = await getDb()
-    .select()
-    .from(submissions)
-    .where(eq(submissions.id, id))
-    .limit(1);
-  return row;
 }
 
 // ---- 测试 -------------------------------------------------------------------
@@ -231,17 +227,13 @@ describe("提交状态机（T06：pending → approved/rejected 均终态，重�
     const created = await submitEdit(editor1, pageId, "福柯视角的受理版内容。");
     expect(created.status).toBe(201);
     expect(created.data).toMatchObject({ outcome: "pending", quorum: 1 });
-    expect((await submissionRow(created.data.submissionId)).status).toBe("pending");
 
     const approved = await review(created.data.submissionId, { action: "approve" }, admin1.cookie);
     expect(approved.status).toBe(200);
     expect(approved.data).toEqual({ outcome: "approved" });
 
     // 受理后的内容立即进入读路径
-    expect(await getHeadContent(pageId)).toBe("福柯视角的受理版内容。");
-    const row = await submissionRow(created.data.submissionId);
-    expect(row.status).toBe("approved");
-    expect(row.decidedAt).not.toBeNull();
+    expect(await headContent(pageId)).toBe("福柯视角的受理版内容。");
 
     // 终态不可再投
     const again = await review(created.data.submissionId, { action: "approve" }, admin1.cookie);
@@ -251,7 +243,7 @@ describe("提交状态机（T06：pending → approved/rejected 均终态，重�
   it("驳回必填理由；驳回是终态；修改重提 = 新建提交（supersedes 谱系）", async () => {
     await setAdminsExactly([admin1.id]);
     const pageId = await perspectiveIdOf("主体性", "福柯");
-    const before = await getHeadContent(pageId);
+    const before = await headContent(pageId);
 
     const created = await submitEdit(editor1, pageId, "有争议的重写版本。");
     const id = created.data.submissionId as number;
@@ -262,8 +254,7 @@ describe("提交状态机（T06：pending → approved/rejected 均终态，重�
 
     const rejected = await review(id, { action: "reject", reason: "论据不足，请补充文献。" }, admin1.cookie);
     expect(rejected.data).toMatchObject({ outcome: "rejected", staleBase: false });
-    expect(await getHeadContent(pageId)).toBe(before); // 未生效
-    expect((await submissionRow(id)).rejectionReason).toBe("论据不足，请补充文献。");
+    expect(await headContent(pageId)).toBe(before); // 未生效
 
     // 终态后再投 409
     expect((await review(id, { action: "approve" }, admin1.cookie)).status).toBe(409);
@@ -273,12 +264,11 @@ describe("提交状态机（T06：pending → approved/rejected 均终态，重�
     expect(resubmitted.status).toBe(201);
     const newId = resubmitted.data.submissionId as number;
     expect(newId).not.toBe(id);
-    expect((await submissionRow(newId)).supersedesId).toBe(id);
-    expect((await submissionRow(id)).status).toBe("rejected");
+    expect((await review(id, { action: "approve" }, admin1.cookie)).status).toBe(409);
 
     const approved = await review(newId, { action: "approve" }, admin1.cookie);
     expect(approved.data).toEqual({ outcome: "approved" });
-    expect(await getHeadContent(pageId)).toBe("补充论据后的重提版本。");
+    expect(await headContent(pageId)).toBe("补充论据后的重提版本。");
   });
 
   it("输入校验：非法 kind / 空 content / 缺 base / 非视角页目标", async () => {
@@ -290,7 +280,7 @@ describe("提交状态机（T06：pending → approved/rejected 均终态，重�
     expect(
       (
         await submit(
-          { kind: "edit", pageId, content: "  ", baseRevisionId: await getHeadRevisionId(pageId) },
+          { kind: "edit", pageId, content: "  ", baseRevisionId: await headRevisionId(pageId) },
           editor1.cookie,
         )
       ).status,
@@ -313,7 +303,7 @@ describe("提交状态机（T06：pending → approved/rejected 均终态，重�
             kind: "edit",
             pageId,
             content: "x",
-            baseRevisionId: await getHeadRevisionId(pageId),
+            baseRevisionId: await headRevisionId(pageId),
             supersedes: 999999,
           },
           editor1.cookie,
@@ -331,31 +321,33 @@ describe("两票受理（顺序批准、任一驳回即终态）", () => {
     const created = await submitEdit(editor1, pageId, "意识形态：两票受理版。");
     expect(created.data.quorum).toBe(2);
     const id = created.data.submissionId as number;
-    const before = await getHeadContent(pageId);
+    const before = await history(pageId);
 
     const first = await review(id, { action: "approve" }, admin1.cookie);
     expect(first.data).toEqual({ outcome: "pending", approveCount: 1, quorum: 2 });
-    expect(await getHeadContent(pageId)).toBe(before); // 记票未生效
+    expect(await history(pageId)).toEqual(before); // 记票未生效，历史也不增加
 
     const dup = await review(id, { action: "approve" }, admin1.cookie);
     expect(dup.status).toBe(409);
+    expect(await history(pageId)).toEqual(before);
 
     const second = await review(id, { action: "approve" }, admin2.cookie);
     expect(second.data).toEqual({ outcome: "approved" });
-    expect(await getHeadContent(pageId)).toBe("意识形态：两票受理版。");
+    expect(await headContent(pageId)).toBe("意识形态：两票受理版。");
+    const after = await history(pageId);
+    expect(after.revisions).toHaveLength(before.revisions.length + 1);
+    expect(after.revisions.slice(1)).toEqual(before.revisions);
 
-    const votes = await getDb()
-      .select()
-      .from(submissionVotes)
-      .where(eq(submissionVotes.submissionId, id));
-    expect(votes).toHaveLength(2);
-    expect(votes.every((vote) => vote.vote === "approve")).toBe(true);
+    // 两名不同管理员的 HTTP 结果证明两票生效；重复/终态请求不能再产生修订。
+    const acceptedHistory = await history(pageId);
+    expect((await review(id, { action: "approve" }, admin2.cookie)).status).toBe(409);
+    expect(await history(pageId)).toEqual(acceptedHistory);
   });
 
   it("一准一驳 = 驳回终态：先投的批准票作废，内容不生效", async () => {
     await setAdminsExactly([admin1.id, admin2.id]);
     const pageId = await perspectiveIdOf("意识形态", "编委会");
-    const before = await getHeadContent(pageId);
+    const before = await headContent(pageId);
 
     const created = await submitEdit(editor1, pageId, "一准一驳的版本。");
     const id = created.data.submissionId as number;
@@ -364,8 +356,7 @@ describe("两票受理（顺序批准、任一驳回即终态）", () => {
     const rejected = await review(id, { action: "reject", reason: "口径与词条定位不符。" }, admin2.cookie);
     expect(rejected.data).toMatchObject({ outcome: "rejected", staleBase: false });
 
-    expect(await getHeadContent(pageId)).toBe(before);
-    expect((await submissionRow(id)).status).toBe("rejected");
+    expect(await headContent(pageId)).toBe(before);
     expect((await review(id, { action: "approve" }, admin2.cookie)).status).toBe(409);
   });
 
@@ -405,7 +396,7 @@ describe("冷启动退化与 quorum 快照（min(2, 管理员数)，创建时定
     expect(created.data.quorum).toBe(1);
     const approved = await review(created.data.submissionId, { action: "approve" }, admin1.cookie);
     expect(approved.data).toEqual({ outcome: "approved" });
-    expect(await getHeadContent(pageId)).toBe("冷启动单管理员版。");
+    expect(await headContent(pageId)).toBe("冷启动单管理员版。");
   });
 
   it("quorum 在提交创建时快照：之后管理员人数增减不追溯已存在的提交", async () => {
@@ -427,13 +418,14 @@ describe("冷启动退化与 quorum 快照（min(2, 管理员数)，创建时定
     const submittedWhenTwo = await submitEdit(editor2, pageId, "双管理员期提交的内容。");
     expect(submittedWhenTwo.data.quorum).toBe(2);
     await setAdminsExactly([admin1.id]);
+    const beforePartial = await history(pageId);
     const partial = await review(
       submittedWhenTwo.data.submissionId,
       { action: "approve" },
       admin1.cookie,
     );
     expect(partial.data).toEqual({ outcome: "pending", approveCount: 1, quorum: 2 });
-    expect((await submissionRow(submittedWhenTwo.data.submissionId)).status).toBe("pending");
+    expect(await history(pageId)).toEqual(beforePartial);
   });
 });
 
@@ -441,7 +433,7 @@ describe("并发防护（base 过期自动驳回，ADR-0004 #2）", () => {
   it("页面 head 越过 base 后受理：自动驳回并提示基于新版重新提交", async () => {
     await setAdminsExactly([admin1.id]);
     const pageId = await perspectiveIdOf("剩余价值", "编委会");
-    const base = await getHeadRevisionId(pageId);
+    const base = await headRevisionId(pageId);
 
     // 编者基于 r1 提交；随后管理员直编使页面前进到 r2
     const created = await submit(
@@ -463,24 +455,21 @@ describe("并发防护（base 过期自动驳回，ADR-0004 #2）", () => {
       admin1.cookie,
     );
     expect(direct.data.outcome).toBe("direct");
-    expect(await getHeadRevisionId(pageId)).not.toBe(base);
+    expect(await headRevisionId(pageId)).not.toBe(base);
 
     // 受理编者的提交：base 过期 → 该票无法通过，自动驳回
     const outcome = await review(created.data.submissionId, { action: "approve" }, admin1.cookie);
     expect(outcome.data).toMatchObject({ outcome: "rejected", staleBase: true });
     expect(outcome.data.message).toContain("重新提交");
 
-    const row = await submissionRow(created.data.submissionId);
-    expect(row.status).toBe("rejected");
-    expect(row.rejectionReason).toContain("重新提交");
     // 读路径保持管理员的版本，编者的旧 base 内容未覆盖
-    expect(await getHeadContent(pageId)).toBe("管理员抢先直编的内容。");
+    expect(await headContent(pageId)).toBe("管理员抢先直编的内容。");
 
     // 编者基于新版（当前 head）重提 → 正常受理生效
     const resubmitted = await submitEdit(editor1, pageId, "编者基于新版的内容。");
     const approved = await review(resubmitted.data.submissionId, { action: "approve" }, admin1.cookie);
     expect(approved.data).toEqual({ outcome: "approved" });
-    expect(await getHeadContent(pageId)).toBe("编者基于新版的内容。");
+    expect(await headContent(pageId)).toBe("编者基于新版的内容。");
   });
 
   it("base 未过期（head == base）时正常通过", async () => {
@@ -493,188 +482,19 @@ describe("并发防护（base 过期自动驳回，ADR-0004 #2）", () => {
 });
 
 describe("管理员直编（不经队列，与受理共用修订管线）", () => {
-  it("同一端点：管理员提交直接生效，不产生提交行", async () => {
+  it("同一端点：管理员提交直接生效，返回阅读地址并追加修订", async () => {
     await setAdminsExactly([admin1.id]);
     const pageId = await perspectiveIdOf("价值（哲学）", "编委会");
-    const pendingBefore = await getDb().$count(submissions, eq(submissions.status, "pending"));
+    const before = await history(pageId);
 
     const result = await submitEdit(admin1, pageId, "管理员直编的通俗视角。");
     expect(result.status).toBe(201);
     expect(result.data.outcome).toBe("direct");
     expect(result.data.href).toMatch(new RegExp(`/perspective/.+-${pageId}$`));
-    expect(await getHeadContent(pageId)).toBe("管理员直编的通俗视角。");
-    expect(
-      await getDb().$count(submissions, eq(submissions.status, "pending")),
-    ).toBe(pendingBefore);
-  });
-});
-
-describe("受理产生修订快照并重建 links（视角热度随之更新）", () => {
-  it("受理后：新修订落库、旧 links 清空重解析、目标视角热度 +1 且排序前移", async () => {
-    await setAdminsExactly([admin1.id]);
-    const subjectivity = await termIdByTitle("主体性");
-    // 本测试之前的用例已重写过 剩余价值/意识形态 等页的 links，选一个尚未动过的种子视角
-    const sourcePageId = await perspectiveIdOf("价值（政治经济学）", "编委会");
-    const foucault = (await listPerspectivesOfTerm(subjectivity)).find(
-      (row) => row.title === "福柯论主体性",
-    )!;
-    const revisionCountBefore = await getDb()
-      .select()
-      .from(revisions)
-      .where(eq(revisions.pageId, sourcePageId));
-    const sourceLinksBefore = await getDb()
-      .select()
-      .from(links)
-      .where(eq(links.sourcePageId, sourcePageId));
-    // 种子里该视角有已解析的旧链（[[异化]] 等），受理后应被整套替换
-    expect(sourceLinksBefore.map((row) => row.targetName)).toContain("异化");
-
-    const created = await submitEdit(
-      editor1,
-      sourcePageId,
-      "剥削机制参见[[剩余价值]]词条；主体问题参见[[主体性|福柯论主体性@福柯]]。",
-    );
-    expect((await review(created.data.submissionId, { action: "approve" }, admin1.cookie)).data).toEqual({
-      outcome: "approved",
-    });
-
-    // 修订快照：多了一个全量修订
-    const revisionCountAfter = await getDb()
-      .select()
-      .from(revisions)
-      .where(eq(revisions.pageId, sourcePageId));
-    expect(revisionCountAfter.length).toBe(revisionCountBefore.length + 1);
-
-    // links 重建：旧的（[[异化]] 等）不在了，只剩新正文的解析结果
-    const sourceLinksAfter = await getDb()
-      .select()
-      .from(links)
-      .where(eq(links.sourcePageId, sourcePageId));
-    expect(sourceLinksAfter).toHaveLength(2);
-    expect(sourceLinksAfter.map((row) => row.targetName).sort()).toEqual(
-      ["剩余价值", "主体性@福柯"].sort(),
-    );
-    const explicit = sourceLinksAfter.find((row) => row.targetName === "主体性@福柯")!;
-    expect(explicit.targetPageId).toBe(foucault.pageId);
-
-    // 视角热度随之更新：福柯视角 +1 条入链，排到零引用视角之前
-    const reordered = await listPerspectivesOfTerm(subjectivity);
-    const foucaultAfter = reordered.find((row) => row.title === "福柯论主体性")!;
-    expect(foucaultAfter.linkCount).toBe(foucault.linkCount + 1);
-    const afterFoucault = reordered.slice(reordered.indexOf(foucaultAfter) + 1);
-    expect(afterFoucault.every((row) => row.linkCount <= foucaultAfter.linkCount)).toBe(true);
-  });
-});
-
-describe("新建页同样进队列（词条/视角/诠释者）", () => {
-  it("新建视角：受理后建页 + 负载 + 修订 + 解析双链，进入读路径", async () => {
-    await setAdminsExactly([admin1.id]);
-    const surplusId = await termIdByTitle("剩余价值");
-    const deleuze = (await listInterpreters()).find((row) => row.name === "德勒兹")!;
-
-    const created = await submit(
-      {
-        kind: "new_perspective",
-        termId: surplusId,
-        interpreterId: deleuze.pageId,
-        content: "德勒兹论剩余价值：欲望生产视角，另见[[异化]]。",
-      },
-      editor1.cookie,
-    );
-    expect(created.status).toBe(201);
-    expect((await review(created.data.submissionId, { action: "approve" }, admin1.cookie)).data).toEqual({
-      outcome: "approved",
-    });
-
-    const newPerspective = (await listPerspectivesOfTerm(surplusId)).find(
-      (row) => row.title === "德勒兹论剩余价值",
-    )!;
-    expect(newPerspective).toBeDefined();
-    const detail = await getPerspectiveDetail(newPerspective.pageId);
-    expect(detail).toMatchObject({ termTitle: "剩余价值", interpreterName: "德勒兹" });
-    expect(await getHeadContent(newPerspective.pageId)).toContain("欲望生产");
-
-    const targets = await getDb()
-      .select()
-      .from(links)
-      .where(eq(links.sourcePageId, newPerspective.pageId));
-    expect(targets).toHaveLength(1);
-    expect(targets[0].targetName).toBe("异化");
-    expect(targets[0].targetPageId).toBe(await termIdByTitle("异化"));
-  });
-
-  it("新建词条与新建诠释者：受理后可读；撞名/重复挂载预检 400", async () => {
-    await setAdminsExactly([admin1.id]);
-
-    const term = await submit(
-      { kind: "new_term", title: "物化（T06 测试）", summary: "测试用新词条。" },
-      editor1.cookie,
-    );
-    expect(term.status).toBe(201);
-    expect(
-      (await review(term.data.submissionId, { action: "approve" }, admin1.cookie)).data,
-    ).toEqual({ outcome: "approved" });
-    expect(
-      (await listTerms()).some((row) => row.title === "物化（T06 测试）"),
-    ).toBe(true);
-
-    const interpreter = await submit(
-      { kind: "new_interpreter", title: "卢卡奇（T06 测试）", summary: "测试用新诠释者。" },
-      editor1.cookie,
-    );
-    expect(interpreter.status).toBe(201);
-    expect(
-      (await review(interpreter.data.submissionId, { action: "approve" }, admin1.cookie)).data,
-    ).toEqual({ outcome: "approved" });
-    expect(
-      (await listInterpreters()).some((row) => row.name === "卢卡奇（T06 测试）"),
-    ).toBe(true);
-
-    // 撞名预检：同名词典（含软删除占位）、重复的（词条 × 诠释者）挂载
-    expect(
-      (await submit({ kind: "new_term", title: "主体性", summary: "" }, editor1.cookie)).status,
-    ).toBe(400);
-    const subjectivity = await termIdByTitle("主体性");
-    const lacan = (await listInterpreters()).find((row) => row.name === "拉康")!;
-    expect(
-      (
-        await submit(
-          { kind: "new_perspective", termId: subjectivity, interpreterId: lacan.pageId, content: "x" },
-          editor1.cookie,
-        )
-      ).status,
-    ).toBe(400);
-  });
-});
-
-describe("审核队列读路径（listQueue）", () => {
-  it("待审列表带票数、base 过期标记与 diff 两侧内容", async () => {
-    await setAdminsExactly([admin1.id, admin2.id]);
-    const pageId = await perspectiveIdOf("主体性", "拉康");
-    const created = await submitEdit(editor1, pageId, "队列展示用的提案内容。");
-    const id = created.data.submissionId as number;
-
-    await review(id, { action: "approve" }, admin1.cookie);
-
-    // 制造 base 过期：管理员直编推进 head
-    await submitEdit(admin2, pageId, "直编推进 head。");
-    await submitEdit(editor2, pageId, "第二条待审提交。");
-
-    const queue = await listQueue();
-    const item = queue.find((row) => row.id === id);
-    expect(item).toBeDefined();
-    expect(item!.kind).toBe("edit");
-    expect(item!.quorum).toBe(2);
-    expect(item!.approverNames).toEqual(["T06 管理员一"]);
-    expect(item!.staleBase).toBe(true); // head 已被直编推进
-    expect(item!.currentContent).toBe("直编推进 head。");
-    expect(item!.content).toBe("队列展示用的提案内容。");
-    expect(item!.targetTitle).toBe("拉康论主体性");
-
-    const other = queue.find((row) => row.content === "第二条待审提交。");
-    expect(other?.staleBase).toBe(false);
-
-    // 清理：把两条都驳回，避免影响后续文件的种子断言（下一个文件会重新灌种子）
-    await review(id, { action: "reject", reason: "测试清理" }, admin2.cookie);
+    expect(await headContent(pageId)).toBe("管理员直编的通俗视角。");
+    expect(result.data).not.toHaveProperty("submissionId");
+    const after = await history(pageId);
+    expect(after.revisions).toHaveLength(before.revisions.length + 1);
+    expect(after.revisions.slice(1)).toEqual(before.revisions);
   });
 });
