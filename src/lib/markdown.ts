@@ -6,15 +6,13 @@
 
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import rehypeStringify from "rehype-stringify";
-import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
-import remarkWikiLink from "remark-wiki-link";
-import { unified } from "unified";
 
 import type { Node, Parent } from "unist";
 
 import { parseWikiLink, wikiLinkKey, type WikiLinkRef } from "@/lib/wiki-links";
 import { filterRenderedImages } from "@/lib/image-markdown";
+import { markdownParser, visitWikiLinks } from "@/lib/markdown-ast";
 
 export interface WikiLinkTarget {
   /** 已解析目标的站内路径（如 /term/主体性-3）；红链为空字符串 */
@@ -32,25 +30,6 @@ export function wikiLinkResolver(
   targets: Map<string, WikiLinkTarget>,
 ): ResolveWikiLink {
   return (ref) => targets.get(wikiLinkKey(ref)) ?? { href: "", exists: false };
-}
-
-interface WikiLinkNode extends Node {
-  type: "wikiLink";
-  value: string;
-  data?: {
-    alias?: string | null;
-    hName?: string;
-    hProperties?: Record<string, unknown>;
-    hChildren?: { type: string; value: string }[];
-  };
-}
-
-/** 深度遍历 mdast，对每个 wikiLink 节点应用访问器。 */
-function visitWikiLinks(tree: Node, visit: (node: WikiLinkNode) => void): void {
-  if (tree.type === "wikiLink") visit(tree as WikiLinkNode);
-  for (const child of (tree as Parent).children ?? []) {
-    visitWikiLinks(child, visit);
-  }
 }
 
 /**
@@ -110,9 +89,7 @@ export function renderMarkdown(
 }
 
 function markdownProcessor(resolveWikiLink: ResolveWikiLink) {
-  return unified()
-    .use(remarkParse)
-    .use(remarkWikiLink, { aliasDivider: "|" })
+  return markdownParser()
     .use(rewriteWikiLinks, resolveWikiLink)
     .use(remarkRehype, { allowDangerousHtml: false })
     .use(rehypeSanitize, sanitizeSchema)

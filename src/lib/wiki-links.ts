@@ -8,6 +8,8 @@
 //                           perspectives 的（词条 × 诠释者）唯一约束保证
 //                           诠释者名即在词条范围内定位唯一视角。
 
+import { markdownParser, visitWikiLinks } from "@/lib/markdown-ast";
+
 /** 一条双链的寻址目标：词条名，可选显式视角语法指定的诠释者。 */
 export interface WikiLinkRef {
   /** 目标词条名（| 之前） */
@@ -49,24 +51,19 @@ export function parseWikiLink(target: string, alias: string | null): ParsedWikiL
   return { term, interpreter, display: display || alias };
 }
 
-const WIKI_LINK_PATTERN = /\[\[([^\[\]|\n]+)(?:\|([^\[\]\n]+))?\]\]/g;
-
 /**
- * 提取 Markdown 源文本里的全部双链（按 wikiLinkKey 去重、保序）。
- *
- * 与渲染器共用同一语法；已知的偏差是代码块内的 `[[..]]` 会被这里计入——
- * 写路径（T06）落库前如需精确，应改用与渲染一致的 AST 提取。
+ * 提取与渲染相同 AST 中的真实双链（按 wikiLinkKey 去重、保序）。
  */
 export function parseWikiLinks(source: string): ParsedWikiLink[] {
   const seen = new Set<string>();
   const links: ParsedWikiLink[] = [];
-  for (const match of source.matchAll(WIKI_LINK_PATTERN)) {
-    const parsed = parseWikiLink(match[1], match[2] ?? null);
-    if (!parsed) continue;
+  visitWikiLinks(markdownParser().parse(source), (node) => {
+    const parsed = parseWikiLink(node.value, node.data?.alias ?? null);
+    if (!parsed) return;
     const key = wikiLinkKey(parsed);
-    if (seen.has(key)) continue;
+    if (seen.has(key)) return;
     seen.add(key);
     links.push(parsed);
-  }
+  });
   return links;
 }

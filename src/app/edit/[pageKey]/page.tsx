@@ -10,6 +10,7 @@ import {
   getHeadRevisionId,
   getLivePage,
   getPerspectiveDetail,
+  getWikiLinkTargets,
 } from "@/lib/content";
 import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { getSessionUser } from "@/lib/session";
@@ -53,9 +54,10 @@ export default async function EditPage({ params }: Params) {
 
   const detail = await getPerspectiveDetail(id);
   if (!detail) notFound();
-  const [content, baseRevisionId] = await Promise.all([
+  const [content, baseRevisionId, linkTargets] = await Promise.all([
     getHeadContent(id),
     getHeadRevisionId(id),
+    getWikiLinkTargets(id),
   ]);
   // base 修订是并发防护的锚点（ADR-0004 #2），缺失即不可编辑
   if (content === null || baseRevisionId === null) notFound();
@@ -90,6 +92,7 @@ export default async function EditPage({ params }: Params) {
           pageId={id}
           initialContent={content}
           baseRevisionId={baseRevisionId}
+          resolvedWikiLinks={[...linkTargets].filter(([, target]) => target.exists || target.unavailable)}
         />
       </div>
     </main>

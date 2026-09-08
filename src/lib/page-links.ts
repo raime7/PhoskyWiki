@@ -14,7 +14,8 @@ import { parseWikiLinks, wikiLinkKey, type ParsedWikiLink } from "@/lib/wiki-lin
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 /**
- * 重建一页的全部双链：先清旧链，再按新正文解析落库——
+ * 重建一页的全部真实双链：仍出现在正文的已解析名称键沿用目标 id，
+ * 不因改名、旧名被复用或目标暂不可用而改变身份；新键与未解析红链按名称解析。
  * 默认链接落词条枢纽（无同名词条时落消歧义页），
  * 显式视角链接按「词条 × 诠释者」定位视角页；未命中留名称快照即红链。
  */
@@ -24,10 +25,17 @@ export async function rebuildPageLinks(
   content: string,
 ): Promise<void> {
   const refs = parseWikiLinks(content);
+  const previous = await tx.select({ name: links.targetName, id: links.targetPageId })
+    .from(links).where(eq(links.sourcePageId, pageId));
+  const preserved = new Map(previous.map((link) => [link.name, link.id]));
   await tx.delete(links).where(eq(links.sourcePageId, pageId));
   if (refs.length === 0) return;
 
-  const targetIds = await Promise.all(refs.map((ref) => resolveLinkTarget(tx, ref)));
+  const targetIds: (number | null)[] = [];
+  for (const ref of refs) {
+    // null 是真正未解析的红链，允许在目标创建后解析；隐藏目标的非空 id 必须保留。
+    targetIds.push(preserved.get(wikiLinkKey(ref)) ?? await resolveLinkTarget(tx, ref));
+  }
   await tx.insert(links).values(
     refs.map((ref, index) => ({
       sourcePageId: pageId,

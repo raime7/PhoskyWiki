@@ -10,7 +10,7 @@ import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { WikiContent } from "@/components/wiki-content";
 import { ImageUpload } from "@/components/image-upload";
-import { renderMarkdown, wikiLinkResolver } from "@/lib/markdown";
+import { renderMarkdown, wikiLinkResolver, type WikiLinkTarget } from "@/lib/markdown";
 import type { EditorCatalog } from "@/lib/editor-catalog";
 
 function wikiCompletions(catalog: EditorCatalog): CompletionSource {
@@ -70,7 +70,12 @@ const formats = [
   { label: "双链", before: "[[", after: "]]", fallback: "词条名" },
 ];
 
-export function MarkdownEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export function MarkdownEditor({ value, onChange, resolvedWikiLinks }: {
+  value: string;
+  onChange: (value: string) => void;
+  /** 该页已有的目标身份优先于当前名称目录，包括暂不可用的已解析目标。 */
+  resolvedWikiLinks?: [string, WikiLinkTarget][];
+}) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const initialValue = useRef(value);
@@ -152,9 +157,10 @@ export function MarkdownEditor({ value, onChange }: { value: string; onChange: (
 
   const html = useMemo(() => {
     if (!catalog) return null;
-    const targets = new Map(catalog.targets.map(({ key, href }) => [key, { href, exists: true }]));
+    const targets = new Map<string, WikiLinkTarget>(catalog.targets.map(({ key, href }) => [key, { href, exists: true }]));
+    for (const [key, target] of resolvedWikiLinks ?? []) targets.set(key, target);
     return renderMarkdown(value, wikiLinkResolver(targets));
-  }, [value, catalog]);
+  }, [value, catalog, resolvedWikiLinks]);
   const buttonClass = "min-h-11 rounded px-3 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring";
 
   return (

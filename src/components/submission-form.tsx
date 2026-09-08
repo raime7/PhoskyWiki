@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import type { CreateSubmissionResult } from "@/lib/review-types";
 import { TERM_CONTENT_TEMPLATE } from "@/lib/content-template";
+import type { WikiLinkTarget } from "@/lib/markdown";
 
 type Option = {
   id: number;
@@ -37,6 +38,7 @@ export type SubmissionFormProps =
       pageId: number;
       initialContent: string;
       baseRevisionId: number;
+      resolvedWikiLinks?: [string, WikiLinkTarget][];
     }
   | { variant: "new_term"; isAdmin: boolean }
   | { variant: "new_interpreter"; isAdmin: boolean }
@@ -292,7 +294,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
         </>
       )}
       {(variant === "edit" || variant === "new_perspective" || variant === "new_term") && (
-        <MarkdownEditor value={content} onChange={setContent} />
+        <MarkdownEditor value={content} onChange={setContent} resolvedWikiLinks={variant === "edit" ? props.resolvedWikiLinks : undefined} />
       )}
 
       {error && (

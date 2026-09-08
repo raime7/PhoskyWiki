@@ -62,6 +62,19 @@ describe("parseWikiLink", () => {
 });
 
 describe("parseWikiLinks", () => {
+  it("只提取真实 Markdown 节点，代码与转义示例不形成关系", () => {
+    const source = [
+      "[[异化|劳动异化]] [[主体性|通俗@编委会]] [[异化]] [[缺口]]",
+      "", "```md", "[[围栏示例]]", "```", "",
+      "    [[缩进示例]]", "", "`[[行内示例]]`", "",
+      "\\[[转义示例]]", "", "> [[主体性|重读@编委会]]",
+    ].join("\n");
+    expect(parseWikiLinks(source)).toEqual([
+      { term: "异化", interpreter: null, display: "劳动异化" },
+      { term: "主体性", interpreter: "编委会", display: "通俗" },
+      { term: "缺口", interpreter: null, display: "缺口" },
+    ]);
+  });
   it("提取默认与显式视角两类链接，按键去重保序", () => {
     const source = "[[异化]] 与 [[主体性|通俗视角@编委会]]，再说 [[异化]]";
     expect(parseWikiLinks(source)).toEqual([
