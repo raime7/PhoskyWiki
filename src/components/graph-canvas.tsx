@@ -72,11 +72,19 @@ function buildOption(
           perspectiveCount: number;
           schoolName: string;
         };
-        return [
-          `<strong>${d.title}</strong>`,
-          `${d.schoolName} · ${d.perspectiveCount} 个视角`,
-          `双链热度 ${d.heat}`,
-        ].join("<br/>");
+        // ECharts accepts an HTMLElement: keep formatting static and put every
+        // content field in a text node, including names saved before this fix.
+        const tooltip = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = d.title;
+        tooltip.append(
+          title,
+          document.createElement("br"),
+          document.createTextNode(`${d.schoolName} · ${d.perspectiveCount} 个视角`),
+          document.createElement("br"),
+          document.createTextNode(`双链热度 ${d.heat}`),
+        );
+        return tooltip;
       },
     },
     series: [
