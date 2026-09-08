@@ -1,3 +1,4 @@
+import { KeyTexts } from "@/components/key-texts";
 import Link from "next/link";
 import { HistoryLink } from "@/components/history-link";
 import { notFound } from "next/navigation";
@@ -45,6 +46,7 @@ export default async function InterpreterPage({ params }: Params) {
         <span aria-current="page">{interpreter.title}</span>
       </nav>
       <HistoryLink pageId={page.id} />
+      <Link href={`/edit/${page.id}`} className="mb-4 inline-block text-sm underline">编辑诠释者信息</Link>
 
       <div className="flex flex-col gap-10 lg:flex-row lg:gap-10">
         <div className="min-w-0 flex-1">
@@ -91,6 +93,7 @@ export default async function InterpreterPage({ params }: Params) {
           <Infobox
             title={interpreter.title}
             rows={[
+              ...(interpreter.keyTexts.length ? [{ label: "关键文本", content: <KeyTexts items={interpreter.keyTexts} /> }] : []),
               {
                 label: "类型",
                 content: interpreter.isBoard ? "编委会（特殊诠释者）" : "诠释者",

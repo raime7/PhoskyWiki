@@ -30,7 +30,7 @@ export function getSearchIndex(): SearchIndex {
   if (injected) return injected;
   const host = process.env.MEILI_HOST;
   if (host) {
-    meili ??= meiliSearchIndex({ host, apiKey: process.env.MEILI_MASTER_KEY });
+    meili ??= meiliSearchIndex({ host, apiKey: process.env.MEILI_MASTER_KEY, indexUid: process.env.MEILI_INDEX_UID || undefined });
     return meili;
   }
   if (!warned && process.env.NODE_ENV === "production") {

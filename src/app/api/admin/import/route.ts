@@ -7,7 +7,7 @@ function entries(value: unknown, kind: "new_term" | "new_interpreter"): Submissi
     if (!item || typeof item !== "object" || typeof item.title !== "string" ||
       (item.summary !== undefined && typeof item.summary !== "string") ||
       (item.content !== undefined && typeof item.content !== "string")) throw new ReviewError(400, "每项必须包含字符串 title；summary、content 为可选字符串");
-    return { kind, title: item.title, summary: item.summary, content: item.content, aliases: item.aliases };
+    return { kind, pageId: item.pageId, title: item.title, summary: item.summary, content: item.content, aliases: item.aliases, keyTexts: item.keyTexts };
   });
 }
 

@@ -1,12 +1,12 @@
-// 读路径的数据访问层：词条页 / 视角页 / 诠释者页 / 学派页 / 分类树 / 消歧义页 的查询都在这里。
+// 读路径的数据访问层：词条页 / 视角页 / 诠释者页 / 学派页 / 分类树 的查询都在这里。
 // 全部过滤 pages.deleted_at（软删除页面对读路径不可见，ADR-0003 #7）。
 
 import "server-only";
 
-import { and, asc, desc, eq, isNull, like, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
-import { getDb } from "@/db";
+import { getDb, type Db } from "@/db";
 import {
   categories,
   interpreters,
@@ -26,7 +26,7 @@ import {
   type CategoryRow,
   type CategoryTreeNode,
 } from "@/lib/categories";
-import { baseTermTitle, pagePath } from "@/lib/slug";
+import { pagePath } from "@/lib/slug";
 import type { WikiLinkTarget } from "@/lib/markdown";
 import { isPageVisible } from "@/lib/page-visibility";
 
@@ -84,6 +84,7 @@ export async function getTermDetail(id: number) {
       slug: pages.slug,
       summary: terms.summary,
       aliases: terms.aliases,
+      keyTexts: terms.keyTexts,
     })
     .from(pages)
     .innerJoin(terms, eq(terms.pageId, pages.id))
@@ -185,6 +186,16 @@ export async function getHeadRevisionId(pageId: number): Promise<number | null> 
   return row?.id ?? null;
 }
 
+/** 正文、base 和预览关系来自同一数据库快照，避免编辑时混入并发发布。 */
+export async function getPerspectiveEditingState(pageId: number) {
+  return getDb().transaction(async (tx) => {
+    const [head] = await tx.select({ content: revisions.content, baseRevisionId: revisions.id })
+      .from(revisions).where(eq(revisions.pageId, pageId)).orderBy(desc(revisions.id)).limit(1);
+    if (!head) return null;
+    return { ...head, linkTargets: await getWikiLinkTargets(pageId, tx) };
+  }, { isolationLevel: "repeatable read", accessMode: "read only" });
+}
+
 /** 全部在线诠释者，供索引与新建视角选择器使用。 */
 export async function listInterpreters(): Promise<
   { pageId: number; name: string; slug: string; summary: string; isBoard: boolean }[]
@@ -257,6 +268,7 @@ export async function getInterpreterDetail(id: number) {
       title: pages.title,
       slug: pages.slug,
       summary: interpreters.summary,
+      keyTexts: interpreters.keyTexts,
       birthYear: interpreters.birthYear,
       deathYear: interpreters.deathYear,
       isBoard: interpreters.isEditorialBoard,
@@ -312,8 +324,9 @@ export async function listPerspectivesOfInterpreter(
  */
 export async function getWikiLinkTargets(
   pageId: number,
+  db: Db | Parameters<Parameters<Db["transaction"]>[0]>[0] = getDb(),
 ): Promise<Map<string, WikiLinkTarget>> {
-  const rows = await getDb()
+  const rows = await db
     .select({
       name: links.targetName,
       targetId: pages.id,
@@ -380,87 +393,6 @@ export async function listBacklinks(targetPageId: number): Promise<BacklinkItem[
     .orderBy(asc(sourcePages.id));
 }
 
-export interface DisambiguationMember {
-  id: number;
-  title: string;
-  slug: string;
-  summary: string;
-  perspectiveCount: number;
-}
-
-/** LIKE 转义：基准名里的 %/_/\ 不参与模式匹配。 */
-function escapeLike(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
-}
-
-/**
- * 消歧义页成员（T04/ADR-0003 #5）：以「基准名（…）」括号限定标题的全部在线词条。
- * 成员由命名约定派生，新增同组词目自动进入分流列表；恰好以基准名为题的词条
- * 不是成员——那是主词条而非待分流项（[[基准名]] 双链直接解析到它）。
- */
-async function listDisambiguationMembers(base: string): Promise<DisambiguationMember[]> {
-  return getDb()
-    .select({
-      id: pages.id,
-      title: pages.title,
-      slug: pages.slug,
-      summary: terms.summary,
-      perspectiveCount: sql<number>`(
-        select count(*) from ${perspectives} pc
-        join ${pages} pcPage on pcPage.id = pc.page_id
-        where pc.term_id = ${pages.id} and ${isPageVisible(sql`pcPage.id`)}
-      )`.mapWith(Number),
-    })
-    .from(pages)
-    .innerJoin(terms, eq(terms.pageId, pages.id))
-    .where(
-      and(
-        eq(pages.type, "term"),
-        isPageVisible(pages.id),
-        like(pages.title, `${escapeLike(base)}\uFF08%\uFF09`),
-      ),
-    )
-    .orderBy(asc(pages.title));
-}
-
-/** 消歧义页详情：成员列表派生自标题命名约定（ADR-0003 #6，不单独建模）。 */
-export async function getDisambiguationDetail(id: number) {
-  const [page] = await getDb()
-    .select({ id: pages.id, title: pages.title, slug: pages.slug })
-    .from(pages)
-    .where(
-      and(
-        eq(pages.id, id),
-        eq(pages.type, "disambiguation"),
-        isPageVisible(pages.id),
-      ),
-    )
-    .limit(1);
-  if (!page) return null;
-  return { ...page, members: await listDisambiguationMembers(page.title) };
-}
-
-/**
- * 词条所属的消歧义页（词条页顶部提示用）：标题剥掉结尾的括号限定段后，
- * 若存在以基准名为标题的在线消歧义页则返回之；无限定段的词条返回 null。
- */
-export async function getTermDisambiguation(termTitle: string) {
-  const base = baseTermTitle(termTitle);
-  if (base === termTitle.trim()) return null;
-  const [row] = await getDb()
-    .select({ id: pages.id, title: pages.title, slug: pages.slug })
-    .from(pages)
-    .where(
-      and(
-        eq(pages.type, "disambiguation"),
-        eq(pages.title, base),
-        isPageVisible(pages.id),
-      ),
-    )
-    .limit(1);
-  return row ?? null;
-}
-
 // ===== 学派轴（强类型实体，只组织诠释者）=====
 
 /** 学派列表（成员数与核心词条数为在线页面计数）。 */
@@ -524,6 +456,7 @@ export async function listSchoolMembers(
       interpreterId: interpreters.pageId,
       name: interpreterPages.title,
       slug: interpreterPages.slug,
+      keyTexts: interpreters.keyTexts,
       birthYear: interpreters.birthYear,
       deathYear: interpreters.deathYear,
       perspectiveCount: sql<number>`(

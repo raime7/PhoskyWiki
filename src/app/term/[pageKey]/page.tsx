@@ -1,3 +1,4 @@
+import { KeyTexts } from "@/components/key-texts";
 import Link from "next/link";
 import { AgentPanel } from "@/components/agent-panel";
 import { HistoryLink } from "@/components/history-link";
@@ -10,7 +11,6 @@ import { LocalGraph } from "@/components/local-graph";
 import { TermDiscoveryPanel } from "@/components/term-discovery";
 import {
   getTermDetail,
-  getTermDisambiguation,
   getHeadContent,
   getWikiLinkTargets,
   listBacklinks,
@@ -43,12 +43,11 @@ export default async function TermPage({ params }: Params) {
   const term = await getTermDetail(page.id);
   if (!term) notFound();
 
-  const [perspectives, categories, backlinks, disambiguation, sessionUser, localGraph, discussionCount] =
+  const [perspectives, categories, backlinks, sessionUser, localGraph, discussionCount] =
     await Promise.all([
       listPerspectivesOfTerm(page.id),
       listCategoriesOfTerm(page.id),
       listBacklinks(page.id),
-      getTermDisambiguation(term.title),
       getSessionUser(),
       getLocalGraph(page.id, 1),
       countDiscussionPosts(page.id),
@@ -80,18 +79,6 @@ export default async function TermPage({ params }: Params) {
 
       <div className="flex flex-col gap-10 lg:flex-row lg:gap-10">
         <div className="min-w-0 flex-1">
-          {disambiguation && (
-            <p className="mb-3 rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
-              「{disambiguation.title}」是同名多义概念：本页指{term.title}；其他含义见{" "}
-              <Link
-                href={pagePath("disambiguation", disambiguation.slug, disambiguation.id)}
-                className="text-foreground underline-offset-4 hover:underline"
-              >
-                {disambiguation.title}（消歧义）
-              </Link>
-              。
-            </p>
-          )}
 
           <h1 className="text-3xl font-bold tracking-tight">{term.title}</h1>
           <p className="mt-3 text-lg leading-relaxed text-muted-foreground">
@@ -147,6 +134,7 @@ export default async function TermPage({ params }: Params) {
           <Infobox
             title={term.title}
             rows={[
+              ...(term.keyTexts.length ? [{ label: "关键文本", content: <KeyTexts items={term.keyTexts} /> }] : []),
               { label: "类型", content: "词条（聚合枢纽）" },
               {
                 label: "别名",

@@ -41,6 +41,52 @@ afterAll(async () => {
 });
 
 describe("词条信息编辑 HTTP", () => {
+  it("诠释者可选信息通过同一审核流程受理并回滚", async () => {
+    const title = `Interpreter ${randomUUID()}`;
+    const { pageId } = await (await post({ kind: "new_interpreter", title }, admin1)).json();
+    const initial = await readHistory(pageId);
+    expect(initial.revisions[0].snapshot).toMatchObject({ type: "interpreter", keyTexts: [] });
+    const { submissionId } = await (await post({ kind: "edit", pageId, baseRevisionId: initial.revisions[0].id, title, summary: "新简介", keyTexts: [{ title: "代表作" }] }, editor)).json();
+    await approve(submissionId, admin1);
+    expect((await readHistory(pageId)).revisions[0].snapshot.keyTexts).toEqual([]);
+    await approve(submissionId, admin2);
+    expect((await readHistory(pageId)).revisions[0].snapshot.keyTexts).toEqual([{ title: "代表作" }]);
+    const { POST: action } = await import("@/app/api/admin/pages/[pageId]/route");
+    expect((await action(new Request(`http://localhost/api/admin/pages/${pageId}`, { method: "POST", headers: { cookie: admin1, "content-type": "application/json" }, body: JSON.stringify({ action: "rollback", revisionId: initial.revisions[0].id }) }), { params: Promise.resolve({ pageId: String(pageId) }) })).status).toBe(200);
+    expect((await readHistory(pageId)).revisions[0].snapshot.keyTexts).toEqual([]);
+  });
+  it("导入更新省略作品保留现值，旧修订缺字段回滚也保留", async () => {
+    const title = `Legacy ${randomUUID()}`;
+    const { pageId } = await (await post({ kind: "new_term", title }, admin1)).json();
+    const initial = await readHistory(pageId);
+    const { revisions } = await import("@/db/schema");
+    await getDb().update(revisions).set({ snapshot: { version: 1, type: "term", title, summary: "旧简介", aliases: [] } }).where(eq(revisions.id, initial.revisions[0].id));
+    const { POST: importRoute } = await import("@/app/api/admin/import/route");
+    const importEntry = (entry: object) => importRoute(new Request("http://localhost/api/admin/import", { method: "POST", headers: { cookie: admin1, "content-type": "application/json" }, body: JSON.stringify({ terms: [{ pageId, title, ...entry }] }) }));
+    expect((await importEntry({ keyTexts: [{ title: "保留作品" }] })).status).toBe(201);
+    expect((await importEntry({ summary: "导入改简介" })).status).toBe(201);
+    expect((await readHistory(pageId)).revisions[0].snapshot.keyTexts).toEqual([{ title: "保留作品" }]);
+    const { POST: action } = await import("@/app/api/admin/pages/[pageId]/route");
+    expect((await action(new Request(`http://localhost/api/admin/pages/${pageId}`, { method: "POST", headers: { cookie: admin1, "content-type": "application/json" }, body: JSON.stringify({ action: "rollback", revisionId: initial.revisions[0].id }) }), { params: Promise.resolve({ pageId: String(pageId) }) })).status).toBe(200);
+    expect((await readHistory(pageId)).revisions[0].snapshot).toMatchObject({ summary: "旧简介", keyTexts: [{ title: "保留作品" }] });
+    expect((await importEntry({ keyTexts: [] })).status).toBe(201);
+    expect((await readHistory(pageId)).revisions[0].snapshot.keyTexts).toEqual([]);
+  });
+  it("关键文本可选，省略保留、明确空数组清空，并随审核进入修订", async () => {
+    const title = `Key texts ${randomUUID()}`;
+    const keyTexts = [{ title: "资本论", author: "马克思", year: "1867", url: "https://example.com/capital" }];
+    const { pageId } = await (await post({ kind: "new_term", title, keyTexts }, admin1)).json();
+    let state = await readHistory(pageId);
+    expect(state.revisions[0].snapshot.keyTexts).toEqual(keyTexts);
+    await post({ kind: "edit", pageId, baseRevisionId: state.revisions[0].id, title, summary: "省略保留", aliases: [] }, admin1);
+    state = await readHistory(pageId);
+    expect(state.revisions[0].snapshot.keyTexts).toEqual(keyTexts);
+    const { submissionId } = await (await post({ kind: "edit", pageId, baseRevisionId: state.revisions[0].id, title, summary: "清空", aliases: [], keyTexts: [] }, editor)).json();
+    await approve(submissionId, admin1);
+    expect((await readHistory(pageId)).revisions[0].snapshot.keyTexts).toEqual(keyTexts);
+    await approve(submissionId, admin2);
+    expect((await readHistory(pageId)).revisions[0].snapshot.keyTexts).toEqual([]);
+  });
   it("完整元数据提案经两名管理员受理，保留独立快照与来源", async () => {
     const title = `Old Term ${randomUUID()}`;
     const created = await post({ kind: "new_term", title, summary: "原简介", aliases: ["原别名"] }, admin1);

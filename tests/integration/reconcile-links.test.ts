@@ -7,7 +7,7 @@ const execute = promisify(execFile);
 const database = decodeURIComponent(new URL(process.env.DATABASE_URL!).pathname.slice(1));
 async function run(args: string[], env = process.env) {
   try {
-    const result = await execute(process.execPath, ["--conditions", "react-server", "--import", "tsx", "scripts/reconcile-links.ts", ...args], { env });
+    const result = await execute(process.execPath, ["--conditions", "react-server", "--import", "tsx", "scripts/reconcile-links.ts", ...args], { env: { ...env, MEILI_HOST: "" } });
     return { code: 0, report: JSON.parse(result.stdout) };
   } catch (error) {
     const result = error as { code: number; stdout: string };
@@ -30,6 +30,6 @@ it("运维命令在连接数据库前拒绝错误目标和未明确选择的范�
 it("全量校对的公开报告在重复运行时保持稳定，并明确搜索未配置的状态", async () => {
   const first = await run(["--database", database, "--all"]);
   expect(first.code).toBe(0);
-  expect(first.report).toMatchObject({ scope: "all", processed: 450, failed: 0, unresolvedLinks: 4, failures: [], searchSync: "disabled: MEILI_HOST is not configured" });
+  expect(first.report).toMatchObject({ scope: "all", processed: 447, failed: 0, unresolvedLinks: 4, failures: [], searchSync: "disabled: MEILI_HOST is not configured" });
   expect(await run(["--database", database, "--all"])).toEqual(first);
 }, 120_000);

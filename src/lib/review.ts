@@ -8,6 +8,7 @@
 //     管线（搜索索引同步见 lib/search/search-sync，ADR-0004 #9）。
 
 import "server-only";
+import { parseKeyTexts, type KeyText } from "@/lib/key-texts";
 
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
@@ -35,7 +36,7 @@ import type { CreateSubmissionResult, ReviewOutcome } from "@/lib/review-types";
 import { ImageError } from "@/lib/image-markdown";
 import { publishImageReferences, validateImageReferences } from "@/lib/images";
 import { lockPerspectiveParents } from "@/lib/perspective-parents";
-import { termSnapshot, type TermSnapshot, type RevisionSource } from "@/lib/revision-snapshot";
+import { termSnapshot, type TermSnapshot, type MetadataSnapshot, type InterpreterSnapshot, type RevisionSource } from "@/lib/revision-snapshot";
 
 export type { CreateSubmissionResult, ReviewOutcome } from "@/lib/review-types";
 
@@ -53,6 +54,7 @@ export class ReviewError extends Error {
   constructor(
     public status: number,
     message: string,
+    public href?: string,
   ) {
     super(message);
   }
@@ -72,7 +74,7 @@ export function isUniqueViolation(err: unknown): boolean {
  */
 export function reviewErrorResponse(err: unknown): Response | null {
   if (err instanceof ReviewError || err instanceof ImageError) {
-    return Response.json({ error: err.message }, { status: err.status });
+    return Response.json({ error: err.message, ...(err instanceof ReviewError && err.href ? { href: err.href } : {}) }, { status: err.status });
   }
   if (isUniqueViolation(err)) {
     return Response.json(
@@ -97,6 +99,7 @@ export interface SubmissionInput {
   title?: string;
   /** 新建页或词条信息编辑：一句话简介 */
   summary?: string;
+  keyTexts?: KeyText[] | null;
   aliases?: string[];
   /** kind=new_perspective：挂载的词条与诠释者 */
   termId?: number;
@@ -110,6 +113,7 @@ export interface SubmissionInput {
 }
 
 interface ValidatedSubmission {
+  keyTexts?: KeyText[] | null;
   aliases?: string[];
   kind: SubmissionKind;
   pageId: number | null;
@@ -133,6 +137,8 @@ async function validateSubmissionInput(
   input: SubmissionInput,
   actor: Actor,
 ): Promise<ValidatedSubmission> {
+  let keyTexts: KeyText[] | undefined;
+  try { keyTexts = parseKeyTexts(input.keyTexts); } catch (error) { throw new ReviewError(400, (error as Error).message); }
   const summary = input.summary?.trim() || null;
   const supersedes =
     input.supersedes === undefined || input.supersedes === null
@@ -183,9 +189,10 @@ async function validateSubmissionInput(
         .limit(1);
       if (!page) throw new ReviewError(404, "目标页面不存在");
       if (page.deletedAt !== null) throw new ReviewError(404, "目标页面已被删除");
-      if (page.type !== "perspective" && page.type !== "term") {
-        throw new ReviewError(400, "只支持编辑词条信息和视角正文");
+      if (page.type !== "perspective" && page.type !== "term" && page.type !== "interpreter") {
+        throw new ReviewError(400, "只支持编辑词条、诠释者信息和视角正文");
       }
+      if (page.type === "interpreter" && (typeof input.title !== "string" || !input.title.trim() || typeof input.summary !== "string")) throw new ReviewError(400, "诠释者编辑必须提供名称与简介");
       if (page.type === "perspective" && !content) throw new ReviewError(400, "正文不能为空");
       if (page.type === "term") {
         if (typeof input.title !== "string" || !input.title.trim()) throw new ReviewError(400, "标题不能为空");
@@ -202,11 +209,12 @@ async function validateSubmissionInput(
       if (!base) throw new ReviewError(400, "base 修订不属于目标页面");
       if (page.type === "term" && !base.snapshot) throw new ReviewError(400, "旧修订没有词条信息快照，请重新打开编辑页获取起始快照");
       return {
+        keyTexts,
         kind: "edit",
         pageId,
-        content: page.type === "term" ? "" : content,
-        title: page.type === "term" ? input.title!.trim() : null,
-        summary: page.type === "term" ? input.summary!.trim() : null,
+        content: page.type !== "perspective" ? "" : content,
+        title: page.type !== "perspective" ? input.title!.trim() : null,
+        summary: page.type !== "perspective" ? input.summary!.trim() : null,
         aliases: page.type === "term" ? [...new Set(input.aliases!.map((a) => a.trim()).filter(Boolean))] : [],
         termId: null,
         interpreterId: null,
@@ -246,11 +254,13 @@ async function validateSubmissionInput(
         throw new ReviewError(
           400,
           input.kind === "new_term"
-            ? "同名词条已存在；同名多义请用括号限定标题（如「价值（哲学）」）"
+            ? "同名词条已存在，请补充该词条的视角或在已有视角中分章说明不同含义"
             : "同名诠释者已存在",
+          `/${input.kind === "new_term" ? "term" : "interpreter"}/${dup.id}`,
         );
       }
       return {
+        keyTexts,
         kind: input.kind,
         pageId: null,
         content: input.kind === "new_term" ? (input.content ?? "").trim() : "",
@@ -339,6 +349,7 @@ export async function createSubmission(
         title: validated.title,
         summary: validated.summary,
         aliases: validated.aliases ?? [],
+        keyTexts: validated.keyTexts,
         termId: validated.termId,
         interpreterId: validated.interpreterId,
         baseRevisionId: validated.baseRevisionId,
@@ -358,7 +369,19 @@ export async function importPages(inputs: SubmissionInput[], actor: Actor) {
     const results = [];
     for (const input of inputs) {
       if (input.kind !== "new_term" && input.kind !== "new_interpreter") throw new ReviewError(400, "只能导入词条与诠释者");
-      const validated = await validateSubmissionInput(tx, input, actor);
+      let imported = input;
+      if (input.pageId !== undefined) {
+        const page = await lockLivePage(tx, requiredInt(input.pageId, "pageId 必须是正整数"));
+        if (page.type !== (input.kind === "new_term" ? "term" : "interpreter")) throw new ReviewError(400, "导入目标类型不匹配");
+        const [value] = page.type === "term" ? await tx.select().from(terms).where(eq(terms.pageId, page.id)) : await tx.select().from(interpreters).where(eq(interpreters.pageId, page.id));
+        const [head] = await tx.select().from(revisions).where(eq(revisions.pageId, page.id)).orderBy(desc(revisions.id)).limit(1);
+        const snapshot: MetadataSnapshot = page.type === "term"
+          ? termSnapshot({ title: page.title, summary: value.summary, aliases: "aliases" in value ? value.aliases : [], keyTexts: value.keyTexts })
+          : { version: 1, type: "interpreter", title: page.title, summary: value.summary, keyTexts: value.keyTexts };
+        const baseRevisionId = head?.snapshot ? head.id : (await tx.insert(revisions).values({ pageId: page.id, content: infoboxSnapshot(snapshot), snapshot, source: "baseline" }).returning({ id: revisions.id }))[0].id;
+        imported = { ...input, kind: "edit", summary: input.summary ?? value.summary, aliases: input.aliases ?? ("aliases" in value ? value.aliases : []), baseRevisionId };
+      }
+      const validated = await validateSubmissionInput(tx, imported, actor);
       await validateImageReferences(tx, validated.content, actor);
       const applied = await applySubmission(tx, { ...validated, submittedBy: actor.id }, "direct");
       results.push({ pageId: applied.pageId, href: pagePath(input.kind === "new_term" ? "term" : "interpreter", slugifyTitle(validated.title!), applied.pageId) });
@@ -514,6 +537,7 @@ export async function reviewSubmission(
 // ---------------------------------------------------------------------------
 
 interface AppliableSubmission {
+  keyTexts?: KeyText[] | null;
   aliases?: string[];
   kind: SubmissionKind;
   pageId: number | null;
@@ -561,7 +585,9 @@ export async function applyTermMetadataChange(
   attribution: { createdBy?: string; source?: RevisionSource } = {},
 ): Promise<number> {
   await tx.update(pages).set({ title: snapshot.title, slug: slugifyTitle(snapshot.title), updatedAt: new Date() }).where(eq(pages.id, pageId));
-  await tx.update(terms).set({ summary: snapshot.summary, aliases: snapshot.aliases }).where(eq(terms.pageId, pageId));
+  const [current] = await tx.select().from(terms).where(eq(terms.pageId, pageId));
+  snapshot = { ...snapshot, keyTexts: snapshot.keyTexts ?? current.keyTexts };
+  await tx.update(terms).set({ summary: snapshot.summary, aliases: snapshot.aliases, keyTexts: snapshot.keyTexts }).where(eq(terms.pageId, pageId));
   // Keep a plain code-block projection for existing content readers; snapshot is authoritative.
   const [revision] = await tx.insert(revisions).values({ pageId, content: infoboxSnapshot(snapshot), snapshot, rollbackFromId, ...attribution, source: rollbackFromId ? "rollback" : attribution.source ?? "direct", createdAt: new Date() }).returning({ id: revisions.id });
   await rebuildPageLinks(tx, pageId, "");
@@ -571,13 +597,39 @@ export async function applyTermMetadataChange(
 }
 
 /** Legacy/imported rows gain one honest baseline from current fields, under the page lock. */
+export async function applyInterpreterMetadataChange(tx: Tx, pageId: number, snapshot: InterpreterSnapshot, rollbackFromId: number | null = null, attribution: { createdBy?: string; source?: RevisionSource } = {}) {
+  const [duplicate] = await tx.select({ id: pages.id }).from(pages).where(and(eq(pages.type, "interpreter"), eq(pages.title, snapshot.title), isNull(pages.deletedAt), sql`${pages.id} <> ${pageId}`));
+  if (duplicate) throw new ReviewError(409, "同名诠释者已存在");
+  const [current] = await tx.select().from(interpreters).where(eq(interpreters.pageId, pageId));
+  snapshot = { ...snapshot, keyTexts: snapshot.keyTexts ?? current.keyTexts };
+  await tx.update(pages).set({ title: snapshot.title, slug: slugifyTitle(snapshot.title), updatedAt: new Date() }).where(eq(pages.id, pageId));
+  await tx.update(interpreters).set({ summary: snapshot.summary, keyTexts: snapshot.keyTexts }).where(eq(interpreters.pageId, pageId));
+  const [revision] = await tx.insert(revisions).values({ pageId, content: infoboxSnapshot(snapshot), snapshot, rollbackFromId, ...attribution, source: rollbackFromId ? "rollback" : attribution.source ?? "direct" }).returning({ id: revisions.id });
+  await rebuildPageLinks(tx, pageId, "");
+  queueSearchSync(tx, pageId);
+  return revision.id;
+}
+
+export async function getInterpreterEditingState(pageId: number) {
+  return getDb().transaction(async (tx) => {
+    const page = await lockLivePage(tx, pageId);
+    if (page.type !== "interpreter") throw new ReviewError(400, "目标必须是诠释者");
+    const [value] = await tx.select().from(interpreters).where(eq(interpreters.pageId, pageId));
+    const snapshot: InterpreterSnapshot = { version: 1, type: "interpreter", title: page.title, summary: value.summary, keyTexts: value.keyTexts };
+    const [head] = await tx.select().from(revisions).where(eq(revisions.pageId, pageId)).orderBy(desc(revisions.id)).limit(1);
+    if (head?.snapshot) return { snapshot, baseRevisionId: head.id };
+    const [baseline] = await tx.insert(revisions).values({ pageId, content: infoboxSnapshot(snapshot), snapshot, source: "baseline" }).returning({ id: revisions.id });
+    return { snapshot, baseRevisionId: baseline.id };
+  });
+}
+
 export async function getTermEditingState(pageId: number) {
   return getDb().transaction(async (tx) => {
     const page = await lockLivePage(tx, pageId);
     if (page.type !== "term") throw new ReviewError(400, "目标必须是词条");
     const [term] = await tx.select().from(terms).where(eq(terms.pageId, pageId));
     if (!term) throw new ReviewError(404, "词条不存在");
-    const snapshot = termSnapshot({ title: page.title, summary: term.summary, aliases: term.aliases });
+    const snapshot = termSnapshot({ title: page.title, summary: term.summary, aliases: term.aliases, keyTexts: term.keyTexts });
     const [head] = await tx.select().from(revisions).where(eq(revisions.pageId, pageId)).orderBy(desc(revisions.id)).limit(1);
     if (head?.snapshot) return { snapshot, baseRevisionId: head.id };
     const [baseline] = await tx.insert(revisions).values({ pageId, content: "", snapshot, source: "baseline", createdAt: new Date() }).returning({ id: revisions.id });
@@ -603,7 +655,9 @@ async function applySubmission(
         throw new ReviewError(409, "页面已有新的修订，请基于当前修订重新编辑");
       }
       if (page.type === "term") {
-        await applyTermMetadataChange(tx, sub.pageId!, termSnapshot({ title: sub.title!, summary: sub.summary ?? "", aliases: sub.aliases ?? [] }), null, { source, createdBy: sub.submittedBy });
+        await applyTermMetadataChange(tx, sub.pageId!, termSnapshot({ title: sub.title!, summary: sub.summary ?? "", aliases: sub.aliases ?? [], keyTexts: sub.keyTexts ?? undefined }), null, { source, createdBy: sub.submittedBy });
+      } else if (page.type === "interpreter") {
+        await applyInterpreterMetadataChange(tx, page.id, { version: 1, type: "interpreter", title: sub.title!, summary: sub.summary ?? "", keyTexts: sub.keyTexts ?? undefined }, null, { source, createdBy: sub.submittedBy });
       } else {
         await applyContentChange(tx, sub.pageId!, sub.content, null, { source, createdBy: sub.submittedBy });
       }
@@ -619,8 +673,8 @@ async function applySubmission(
           createdBy: sub.submittedBy,
         })
         .returning({ id: pages.id });
-      await tx.insert(terms).values({ pageId: page.id, summary: sub.summary ?? "", aliases: sub.aliases ?? [] });
-      await applyTermMetadataChange(tx, page.id, termSnapshot({ title: sub.title!, summary: sub.summary ?? "", aliases: sub.aliases ?? [] }), null, { source: "create", createdBy: sub.submittedBy });
+      await tx.insert(terms).values({ pageId: page.id, summary: sub.summary ?? "", aliases: sub.aliases ?? [], keyTexts: sub.keyTexts ?? undefined });
+      await applyTermMetadataChange(tx, page.id, termSnapshot({ title: sub.title!, summary: sub.summary ?? "", aliases: sub.aliases ?? [], keyTexts: sub.keyTexts ?? undefined }), null, { source: "create", createdBy: sub.submittedBy });
       if (sub.content) {
         const [board] = await tx.select({ id: interpreters.pageId }).from(interpreters)
           .innerJoin(pages, eq(pages.id, interpreters.pageId))
@@ -643,7 +697,7 @@ async function applySubmission(
       await tx
         .insert(interpreters)
         .values({ pageId: page.id, summary: sub.summary ?? "" });
-      await applyContentChange(tx, page.id, infoboxSnapshot({ title: sub.title, summary: sub.summary ?? "" }), null, { source: "create", createdBy: sub.submittedBy });
+      await applyInterpreterMetadataChange(tx, page.id, { version: 1, type: "interpreter", title: sub.title!, summary: sub.summary ?? "", keyTexts: sub.keyTexts ?? [] }, null, { source: "create", createdBy: sub.submittedBy });
       return { pageId: page.id };
     }
     case "new_perspective": {
@@ -675,7 +729,8 @@ async function applySubmission(
 // ---------------------------------------------------------------------------
 
 export interface QueueItem {
-  currentMetadata: TermSnapshot | null;
+  keyTexts: KeyText[] | null;
+  currentMetadata: MetadataSnapshot | null;
   aliases: string[];
   id: number;
   kind: SubmissionKind;
@@ -718,6 +773,7 @@ export async function listQueue(): Promise<QueueItem[]> {
       title: submissions.title,
       summary: submissions.summary,
       aliases: submissions.aliases,
+      keyTexts: submissions.keyTexts,
       termId: submissions.termId,
       interpreterId: submissions.interpreterId,
     })
@@ -782,9 +838,12 @@ export async function listQueue(): Promise<QueueItem[]> {
         )
     : [];
   const contentByRevision = new Map(headContents.map((row) => [row.id, row.content]));
-  const termRows = editPageIds.length ? await db.select({ pageId: terms.pageId, title: pages.title, summary: terms.summary, aliases: terms.aliases })
+  const termRows = editPageIds.length ? await db.select({ pageId: terms.pageId, title: pages.title, summary: terms.summary, aliases: terms.aliases, keyTexts: terms.keyTexts })
     .from(terms).innerJoin(pages, eq(pages.id, terms.pageId)).where(inArray(terms.pageId, editPageIds)) : [];
-  const metadataByPage = new Map(termRows.map((row) => [row.pageId, termSnapshot(row)]));
+  const metadataByPage = new Map<number, MetadataSnapshot>(termRows.map((row) => [row.pageId, termSnapshot(row)]));
+
+  const interpreterRows = editPageIds.length ? await db.select({ pageId: interpreters.pageId, title: pages.title, summary: interpreters.summary, keyTexts: interpreters.keyTexts }).from(interpreters).innerJoin(pages, eq(pages.id, interpreters.pageId)).where(inArray(interpreters.pageId, editPageIds)) : [];
+  for (const row of interpreterRows) metadataByPage.set(row.pageId, { version: 1, type: "interpreter", ...row });
 
   // new_perspective 的挂载名称
   const mountPageIds = rows
@@ -824,6 +883,7 @@ export async function listQueue(): Promise<QueueItem[]> {
       title: row.title,
       summary: row.summary,
       aliases: row.aliases,
+      keyTexts: row.keyTexts,
       termTitle: row.termId !== null ? titleById.get(row.termId) ?? null : null,
       interpreterName:
         row.interpreterId !== null

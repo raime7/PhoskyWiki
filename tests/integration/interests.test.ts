@@ -273,12 +273,12 @@ describe("相关词条推荐（共同引用 + 兴趣匹配）", () => {
 
   it("默认（无兴趣）按共同引用强度排序", async () => {
     const related = await listRelatedTerms(await subjectivityGraph(), null, new Set());
-    // 主体性 的 1 跳邻居：异化(10) > 意识形态(8) > 剩余价值(2) > 价值（哲学）(1)
+    // 主体性 的 1 跳邻居：异化(10) > 意识形态(8) > 剩余价值(2) > 价值(1)
     expect(related.map((term) => term.title)).toEqual([
       "异化",
       "意识形态",
       "剩余价值",
-      "价值（哲学）",
+      "价值",
     ]);
     expect(related.every((term) => term.interestMatchCount === 0)).toBe(true);
     expect(related[0].commonRefCount).toBeGreaterThan(related[1].commonRefCount);
@@ -290,9 +290,9 @@ describe("相关词条推荐（共同引用 + 兴趣匹配）", () => {
     const related = await listRelatedTerms(await subjectivityGraph(), interests, new Set());
     expect(related.map((term) => term.title)).toEqual([
       "剩余价值",
+      "价值",
       "异化",
       "意识形态",
-      "价值（哲学）",
     ]);
     expect(related[0].interestMatchCount).toBeGreaterThan(0);
   });

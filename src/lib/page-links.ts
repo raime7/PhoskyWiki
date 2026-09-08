@@ -4,7 +4,7 @@
 
 import "server-only";
 
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { Db } from "@/db";
@@ -16,7 +16,7 @@ type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 /**
  * 重建一页的全部真实双链：仍出现在正文的已解析名称键沿用目标 id，
  * 不因改名、旧名被复用或目标暂不可用而改变身份；新键与未解析红链按名称解析。
- * 默认链接落词条枢纽（无同名词条时落消歧义页），
+ * 默认链接落词条枢纽，
  * 显式视角链接按「词条 × 诠释者」定位视角页；未命中留名称快照即红链。
  */
 export async function rebuildPageLinks(
@@ -50,7 +50,7 @@ async function resolveLinkTarget(
   ref: ParsedWikiLink,
 ): Promise<number | null> {
   if (ref.interpreter === null) {
-    // 精确同名词条优先（主词条），否则消歧义页（同名多义的分流入口）
+    // 同名解释都落在统一词条
     const [row] = await tx
       .select({ id: pages.id })
       .from(pages)
@@ -58,10 +58,9 @@ async function resolveLinkTarget(
         and(
           eq(pages.title, ref.term),
           isNull(pages.deletedAt),
-          inArray(pages.type, ["term", "disambiguation"]),
+          eq(pages.type, "term"),
         ),
       )
-      .orderBy(desc(sql`${pages.type} = 'term'`))
       .limit(1);
     return row?.id ?? null;
   }

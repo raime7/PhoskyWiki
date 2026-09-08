@@ -60,6 +60,7 @@ it("两次词条编辑后任意两版按真实字段双向对比，区分来源"
   expect(comparison).toMatchObject({ kind: "term", metadataRows: [
     { field: "title", before: title, after: `${title} Last`, changed: true },
     { field: "summary", before: "最初简介", after: "最终简介", changed: true },
+    { field: "keyTexts", before: "", after: "", changed: false },
     { field: "aliases", before: '"最初别名"', after: '"最终别名"、"第二别名"', changed: true },
   ] });
   const reverse = await read(pageId, `?from=${last}&to=${first}`);

@@ -9,8 +9,8 @@ import { TermMetadataDiff } from "@/components/term-metadata-diff";
 import { getLivePage, getWikiLinkTargets, listTerms, listInterpreters, listPerspectivePairs } from "@/lib/content";
 import { getSessionUser } from "@/lib/session";
 import { getMySubmission } from "@/lib/submission-history";
-import { getTermEditingState, ReviewError } from "@/lib/review";
-import { termSnapshot } from "@/lib/revision-snapshot";
+import { getTermEditingState, getInterpreterEditingState, ReviewError } from "@/lib/review";
+import { termSnapshot, type MetadataSnapshot } from "@/lib/revision-snapshot";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "修改后重新提交" };
@@ -31,15 +31,16 @@ export default async function ResubmitPage({ params }: { params: Promise<{ id: s
     const page = proposal.pageId ? await getLivePage(proposal.pageId) : null;
     if (!page) retry.unavailable = "目标页面或其父页面已删除或不可用。";
     if (proposal.title !== null) {
-      const original = termSnapshot({ title: proposal.title, summary: proposal.summary ?? "", aliases: proposal.aliases });
+      const original: MetadataSnapshot = page?.type === "interpreter" || proposal.baseSnapshot?.type === "interpreter" ? { version: 1, type: "interpreter", title: proposal.title, summary: proposal.summary ?? "", keyTexts: proposal.keyTexts ?? undefined } : termSnapshot({ title: proposal.title, summary: proposal.summary ?? "", aliases: proposal.aliases, keyTexts: proposal.keyTexts ?? undefined });
       let current = { snapshot: original, baseRevisionId: proposal.baseRevisionId! };
       if (page) {
-        try { current = await getTermEditingState(page.id); }
+        try { current = await (page.type === "interpreter" ? getInterpreterEditingState(page.id) : getTermEditingState(page.id)); }
         catch (err) { if (!(err instanceof ReviewError)) throw err; retry.unavailable = err.message; }
       }
+      original.keyTexts ??= current.snapshot.keyTexts;
       retry.stale = current.baseRevisionId !== proposal.baseRevisionId;
       if (!retry.unavailable) comparison = <TermMetadataDiff from={current.snapshot} to={original} />;
-      form = { ...common, variant: "edit_term", pageId: proposal.pageId!, initialMetadata: original, baseRevisionId: current.baseRevisionId };
+      form = { ...common, variant: original.type === "term" ? "edit_term" : "edit_interpreter", pageId: proposal.pageId!, initialMetadata: original, baseRevisionId: current.baseRevisionId };
     } else {
       const [head] = page ? await getDb().select().from(revisions).where(eq(revisions.pageId, page.id)).orderBy(desc(revisions.id)).limit(1) : [];
       if (!head) retry.unavailable ??= "目标页面缺少可编辑修订。";

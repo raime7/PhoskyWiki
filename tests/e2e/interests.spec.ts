@@ -143,7 +143,7 @@ test("游客：选择兴趣即存本浏览器，词条页视角按兴趣重排",
   const before = await perspectiveTitles(page);
   expect(before[0]).not.toBe("拉康论主体性");
 
-  // 相关词条区块：游客按共同引用强度（异化 10 > 意识形态 8 > 剩余价值 2 > 价值（哲学）1）
+  // 相关词条区块：游客按共同引用强度（异化 10 > 意识形态 8 > 剩余价值 2 > 价值1）
   const related = page.getByTestId("related-terms");
   await expect(related).toBeVisible();
   await expect(related).toContainText("异化");

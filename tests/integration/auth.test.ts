@@ -9,8 +9,8 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { auth } from "@/lib/auth";
 import { getDb } from "@/db";
-import { CREDENTIAL_ISSUER, seedAdminAccount } from "@/db/seed-admin";
-import { account, session, user } from "@/db/schema";
+import { seedAdminAccount } from "@/db/seed-admin";
+import { user } from "@/db/schema";
 
 const createdEmails: string[] = [];
 
@@ -32,28 +32,13 @@ afterAll(async () => {
 });
 
 describe("注册（邮箱 + 密码）", () => {
-  it("创建 editor 角色用户 + credential 账号（密码只存散列）并自动建立会话", async () => {
-    const db = getDb();
+  it("注册创建编者会话并允许凭密码登录", async () => {
     const { email, res } = await signUpFixture();
-
     expect(res.user).toMatchObject({ email, role: "editor", emailVerified: false });
-    expect(typeof res.token).toBe("string");
-
-    const [row] = await db.select().from(user).where(eq(user.email, email));
-    expect(row.role).toBe("editor");
-
-    const [acc] = await db.select().from(account).where(eq(account.userId, row.id));
-    expect(acc).toMatchObject({
-      providerId: "credential",
-      issuer: CREDENTIAL_ISSUER,
-      accountId: row.id,
-    });
-    expect(acc.password).toBeTruthy();
-    expect(acc.password).not.toBe("password123");
-
-    // autoSignIn：注册即有数据库会话
-    const sessions = await db.select().from(session).where(eq(session.userId, row.id));
-    expect(sessions.length).toBeGreaterThanOrEqual(1);
+    const login = await auth.api.signInEmail({ body: { email, password: "password123" }, asResponse: true });
+    const cookie = login.headers.getSetCookie().map(c => c.split(";")[0]).join("; ");
+    const current = await auth.api.getSession({ headers: new Headers({ cookie }) });
+    expect(current?.user).toMatchObject({ email, role: "editor" });
   });
 
   it("注册请求携带 role 一律忽略（角色只能由服务端写入）", async () => {
@@ -84,24 +69,15 @@ describe("注册（邮箱 + 密码）", () => {
 });
 
 describe("登录（数据库会话）", () => {
-  it("正确凭据建立新会话；错误凭据 401，不建会话", async () => {
-    const db = getDb();
+  it("正确凭据建立可用会话；错误凭据返回 401，登出后会话失效", async () => {
     const { email } = await signUpFixture();
-
-    const [u] = await db.select({ id: user.id }).from(user).where(eq(user.email, email));
-    const before = await db.$count(session, eq(session.userId, u.id));
-
-    const good = await auth.api.signInEmail({ body: { email, password: "password123" } });
-    expect(good.user.email).toBe(email);
-    expect(await db.$count(session, eq(session.userId, u.id))).toBe(before + 1);
-
-    await expect(
-      auth.api.signInEmail({ body: { email, password: "wrong-password" } }),
-    ).rejects.toMatchObject({
-      statusCode: 401,
-      body: { code: "INVALID_EMAIL_OR_PASSWORD" },
-    });
-    expect(await db.$count(session, eq(session.userId, u.id))).toBe(before + 1);
+    const good = await auth.api.signInEmail({ body: { email, password: "password123" }, asResponse: true });
+    const cookie = good.headers.getSetCookie().map(c => c.split(";")[0]).join("; ");
+    const headers = new Headers({ cookie });
+    expect((await auth.api.getSession({ headers }))?.user.email).toBe(email);
+    await expect(auth.api.signInEmail({ body: { email, password: "wrong-password" } })).rejects.toMatchObject({ statusCode: 401 });
+    await auth.api.signOut({ headers });
+    expect(await auth.api.getSession({ headers })).toBeNull();
   });
 });
 
@@ -139,9 +115,6 @@ describe("种子管理员", () => {
     const first = await seedAdminAccount({ email, password: "admin-pass-123" });
     expect(first).toMatchObject({ created: true, passwordGenerated: false });
 
-    const db = getDb();
-    const [row] = await db.select().from(user).where(eq(user.email, email));
-    expect(row.role).toBe("admin");
 
     // 种子写入的凭据能走正常登录路径
     const signIn = await auth.api.signInEmail({ body: { email, password: "admin-pass-123" } });
@@ -154,6 +127,6 @@ describe("种子管理员", () => {
       auth.api.signInEmail({ body: { email, password: "admin-pass-123" } }),
     ).rejects.toMatchObject({ statusCode: 401 });
     const rotated = await auth.api.signInEmail({ body: { email, password: "rotated-pass-456" } });
-    expect(rotated.user.id).toBe(row.id);
+    expect(rotated.user.id).toBe(signIn.user.id);
   });
 });

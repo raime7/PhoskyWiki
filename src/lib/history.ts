@@ -3,7 +3,7 @@ import "server-only";
 import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pages, revisions } from "@/db/schema";
-import { applyContentChange, applyTermMetadataChange, isUniqueViolation, lockLivePage, ReviewError, type Actor } from "@/lib/review";
+import { applyContentChange, applyTermMetadataChange, applyInterpreterMetadataChange, isUniqueViolation, lockLivePage, ReviewError, type Actor } from "@/lib/review";
 import { queueSearchSync, transactionWithSearchSync } from "@/lib/search/search-sync";
 import { diffLines } from "@/lib/diff";
 import { getLivePage } from "@/lib/content";
@@ -37,7 +37,7 @@ export function compareRevisions(history: Awaited<ReturnType<typeof getPageHisto
   const from = history.revisions.find((revision) => revision.id === fromId);
   const to = history.revisions.find((revision) => revision.id === toId);
   if (!from || !to) throw new ReviewError(404, "修订不存在或不属于此页面");
-  if (history.page.type === "term") {
+  if (history.page.type === "term" || history.page.type === "interpreter") {
     return {
       kind: "term" as const, from, to,
       metadataRows: from.snapshot && to.snapshot ? compareTermMetadata(from.snapshot, to.snapshot) : null,
@@ -54,11 +54,13 @@ export async function rollbackPage(pageId: number, revisionId: number, actor: Ac
     const [target] = await tx.select().from(revisions)
       .where(and(eq(revisions.pageId, pageId), eq(revisions.id, revisionId)));
     if (!target) throw new ReviewError(404, "修订不存在或不属于此页面");
-    if (page.type === "term" && !target.snapshot) {
+    if ((page.type === "term" || page.type === "interpreter") && !target.snapshot) {
       throw new ReviewError(409, legacyTermHistoryNote);
     }
-    const id = page.type === "term" && target.snapshot
+    const id = page.type === "term" && target.snapshot?.type === "term"
       ? await applyTermMetadataChange(tx, pageId, target.snapshot, target.id, { createdBy: actor.id })
+      : page.type === "interpreter" && target.snapshot?.type === "interpreter"
+      ? await applyInterpreterMetadataChange(tx, pageId, target.snapshot, target.id, { createdBy: actor.id })
       : await applyContentChange(tx, pageId, target.content, target.id, { createdBy: actor.id });
     return { revisionId: id };
   }).catch((error: unknown) => {

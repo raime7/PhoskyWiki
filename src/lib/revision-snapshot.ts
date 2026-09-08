@@ -1,3 +1,4 @@
+import { formatKeyTexts, type KeyText } from "@/lib/key-texts";
 /** Structured metadata is separate from Markdown; legacy content cannot recover it. */
 export interface TermSnapshot {
   version: 1;
@@ -5,7 +6,18 @@ export interface TermSnapshot {
   title: string;
   summary: string;
   aliases: string[];
+  keyTexts?: KeyText[];
 }
+
+export interface InterpreterSnapshot {
+  version: 1;
+  type: "interpreter";
+  title: string;
+  summary: string;
+  keyTexts?: KeyText[];
+}
+export type MetadataSnapshot = TermSnapshot | InterpreterSnapshot;
+export const missingKeyTextsNote = "此旧修订未记录关键文本，回滚时保留当前关键文本。";
 
 export type RevisionSource = "legacy" | "baseline" | "create" | "approval" | "direct" | "rollback";
 
@@ -16,14 +28,15 @@ export const revisionSourceLabels: Record<RevisionSource, string> = {
 
 export const legacyTermHistoryNote = "此旧修订未保存词条信息快照，无法恢复标题、简介和别名；历史正文仍可查看。";
 
-export function termSnapshot(value: { title: string; summary: string; aliases: string[] }): TermSnapshot {
-  return { version: 1, type: "term", title: value.title, summary: value.summary, aliases: [...value.aliases] };
+export function termSnapshot(value: { title: string; summary: string; aliases: string[]; keyTexts?: KeyText[] }): TermSnapshot {
+  return { version: 1, type: "term", title: value.title, summary: value.summary, aliases: [...value.aliases], ...(value.keyTexts === undefined ? {} : { keyTexts: value.keyTexts }) };
 }
 
-export function compareTermMetadata(from: TermSnapshot, to: TermSnapshot) {
+export function compareTermMetadata(from: MetadataSnapshot, to: MetadataSnapshot) {
   return [
     { field: "title", label: "标题", before: from.title, after: to.title },
     { field: "summary", label: "简介", before: from.summary, after: to.summary },
-    { field: "aliases", label: "别名", before: from.aliases.map((alias) => JSON.stringify(alias)).join("、"), after: to.aliases.map((alias) => JSON.stringify(alias)).join("、") },
+    { field: "keyTexts", label: "关键文本", before: formatKeyTexts(from.keyTexts), after: formatKeyTexts(to.keyTexts) },
+    ...(from.type === "term" && to.type === "term" ? [{ field: "aliases", label: "别名", before: from.aliases.map((alias) => JSON.stringify(alias)).join("、"), after: to.aliases.map((alias) => JSON.stringify(alias)).join("、") }] : []),
   ].map((row) => ({ ...row, changed: row.before !== row.after }));
 }

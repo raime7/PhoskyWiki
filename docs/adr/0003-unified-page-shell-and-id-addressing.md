@@ -1,5 +1,8 @@
 # 0003 - 统一页面壳与 id 寻址
 
+> 同名分流与关键文本规则已由 [MVP 收束规格](../specs/0003-mvp-consolidation-and-optional-key-texts.md) 和 [ADR-0005](../adr/0005-single-term-and-optional-key-texts.md) 修订：同名词条统一归并、视角内分章，关键文本可选。以下相关旧约定仅作历史记录。
+
+
 - 状态：已接受（Accepted）
 - 日期：2026-09-04
 - 关联：Amends [0001-mvp.md](../specs/0001-mvp.md)「核心数据模型」「双链语法」两条；依据 [ADR-0001](./0001-postgresql-as-content-store.md)（PG 唯一内容存储、关系查询是选库决定性理由）

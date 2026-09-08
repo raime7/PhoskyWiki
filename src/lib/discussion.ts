@@ -14,6 +14,7 @@ import "server-only";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getDb, type Db } from "@/db";
+import { isPageVisible } from "@/lib/page-visibility";
 import {
   discussionPosts,
   pages,
@@ -147,7 +148,7 @@ export async function listDiscussionFloors(termId: number): Promise<FloorView[]>
         pageId: pages.id,
         title: pages.title,
         slug: pages.slug,
-        deletedAt: pages.deletedAt,
+        live: isPageVisible(pages.id),
       })
       .from(pages)
       .where(inArray(pages.id, anchorIds))) {
@@ -155,7 +156,7 @@ export async function listDiscussionFloors(termId: number): Promise<FloorView[]>
         pageId: row.pageId,
         title: row.title,
         slug: row.slug,
-        live: row.deletedAt === null,
+        live: row.live,
       });
     }
   }
@@ -260,7 +261,7 @@ export async function createDiscussionPost(
           and(
             eq(perspectives.pageId, input.perspectiveId),
             eq(perspectives.termId, input.termId),
-            isNull(pages.deletedAt),
+            isPageVisible(pages.id),
           ),
         )
         .limit(1);

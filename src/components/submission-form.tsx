@@ -13,7 +13,9 @@ import { MarkdownEditor } from "@/components/markdown-editor";
 import type { CreateSubmissionResult } from "@/lib/review-types";
 import { TERM_CONTENT_TEMPLATE } from "@/lib/content-template";
 import type { WikiLinkTarget } from "@/lib/markdown";
-import type { TermSnapshot } from "@/lib/revision-snapshot";
+import { KeyTextsEditor } from "@/components/key-texts";
+import type { KeyText } from "@/lib/key-texts";
+import type { MetadataSnapshot } from "@/lib/revision-snapshot";
 import { formatAliasInput, parseAliasInput } from "@/lib/alias-input";
 
 type Option = {
@@ -32,6 +34,8 @@ interface ContentDraft {
   title?: string;
   summary?: string;
   aliases?: string;
+  keyTexts?: KeyText[];
+  needsConfirmation?: boolean;
   aliasesFormat?: "quoted-v1";
   termId?: string;
   interpreterId?: string;
@@ -39,9 +43,9 @@ interface ContentDraft {
 
 export type SubmissionFormProps = { resubmission?: {
   id: number; ownerId: string; reason: string; stale: boolean; unavailable?: string;
-  proposal: { content: string; title: string | null; summary: string | null; aliases: string[]; termId: number | null; interpreterId: number | null };
+  proposal: { keyTexts?: KeyText[] | null; content: string; title: string | null; summary: string | null; aliases: string[]; termId: number | null; interpreterId: number | null };
 } } & (
-  | { variant: "edit_term"; isAdmin: boolean; pageId: number; initialMetadata: TermSnapshot; baseRevisionId: number }
+  | { variant: "edit_term" | "edit_interpreter"; isAdmin: boolean; pageId: number; initialMetadata: MetadataSnapshot; baseRevisionId: number }
   | {
       variant: "edit";
       isAdmin: boolean;
@@ -64,11 +68,11 @@ export type SubmissionFormProps = { resubmission?: {
 export function SubmissionForm(props: SubmissionFormProps) {
   const { variant, isAdmin } = props;
   const retry = props.resubmission;
-  const metadataEdit = variant === "edit_term";
-  const initialAliases = retry ? retry.proposal.aliases : metadataEdit ? props.initialMetadata.aliases : NO_ALIASES;
+  const metadataEdit = variant === "edit_term" || variant === "edit_interpreter";
+  const initialAliases = retry ? retry.proposal.aliases : metadataEdit && props.initialMetadata.type === "term" ? props.initialMetadata.aliases : NO_ALIASES;
   // 编辑/新视角保存正文；词条向导同时保存信息框。
   const draftKey =
-    retry ? `phoskywiki:draft:resubmit:${retry.ownerId}:${retry.id}` : variant === "edit" || variant === "edit_term"
+    retry ? `phoskywiki:draft:resubmit:${retry.ownerId}:${retry.id}` : variant === "edit" || metadataEdit
       ? `phoskywiki:draft:${variant}:${props.pageId}`
       : variant === "new_perspective"
         ? "phoskywiki:draft:new-perspective"
@@ -81,6 +85,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
   );
   const [title, setTitle] = useState(retry ? retry.proposal.title ?? "" : metadataEdit ? props.initialMetadata.title : "");
   const [summary, setSummary] = useState(retry ? retry.proposal.summary ?? "" : metadataEdit ? props.initialMetadata.summary : "");
+  const [keyTexts, setKeyTexts] = useState<KeyText[]>(retry?.proposal.keyTexts ?? (metadataEdit ? props.initialMetadata.keyTexts : undefined) ?? []);
   const [aliases, setAliases] = useState(formatAliasInput(initialAliases));
   const [termId, setTermId] = useState(
     retry ? String(retry.proposal.termId ?? "") : variant === "new_perspective" ? (props.presetTermId ?? "") : "",
@@ -93,13 +98,14 @@ export function SubmissionForm(props: SubmissionFormProps) {
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [existingHref, setExistingHref] = useState<string | null>(null);
   const [result, setResult] = useState<CreateSubmissionResult | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [savedDraft, setSavedDraft] = useState<string | null>(null);
   const initialContent = variant === "edit" ? props.initialContent : null;
   // 草稿基于的修订：编辑 = 表单加载时的 head；新建视角无修订概念，恒 null
-  const draftBase = variant === "edit" || variant === "edit_term" ? props.baseRevisionId : null;
-  const draftSnapshot = JSON.stringify({ content, baseRevisionId: draftBase, title, summary, aliases, aliasesFormat: "quoted-v1", termId: String(termId), interpreterId } satisfies ContentDraft);
+  const draftBase = variant === "edit" || metadataEdit ? props.baseRevisionId : null;
+  const draftSnapshot = JSON.stringify({ content, baseRevisionId: draftBase, title, summary, aliases, keyTexts, needsConfirmation: needsConfirmation && !confirmed, aliasesFormat: "quoted-v1", termId: String(termId), interpreterId } satisfies ContentDraft);
 
   // 恢复本地草稿：延后到 hydration 之后（render 期不读 localStorage）；
   // 只在与当前 base 同源时可信，页面已前进则弃用
@@ -116,15 +122,12 @@ export function SubmissionForm(props: SubmissionFormProps) {
     }
     if (!draft || typeof draft.content !== "string") return;
     if (variant === "edit_term" && (typeof draft.title !== "string" || typeof draft.summary !== "string" || typeof draft.aliases !== "string")) return;
-    if (draft.baseRevisionId !== draftBase && !retry) {
-      try { window.localStorage.removeItem(draftKey); } catch { /* Storage may be unavailable. */ }
-      return;
-    }
     const restored = draft;
     const timer = setTimeout(() => {
       setContent(restored.content);
-      if (retry && restored.baseRevisionId !== draftBase) setNeedsConfirmation(true);
-      if (variant === "new_term" || variant === "edit_term" || variant === "new_interpreter") {
+      if (Array.isArray(restored.keyTexts)) setKeyTexts(restored.keyTexts);
+      if (restored.baseRevisionId !== draftBase || restored.needsConfirmation) setNeedsConfirmation(true);
+      if (variant === "new_term" || metadataEdit || variant === "new_interpreter") {
         setTitle(typeof restored.title === "string" ? restored.title : "");
         setSummary(typeof restored.summary === "string" ? restored.summary : "");
         const storedAliases = typeof restored.aliases === "string" ? restored.aliases : "";
@@ -140,7 +143,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [draftKey, draftBase, variant, retry, initialAliases]);
+  }, [draftKey, draftBase, variant, retry, initialAliases, metadataEdit]);
 
   // 自动保存草稿（防抖 500ms；提交成功后停笔）
   useEffect(() => {
@@ -161,6 +164,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
     if (duplicatePerspective || (needsConfirmation && !confirmed) || (retry?.unavailable && variant !== "new_perspective")) return;
     try { window.localStorage.setItem(draftKey, draftSnapshot); } catch { /* Storage may be unavailable. */ }
     setError(null);
+    setExistingHref(null);
     const parsedAliases = parseAliasInput(aliases);
     if ((metadataEdit || variant === "new_term") && parsedAliases.error) {
       setError(parsedAliases.error);
@@ -168,8 +172,8 @@ export function SubmissionForm(props: SubmissionFormProps) {
     }
     setPending(true);
     const payload =
-      variant === "edit_term"
-        ? { kind: "edit", pageId: props.pageId, baseRevisionId: props.baseRevisionId, title, summary, aliases: parsedAliases.aliases }
+      metadataEdit
+        ? { kind: "edit", pageId: props.pageId, baseRevisionId: props.baseRevisionId, title, summary, aliases: parsedAliases.aliases, keyTexts }
         : variant === "edit"
         ? {
             kind: "edit",
@@ -178,9 +182,9 @@ export function SubmissionForm(props: SubmissionFormProps) {
             baseRevisionId: props.baseRevisionId,
           }
         : variant === "new_term"
-          ? { kind: "new_term", title, summary, aliases: parsedAliases.aliases, content }
+          ? { kind: "new_term", title, summary, aliases: parsedAliases.aliases, content, keyTexts }
           : variant === "new_interpreter"
-            ? { kind: "new_interpreter", title, summary }
+            ? { kind: "new_interpreter", title, summary, keyTexts }
             : {
                 kind: "new_perspective",
                 termId: termId === "" ? undefined : Number(termId),
@@ -194,11 +198,12 @@ export function SubmissionForm(props: SubmissionFormProps) {
       body: JSON.stringify({ ...payload, ...(retry ? { supersedes: retry.id, confirmedBaseRevisionId: confirmed ? draftBase : undefined } : {}) }),
     });
     const data = (await res.json().catch(() => null)) as
-      | (CreateSubmissionResult & { error?: string })
+      | (CreateSubmissionResult & { error?: string; href?: string })
       | null;
     setPending(false);
     if (!res.ok || !data || (data.outcome !== "pending" && data.outcome !== "direct")) {
       setError(data?.error ?? "提交失败，请稍后再试");
+      setExistingHref(data?.href ?? null);
       return;
     }
     if (draftKey) { try { window.localStorage.removeItem(draftKey); } catch { /* Submission still succeeded. */ } }
@@ -244,6 +249,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
       {retry && <p className="text-sm">驳回理由：<span>{retry.reason}</span></p>}
       {retry?.unavailable && <p role="alert">{retry.unavailable} 草稿会保留；请等待恢复{variant === "new_perspective" ? "或调整词条与诠释者" : "后再重提"}。</p>}
       {needsConfirmation && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />我已对照最新版与原提案，人工整理并确认本次内容</label>}
+      {needsConfirmation && !retry && <details open className="rounded border p-3"><summary>最新版（请与下方保留的草稿对照）</summary><pre className="whitespace-pre-wrap">{variant === "edit" ? props.initialContent : metadataEdit ? JSON.stringify(props.initialMetadata, null, 2) : ""}</pre></details>}
       {variant === "new_perspective" && (
         <>
           <label className="flex flex-col gap-2 text-sm font-medium">
@@ -297,7 +303,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
 
       {(variant === "new_term" || variant === "new_interpreter" || metadataEdit) && (
         <label className="flex flex-col gap-2 text-sm font-medium">
-          {variant === "new_term" || metadataEdit ? "词条标题" : "诠释者名称"}
+          {variant === "new_term" || variant === "edit_term" ? "词条标题" : "诠释者名称"}
           <Input
             name="title"
             type="text"
@@ -305,8 +311,8 @@ export function SubmissionForm(props: SubmissionFormProps) {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder={
-              variant === "new_term" || metadataEdit
-                ? "如「物化」；同名多义请用括号限定（如「价值（哲学）」）"
+              variant === "new_term" || variant === "edit_term"
+                ? "如「物化」；不同领域或含义请在同一视角内分章"
                 : "如「卢卡奇」"
             }
           />
@@ -326,7 +332,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
         </label>
       )}
 
-      {(variant === "new_term" || metadataEdit) && (
+      {(variant === "new_term" || variant === "edit_term") && (
         <>
           <label className="flex flex-col gap-2 text-sm font-medium">
             别名（信息框用，以逗号分隔）
@@ -336,6 +342,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
           {variant === "new_term" && <p className="text-sm text-muted-foreground">填写信息框后，完善下方通俗解读骨架。正文将成为编委会视角，与词条一起提交。</p>}
         </>
       )}
+      {(metadataEdit || variant === "new_term" || variant === "new_interpreter") && <KeyTextsEditor value={keyTexts} onChange={setKeyTexts} />}
       {(variant === "edit" || variant === "new_perspective" || variant === "new_term") && (
         <MarkdownEditor value={content} onChange={setContent} resolvedWikiLinks={variant === "edit" ? props.resolvedWikiLinks : undefined} />
       )}
@@ -343,6 +350,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
       {error && (
         <p data-testid="form-error" role="alert" className="text-sm text-destructive">
           {error}
+          {existingHref && <Link href={existingHref} className="ml-2 underline">前往已有页面</Link>}
         </p>
       )}
 

@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { ContentDiff } from "@/components/content-diff";
 import { TermMetadataDiff } from "@/components/term-metadata-diff";
-import { termSnapshot } from "@/lib/revision-snapshot";
+import { formatKeyTexts } from "@/lib/key-texts";
 import { getSessionUser } from "@/lib/session";
 import { getMySubmission } from "@/lib/submission-history";
 import { formatWhen, kindLabels, RejectionReason, statusLabels } from "../../_components";
@@ -28,7 +28,7 @@ export default async function SubmissionDetailPage({ params }: Props) {
 
   const proposedText =
     submission.kind === "new_term" || submission.kind === "new_interpreter" || (submission.kind === "edit" && submission.title !== null)
-      ? `标题：${submission.title ?? ""}\n简介：${submission.summary ?? ""}\n别名：${submission.aliases.join("、")}\n\n${submission.content}`
+      ? `标题：${submission.title ?? ""}\n简介：${submission.summary ?? ""}\n别名：${submission.aliases.join("、")}\n关键文本：${formatKeyTexts(submission.keyTexts ?? undefined)}\n\n${submission.content}`
       : submission.content;
 
   return (
@@ -64,7 +64,7 @@ export default async function SubmissionDetailPage({ params }: Props) {
         {submission.baseHidden
           ? <pre className="whitespace-pre-wrap break-words rounded bg-muted p-3 text-sm">{proposedText}</pre>
           : submission.baseSnapshot
-            ? <TermMetadataDiff from={submission.baseSnapshot} to={termSnapshot({ title: submission.title!, summary: submission.summary ?? "", aliases: submission.aliases })} />
+            ? <TermMetadataDiff from={submission.baseSnapshot} to={{ ...submission.baseSnapshot, title: submission.title!, summary: submission.summary ?? "", ...(submission.baseSnapshot.type === "term" ? { aliases: submission.aliases } : {}), keyTexts: submission.keyTexts ?? submission.baseSnapshot.keyTexts }} />
             : <ContentDiff oldText={submission.baseContent ?? ""} newText={proposedText} />}
       </section>
     </main>

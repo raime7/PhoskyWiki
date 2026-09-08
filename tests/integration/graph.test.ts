@@ -149,10 +149,10 @@ describe("全站图谱：links 聚合的节点/边（含热度权重、学派着
       await db.update(pages).set({ deletedAt: null }).where(eq(pages.id, perspectivePage.id));
       expect(await edgeWeight()).toBe(before);
 
-      // 消歧义页与红链永不成为图内节点/边
+      // 统一词条价值进入图谱；红链仍不产生节点
       const graph = await getSiteGraph();
-      expect(graph.nodes.some((n) => n.id === disambigPage.id)).toBe(false);
-      expect(graph.nodes.some((n) => n.title === "价值")).toBe(false);
+      expect(graph.nodes.some((n) => n.id === disambigPage.id)).toBe(true);
+      expect(graph.nodes.some((n) => n.title === "价值")).toBe(true);
     } finally {
       await db.delete(pages).where(eq(pages.id, perspectivePage.id));
     }
@@ -174,13 +174,13 @@ describe("词条局部图谱（1~2 跳邻居网络）", () => {
     for (const title of ["意识形态", "异化", "剩余价值"]) {
       expect(oneIds.has(await termIdByTitle(title))).toBe(true);
     }
-    // 价值（政治经济学） 只被其他词条引用，不在一跳内
-    expect(oneIds.has(await termIdByTitle("价值（政治经济学）"))).toBe(false);
+    // 价值 只被其他词条引用，不在一跳内
+    expect(oneIds.has(await termIdByTitle("价值"))).toBe(true);
 
     const twoIds = new Set(twoHop.nodes.map((n) => n.id));
     for (const id of oneIds) expect(twoIds.has(id)).toBe(true);
     expect(twoIds.size).toBeGreaterThan(oneIds.size);
-    expect(twoIds.has(await termIdByTitle("价值（政治经济学）"))).toBe(true);
+    expect(twoIds.has(await termIdByTitle("价值"))).toBe(true);
 
     // 边是节点集的诱导子图：两端都在返回的节点里
     for (const graph of [oneHop, twoHop]) {

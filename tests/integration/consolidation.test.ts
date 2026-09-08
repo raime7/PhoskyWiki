@@ -1,0 +1,75 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { beforeAll, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { seedDatabase } from "@/db/seed";
+import { getDb } from "@/db";
+import { pages, terms, perspectives, revisions, interpreters, user, discussionPosts, termCategories, categories, submissions } from "@/db/schema";
+import { GET as history } from "@/app/api/pages/[pageId]/history/route";
+import { GET as graph } from "@/app/api/graph/site/route";
+
+const execute = promisify(execFile);
+let directory: string;
+let kept: number, removed: number, first: number, second: number, hidden: number;
+async function readHistory(id: number) {
+  return history(new Request(`http://localhost/api/pages/${id}/history`), { params: Promise.resolve({ pageId: String(id) }) });
+}
+async function run(apply: boolean) {
+  const database = new URL(process.env.DATABASE_URL!).pathname.slice(1);
+  const result = await execute(process.execPath, ["--conditions", "react-server", "--import", "tsx", "scripts/consolidate-mvp.ts", "--database", database, "--groups", join(directory, "groups.json"), ...(apply ? ["--apply", "--backup", join(directory, "fixture-backup.txt")] : [])], { env: { ...process.env, MEILI_HOST: "" } });
+  return JSON.parse(result.stdout);
+}
+beforeAll(async () => {
+  await seedDatabase();
+  directory = await mkdtemp(join(tmpdir(), "phosky-merge-"));
+  await writeFile(join(directory, "groups.json"), JSON.stringify([{ title: "合并测试", sourceTitles: ["合并测试（哲学）", "合并测试（经济学）"] }]));
+  // 测试库夹具可由 seed 重建；真实运维必须使用目标库备份。
+  await writeFile(join(directory, "fixture-backup.txt"), "isolated seed fixture");
+  const db = getDb();
+  async function term(title: string) {
+    const [p] = await db.insert(pages).values({ type: "term", title, slug: title }).returning();
+    await db.insert(terms).values({ pageId: p.id }); return p.id;
+  }
+  kept = await term("合并测试（哲学）"); removed = await term("合并测试（经济学）");
+  const [board] = await db.select().from(interpreters).where(eq(interpreters.isEditorialBoard, true));
+  async function perspective(termId: number, content: string) {
+    const [p] = await db.insert(pages).values({ type: "perspective", title: `编委会论${termId}`, slug: `merge-${termId}` }).returning();
+    await db.insert(perspectives).values({ pageId: p.id, termId, interpreterId: board.pageId });
+    await db.insert(revisions).values({ pageId: p.id, content }); return p.id;
+  }
+  first = await perspective(kept, "哲学解释完整保留 [[合并测试（经济学）|经济解释@编委会]]");
+  second = await perspective(removed, "经济解释完整保留 [[合并测试（哲学）]]");
+  hidden = await term("隐藏夹具");
+  await db.update(pages).set({ deletedAt: new Date() }).where(eq(pages.id, hidden));
+  await perspective(hidden, "应被清除");
+  const [author] = await db.insert(user).values({ id: "consolidation-fixture", name: "归并夹具", email: "consolidation-fixture@example.com" }).onConflictDoUpdate({ target: user.id, set: { name: "归并夹具" } }).returning();
+  const [floor] = await db.insert(discussionPosts).values({ termId: removed, perspectiveId: second, authorId: author.id, content: "公开楼层" }).returning();
+  await db.insert(discussionPosts).values({ termId: removed, parentId: floor.id, authorId: author.id, content: "公开回复" });
+  await db.insert(submissions).values({ kind: "edit", pageId: second, submittedBy: author.id, quorum: 2, content: "来源待审不能发布" });
+  await db.insert(submissions).values({ kind: "edit", pageId: first, submittedBy: author.id, quorum: 2, content: "保留页待审" });
+  const [category] = await db.select().from(categories).limit(1);
+  await db.insert(termCategories).values([{ termId: kept, categoryId: category.id }, { termId: removed, categoryId: category.id }]);
+});
+
+it("运维预览不改变公开页面；归并保留正文历史、清理来源并可重复执行", async () => {
+  const preview = await run(false);
+  expect(preview).toMatchObject({ applied: false, groups: [{ title: "合并测试", keepId: kept, perspectiveCount: 1 }] });
+  expect((await readHistory(second)).status).toBe(200);
+  const applied = await run(true);
+  expect(applied.applied).toBe(true);
+  expect((await readHistory(second)).status).toBe(404);
+  expect((await readHistory(removed)).status).toBe(404);
+  expect((await readHistory(hidden)).status).toBe(404);
+  const state = await (await readHistory(first)).json();
+  expect(state.revisions[0].content).toContain("## 合并测试（哲学）");
+  expect(state.revisions[0].content).toContain("## 合并测试（经济学）");
+  expect(state.revisions[0].content).toContain("[[合并测试|经济解释@编委会]]");
+  expect(state.revisions[0].content).not.toContain("来源待审不能发布");
+  expect(state.revisions.at(-1).content).toContain("哲学解释完整保留");
+  const network = await (await graph()).json();
+  expect(network.nodes.filter((node: { title: string }) => node.title.startsWith("合并测试"))).toMatchObject([{ id: kept, title: "合并测试", perspectiveCount: 1 }]);
+  expect(await run(true)).toMatchObject({ groups: [], removedPages: 0, removedPosts: 0, removedRevisions: 0, removedSubmissions: 0 });
+}, 60_000);

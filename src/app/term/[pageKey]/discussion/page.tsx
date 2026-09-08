@@ -179,7 +179,7 @@ export default async function TermDiscussionPage({ params, searchParams }: Param
                 {floor.replies.length > 0 && (
                   <ul className="mt-3 flex flex-col gap-3 border-l-2 border-border pl-4">
                     {floor.replies.map((reply) => (
-                      <li key={reply.id} className="text-sm">
+                      <li key={reply.id} id={`floor-${reply.id}`} className="scroll-mt-20 text-sm">
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                           <span>{reply.authorName}</span>
                           <time dateTime={reply.createdAt.toISOString()}>

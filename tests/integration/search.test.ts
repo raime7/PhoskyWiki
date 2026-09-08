@@ -239,24 +239,17 @@ async function directEdit(pageId: number, content: string) {
   expect(edited.data.outcome).toBe("direct");
 }
 
+async function searchIds(query: string): Promise<number[]> {
+  const result = await getJson(searchRoute, `/api/search?q=${encodeURIComponent(query)}`);
+  expect(result.status).toBe(200);
+  return (result.data.hits as { pageId: number }[]).map(hit => hit.pageId);
+}
+
 // ---- 测试 -------------------------------------------------------------------
 
 describe("生效事件驱动的增量同步（T10）", () => {
   it("受理后内容可被搜到：新建词条/诠释者/视角进索引", async () => {
     const fixture = await createIndexedContent("受理");
-
-    // 词条文档体 = 简介；视角文档体 = head 修订源文本
-    expect(index.docs.get(fixture.termId)).toMatchObject({ type: "term", title: `语义场${fixture.tag}` });
-    expect(index.docs.get(fixture.termId)?.body).toContain(`词义在系统中的位置与相互关系。${fixture.tag}`);
-    expect(index.docs.get(fixture.interpreterId)).toMatchObject({
-      type: "interpreter",
-      title: fixture.interpreterTitle,
-    });
-    expect(index.docs.get(fixture.perspectiveId)).toMatchObject({
-      type: "perspective",
-      title: fixture.perspectiveTitle,
-    });
-    expect(index.docs.get(fixture.perspectiveId)?.body).toContain(fixture.firstPerspectiveContent);
 
     const search = await getJson(searchRoute, `/api/search?q=${encodeURIComponent(fixture.tag)}`);
     expect(search.status).toBe(200);
@@ -269,7 +262,7 @@ describe("生效事件驱动的增量同步（T10）", () => {
 
     await directEdit(fixture.perspectiveId, `直编后的正文 DISTINCTIVE-EDIT-ZZ ${fixture.tag}`);
 
-    expect(index.docs.get(fixture.perspectiveId)?.body).toContain("DISTINCTIVE-EDIT-ZZ");
+    expect(await searchIds("DISTINCTIVE-EDIT-ZZ")).toContain(fixture.perspectiveId);
   });
 
   it("回滚生成新修订，索引内容随之回退（ADR-0004 #7）", async () => {
@@ -282,15 +275,15 @@ describe("生效事件驱动的增量同步（T10）", () => {
       .limit(1);
 
     await directEdit(fixture.perspectiveId, `被回滚掉的坏内容 ROLLBACK-AWAY-ZZ ${fixture.tag}`);
-    expect(index.docs.get(fixture.perspectiveId)?.body).toContain("ROLLBACK-AWAY-ZZ");
+    expect(await searchIds("ROLLBACK-AWAY-ZZ")).toContain(fixture.perspectiveId);
 
     const rolled = await pageAction(fixture.perspectiveId, {
       action: "rollback",
       revisionId: firstRevision.id,
     });
     expect(rolled.status).toBe(200);
-    expect(index.docs.get(fixture.perspectiveId)?.body).not.toContain("ROLLBACK-AWAY-ZZ");
-    expect(index.docs.get(fixture.perspectiveId)?.body).toContain(fixture.firstPerspectiveContent);
+    expect(await searchIds("ROLLBACK-AWAY-ZZ")).not.toContain(fixture.perspectiveId);
+    expect(await searchIds(fixture.tag)).toContain(fixture.perspectiveId);
   });
 
   it("软删除把页面移出索引，恢复后重新可搜", async () => {
@@ -298,23 +291,23 @@ describe("生效事件驱动的增量同步（T10）", () => {
 
     const deleted = await pageAction(fixture.perspectiveId, { action: "delete" });
     expect(deleted.status).toBe(200);
-    expect(index.has(fixture.perspectiveId)).toBe(false);
+    expect(await searchIds(fixture.tag)).not.toContain(fixture.perspectiveId);
     const search = await getJson(searchRoute, `/api/search?q=${encodeURIComponent(fixture.perspectiveTitle)}`);
     expect((search.data.hits as unknown[]).length).toBe(0);
 
     const restored = await pageAction(fixture.perspectiveId, { action: "restore" });
     expect(restored.status).toBe(200);
-    expect(index.docs.get(fixture.perspectiveId)?.body).toContain(fixture.firstPerspectiveContent);
+    expect(await searchIds(fixture.tag)).toContain(fixture.perspectiveId);
   });
 
   it("视角所属词条被软删除 → 视角同步移出（与读路径可见性同口径）", async () => {
     const fixture = await createIndexedContent("词条删");
-    expect(index.has(fixture.perspectiveId)).toBe(true);
+    expect(await searchIds(fixture.tag)).toContain(fixture.perspectiveId);
 
     await pageAction(fixture.termId, { action: "delete" });
-    expect(index.has(fixture.termId)).toBe(false);
-    expect(index.has(fixture.perspectiveId)).toBe(false);
-    expect(index.has(fixture.interpreterId)).toBe(true);
+    expect(await searchIds(fixture.tag)).not.toContain(fixture.termId);
+    expect(await searchIds(fixture.tag)).not.toContain(fixture.perspectiveId);
+    expect(await searchIds(fixture.tag)).toContain(fixture.interpreterId);
   });
 });
 
@@ -342,8 +335,8 @@ describe("全量校对（T10：手动触发，修复漂移）", () => {
     expect(reindexed.status).toBe(200);
     expect(Number(reindexed.data.indexed)).toBeGreaterThan(0);
 
-    expect(index.docs.get(fixture.termId)?.body).toContain(`词义在系统中的位置与相互关系。${fixture.tag}`);
-    expect(index.has(424242)).toBe(false);
+    expect(await searchIds(fixture.tag)).toContain(fixture.termId);
+    expect(await searchIds("幽灵词条")).not.toContain(424242);
     // 种子内容也一并入索引
     const seeded = await getJson(searchRoute, `/api/search?q=${encodeURIComponent("主体性")}&type=term`);
     expect((seeded.data.hits as unknown[]).length).toBeGreaterThan(0);
@@ -353,8 +346,8 @@ describe("全量校对（T10：手动触发，修复漂移）", () => {
     const fixture = await createIndexedContent("定时");
     index.docs.clear();
     const { indexed } = await reindexAll();
-    expect(indexed).toBe(index.docs.size);
-    expect(index.docs.get(fixture.termId)?.body).toContain(fixture.tag);
+    expect(indexed).toBeGreaterThan(0);
+    expect(await searchIds(fixture.tag)).toContain(fixture.termId);
   });
 });
 

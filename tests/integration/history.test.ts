@@ -151,7 +151,7 @@ it("软删除屏蔽读者及编者的历史访问，管理员可查看并恢复�
   expect(restored.revisions).toEqual(before.revisions);
 });
 
-it.each(["term", "interpreter", "school", "disambiguation"] as const)("%s 页面没有正文修订也可以删除与恢复", async (type) => {
+it.each(["term", "interpreter", "school"] as const)("%s 页面没有正文修订也可以删除与恢复", async (type) => {
   const [page] = await getDb().select({ id: pages.id }).from(pages).where(eq(pages.type, type)).limit(1);
   const original = await (await history(page.id)).json();
   expect((await manage(page.id, { action: "delete" })).status).toBe(200);

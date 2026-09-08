@@ -1,7 +1,7 @@
 // 种子数据：读路径的第一批演示内容。
 // T02 验收：≥3 词条、≥3 诠释者、≥4 视角（含编委会通俗视角、跨词条双链、红链）。
 // T03 验收：≥2 学派（成员 + 派生核心词条就位）、分类树（多级 + 词条多挂）。
-// T04 增补：显式视角链接（含红链示例）、消歧义双义示例（「价值」）。
+// T04 增补：显式视角链接（含红链示例）、同名分章示例（「价值」）。
 // T11 增补：seedExtendedContent 扩容至 ≥100 词条/千级图元素（图谱性能验收）。
 //
 // seedDatabase() 幂等：TRUNCATE 全部内容表后按固定顺序重插（serial 因此确定），
@@ -34,13 +34,6 @@ interface SeedTerm {
   title: string;
   aliases: string[];
   summary: string;
-}
-
-interface SeedDisambiguation {
-  /** 基准名：聚合「基准名」与「基准名（…）」形态的全部词条（ADR-0003 #5/#6） */
-  title: string;
-  /** 分流页导语；成员列表由命名约定派生，不写入正文 */
-  content: string;
 }
 
 interface SeedInterpreter {
@@ -101,23 +94,9 @@ const SEED_TERMS: SeedTerm[] = [
       "工人创造的价值超过其劳动力价格的部分——不等价的占有藏身于等价交换之中。",
   },
   {
-    title: "价值（政治经济学）",
-    aliases: ["劳动价值", "value"],
-    summary:
-      "凝结在商品中的社会必要劳动：一个看似物性的范畴，如何支配整个社会生产。",
-  },
-  {
-    title: "价值（哲学）",
-    aliases: ["价值论", "axiology"],
-    summary: "善、美、正当为何值得欲求？价值论（axiology）对价值客观性的追问。",
-  },
-];
-
-// 消歧义双义示例（T04 验收）：「价值」聚合 括号限定的同组词条
-const SEED_DISAMBIGUATIONS: SeedDisambiguation[] = [
-  {
     title: "价值",
-    content: `「价值」是典型的同名多义概念：政治经济学里指凝结在商品中的社会必要劳动与它所支配的社会关系；哲学里指善、美、正当等值得欲求的性质（价值论）。两个问题链共享同一个中文词，但概念机器互不相通——请按你的问题选择词条。`,
+    aliases: ["劳动价值", "value", "价值论", "axiology"],
+    summary: "价值涉及社会生产关系，也涉及善、美与正当；不同含义在各诠释者的视角中分章展开。",
   },
 ];
 
@@ -222,8 +201,7 @@ const SEED_TERM_CATEGORIES: SeedTermCategory[] = [
   { term: "意识形态", categories: ["意识形态批判"] },
   { term: "异化", categories: ["异化理论"] },
   { term: "剩余价值", categories: ["政治经济学", "马克思主义"] },
-  { term: "价值（政治经济学）", categories: ["政治经济学"] },
-  { term: "价值（哲学）", categories: ["哲学"] },
+  { term: "价值", categories: ["政治经济学", "哲学"] },
 ];
 
 const SEED_PERSPECTIVES: SeedPerspective[] = [
@@ -344,25 +322,22 @@ const SEED_PERSPECTIVES: SeedPerspective[] = [
 
 把这一概念与日常的「剥削」直觉区分开的关键在于：剩余价值不需要欺诈——等价交换的市场上照样发生。资本家按价值购买劳动力（付工资），而劳动力是一种特殊商品：它的使用（劳动）本身就能创造出大于自身价值的价值。
 
-本词条当前只有通俗视角，具体展开（不变资本与可变资本、绝对剩余价值与相对剩余价值、资本有机构成）尚待撰写。相关概念见[[异化]]与[[主体性]]；价值概念的哲学分支另见[[价值]]（消歧义）。`,
+本词条当前只有通俗视角，具体展开（不变资本与可变资本、绝对剩余价值与相对剩余价值、资本有机构成）尚待撰写。相关概念见[[异化]]与[[主体性]]；价值的不同含义见[[价值]]的分章解读。`,
   },
   {
-    term: "价值（政治经济学）",
+    term: "价值",
     interpreter: "编委会",
-    content: `政治经济学里的「价值」不是物品的固有属性，而是一种社会关系的结晶式表达：一物有价值，因为它是无差别人类劳动的凝结，并且这层关系只有通过交换才显形。
+    content: `## 政治经济学
+
+政治经济学里的「价值」不是物品的固有属性，而是一种社会关系的结晶式表达：一物有价值，因为它是无差别人类劳动的凝结，并且这层关系只有通过交换才显形。
 
 本词条处理古典政治经济学与马克思传统的问题链：使用价值与交换价值的二分、劳动价值论、价值形式如何从简单等价发展到货币，以及价值规律如何支配一个看似自由的市场社会。剥削的机制性概念见[[剩余价值]]，劳动颠倒的哲学表达见[[异化]]。
 
-「价值」的哲学用法（价值论、伦理学意义的价值）是另一条问题链，概念机器互不相通——分流见[[价值]]（消歧义页）。`,
-  },
-  {
-    term: "价值（哲学）",
-    interpreter: "编委会",
-    content: `哲学里的「价值」（value / axiology）问的是：什么使得事物值得欲求、值得追求？善、美、正当是客观的性质，还是情绪与偏好的投射？
+## 哲学
 
-本词条聚合价值论的传统站点：新康德主义对价值客观性的辩护、情感主义与偏好论的还原、相对主义的挑战，以及规范如何可能的社会建构论回答。价值的构成离不开评价者，因此与[[主体性]]问题相通。
+哲学里的「价值」（value / axiology）问的是：什么使得事物值得欲求、值得追求？善、美、正当是客观的性质，还是情绪与偏好的投射？
 
-注意分流：政治经济学里的价值（凝结在商品中的社会必要劳动）是另一条问题链，见[[价值]]（消歧义页）。`,
+本词条聚合价值论的传统站点：新康德主义对价值客观性的辩护、情感主义与偏好论的还原、相对主义的挑战，以及规范如何可能的社会建构论回答。价值的构成离不开评价者，因此与[[主体性]]问题相通。`,
   },
   {
     term: "主体性",
@@ -408,7 +383,7 @@ export async function seedDatabase(): Promise<{
     sql`truncate table ${termDiscussions}, ${discussionPosts}, ${submissionVotes}, ${submissions}, ${links}, ${revisions}, ${perspectives}, ${termCategories}, ${categories}, ${schoolMembers}, ${schools}, ${interpreters}, ${terms}, ${pages} restart identity cascade`,
   );
 
-  // 词条与消歧义页：pages 壳 + 负载/修订（消歧义页无负载表，ADR-0003 #6）
+  // 词条：pages 壳 + 负载
   const titleToPageId = new Map<string, number>();
   for (const term of SEED_TERMS) {
     const [page] = await db
@@ -419,20 +394,6 @@ export async function seedDatabase(): Promise<{
       .insert(terms)
       .values({ pageId: page.id, summary: term.summary, aliases: term.aliases });
     titleToPageId.set(term.title, page.id);
-  }
-  for (const disambiguation of SEED_DISAMBIGUATIONS) {
-    const [page] = await db
-      .insert(pages)
-      .values({
-        type: "disambiguation",
-        title: disambiguation.title,
-        slug: slugify(disambiguation.title),
-      })
-      .returning({ id: pages.id });
-    await db
-      .insert(revisions)
-      .values({ pageId: page.id, content: disambiguation.content });
-    titleToPageId.set(disambiguation.title, page.id);
   }
 
   const interpreterIds = new Map<string, number>();
@@ -511,7 +472,7 @@ export async function seedDatabase(): Promise<{
     perspectivePageIds.push(page.id);
   }
 
-  // 保存时解析（ADR-0003 #4）：默认链接按词条/消歧义页名解析；
+  // 保存时解析（ADR-0003 #4）：默认链接按词条名解析；
   // 显式视角链接按「词条@诠释者」定位视角页；未命中留名称快照（红链）。
   // 页面先建全、链接后解析，链接目标与视角插入顺序无关。
   let resolvedLinks = 0;
@@ -537,7 +498,7 @@ export async function seedDatabase(): Promise<{
 
   return {
     terms: SEED_TERMS.length + extended.terms,
-    disambiguations: SEED_DISAMBIGUATIONS.length,
+    disambiguations: 0,
     interpreters: SEED_INTERPRETERS.length + extended.interpreters,
     schools: SEED_SCHOOLS.length + extended.schools,
     perspectives: SEED_PERSPECTIVES.length + extended.perspectives,

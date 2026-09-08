@@ -4,4 +4,4 @@ import "dotenv/config";
 // injectSearchIndex），这里抹掉 MEILI_HOST 让默认实现降级为 null；
 // 唯一打真 Meilisearch 的是契约测试 search-meili.contract.test.ts——
 // 它自备连接参数、绕过注册表，不受本行影响。
-delete process.env.MEILI_HOST;
+process.env.MEILI_HOST = "";

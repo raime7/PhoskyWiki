@@ -18,7 +18,7 @@ it("编辑器目录解析词条、显式视角和消歧义，过滤软删除目�
   expect(catalog.targets).toEqual(expect.arrayContaining([
     { key: "主体性", href: expect.stringMatching(/^\/term\//) },
     { key: "主体性@拉康", href: expect.stringMatching(/^\/perspective\//) },
-    { key: "价值", href: expect.stringMatching(/^\/disambiguation\//) },
+    { key: "价值", href: expect.stringMatching(/^\/term\//) },
   ]));
   await getDb().update(pages).set({ deletedAt: new Date() }).where(eq(pages.title, "主体性"));
   try {

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "@/db";
 import { pages, perspectives } from "@/db/schema";
@@ -20,7 +20,7 @@ export async function getEditorCatalog(): Promise<EditorCatalog> {
   const [hubs, viewpoints] = await Promise.all([
     db.select({ id: pages.id, title: pages.title, slug: pages.slug, type: pages.type })
       .from(pages)
-      .where(and(inArray(pages.type, ["term", "disambiguation"]), isNull(pages.deletedAt)))
+      .where(and(eq(pages.type, "term"), isNull(pages.deletedAt)))
       .orderBy(asc(pages.type), asc(pages.title)),
     db.select({ id: pages.id, slug: pages.slug, term: term.title, interpreter: interpreter.title })
       .from(perspectives)
@@ -29,11 +29,11 @@ export async function getEditorCatalog(): Promise<EditorCatalog> {
       .innerJoin(interpreter, eq(interpreter.id, perspectives.interpreterId))
       .where(and(isNull(pages.deletedAt), isNull(term.deletedAt), isNull(interpreter.deletedAt))),
   ]);
-  // 与保存时的解析保持一致：同名词条优先于消歧义页。
+  // 与保存时的解析保持一致：默认链接落词条。
   const targets = new Map<string, string>();
   for (const hub of hubs) {
     const key = wikiLinkKey({ term: hub.title, interpreter: null });
-    if (hub.type === "term" || !targets.has(key)) targets.set(key, pagePath(hub.type, hub.slug, hub.id));
+    targets.set(key, pagePath(hub.type, hub.slug, hub.id));
   }
   for (const viewpoint of viewpoints) {
     targets.set(wikiLinkKey(viewpoint), pagePath("perspective", viewpoint.slug, viewpoint.id));

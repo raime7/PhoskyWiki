@@ -5,15 +5,13 @@ import { notFound } from "next/navigation";
 
 import { SubmissionForm } from "@/components/submission-form";
 import {
-  getHeadContent,
-  getHeadRevisionId,
+  getPerspectiveEditingState,
   getLivePage,
   getPerspectiveDetail,
-  getWikiLinkTargets,
 } from "@/lib/content";
 import { pageIdFromKey, pagePath } from "@/lib/slug";
 import { getSessionUser } from "@/lib/session";
-import { getTermEditingState } from "@/lib/review";
+import { getTermEditingState, getInterpreterEditingState } from "@/lib/review";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +22,7 @@ export default async function EditPage({ params }: Params) {
   if (!id) notFound();
   const page = await getLivePage(id);
   // 词条信息与视角正文共用提交管线，保持各自编辑边界。
-  if (!page || (page.type !== "perspective" && page.type !== "term")) notFound();
+  if (!page || (page.type !== "perspective" && page.type !== "term" && page.type !== "interpreter")) notFound();
 
   const sessionUser = await getSessionUser();
   if (!sessionUser) {
@@ -52,25 +50,22 @@ export default async function EditPage({ params }: Params) {
     );
   }
 
-  if (page.type === "term") {
-    const { snapshot, baseRevisionId } = await getTermEditingState(id);
+  if (page.type === "term" || page.type === "interpreter") {
+    const { snapshot, baseRevisionId } = await (page.type === "term" ? getTermEditingState(id) : getInterpreterEditingState(id));
     return <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-      <Link href={pagePath("term", page.slug, id)} className="text-sm text-muted-foreground">返回词条 →</Link>
-      <h1 className="mt-4 text-2xl font-bold">编辑词条信息：{page.title}</h1>
+      <Link href={pagePath(page.type, page.slug, id)} className="text-sm text-muted-foreground">返回词条 →</Link>
+      <h1 className="mt-4 text-2xl font-bold">编辑页面信息：{page.title}</h1>
       <p className="my-4 text-sm text-muted-foreground">修改词条标题、简介和别名。正文请在通俗视角中编辑；别名仅用于展示。</p>
-      <SubmissionForm variant="edit_term" isAdmin={sessionUser.role === "admin"} pageId={id} initialMetadata={snapshot} baseRevisionId={baseRevisionId} />
+      <SubmissionForm variant={page.type === "term" ? "edit_term" : "edit_interpreter"} isAdmin={sessionUser.role === "admin"} pageId={id} initialMetadata={snapshot} baseRevisionId={baseRevisionId} />
     </main>;
   }
 
   const detail = await getPerspectiveDetail(id);
   if (!detail) notFound();
-  const [content, baseRevisionId, linkTargets] = await Promise.all([
-    getHeadContent(id),
-    getHeadRevisionId(id),
-    getWikiLinkTargets(id),
-  ]);
+  const editingState = await getPerspectiveEditingState(id);
   // base 修订是并发防护的锚点（ADR-0004 #2），缺失即不可编辑
-  if (content === null || baseRevisionId === null) notFound();
+  if (!editingState) notFound();
+  const { content, baseRevisionId, linkTargets } = editingState;
 
   const termHref = pagePath("term", detail.termSlug, detail.termId);
 

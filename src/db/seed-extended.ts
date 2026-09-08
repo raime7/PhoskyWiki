@@ -401,7 +401,7 @@ export async function seedExtendedContent(
       }
       if (rng() < 0.3) {
         const core = pick(allTitles);
-        if (core !== "价值") candidates.add(core); // [[价值]] 落消歧义页，不是图谱节点
+        candidates.add(core);
       }
       candidates.delete(term.title);
       const linkTitles = [...candidates].slice(0, 7 + randInt(3));
@@ -431,7 +431,7 @@ export async function seedExtendedContent(
 
   // 演示入口与扩容网络之间保留一条确定的桥。
   // 随机候选里的核心词条可能落在正文未使用的位置，不能依赖随机选链保证连通。
-  planned[0]!.content += "\n\n阅读导航：可从[[价值（哲学）]]对照规范性问题，再沿双链进入这里的哲学、政治经济学与历史网络。";
+  planned[0]!.content += "\n\n阅读导航：可从[[价值]]对照规范性问题，再沿双链进入这里的哲学、政治经济学与历史网络。";
 
   // 视角页批量：pages 壳 + 负载 + 首修订
   const perspectiveRows = await db

@@ -44,24 +44,14 @@ test("显式视角语法未命中：红链提示视角尚未创建、不可点�
   await expect(redLink).toHaveAttribute("title", "视角尚未创建");
 });
 
-test("消歧义分流：[[价值]] 落消歧义页，再分流到括号限定词条", async ({ page }) => {
+test("同名聚合：价值链接落统一词条，编委会视角分章阅读", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "剩余价值", exact: true }).click();
-
-  // 剩余价值正文里的 [[价值]] 解析到「价值」消歧义页
-  await page.getByRole("link", { name: "价值", exact: true }).click();
-  await expect(page).toHaveURL(/\/disambiguation\//, { timeout: 5_000 });
+  await page.locator(".wiki-content").getByRole("link", { name: "价值", exact: true }).click();
+  await expect(page).toHaveURL(/\/term\//);
   await expect(page.getByRole("heading", { level: 1, name: "价值" })).toBeVisible();
-  await expect(page.getByText("同名多义词条分流页")).toBeVisible();
-
-  // 分流列表列出同组词条，点进政治经济学一支
-  await page.getByRole("link", { name: "价值（政治经济学）", exact: true }).click();
-  await expect(page).toHaveURL(/\/term\//, { timeout: 5_000 });
-  await expect(
-    page.getByRole("heading", { level: 1, name: "价值（政治经济学）" }),
-  ).toBeVisible();
-
-  // 词条页顶部提示反向可达消歧义页
-  await page.getByRole("link", { name: "价值（消歧义）", exact: true }).click();
-  await expect(page).toHaveURL(/\/disambiguation\//, { timeout: 5_000 });
+  await expect(page.getByRole("heading", { name: "政治经济学", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "哲学", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "查看视角页 →", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "编委会论价值" })).toBeVisible();
 });

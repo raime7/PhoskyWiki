@@ -5,7 +5,7 @@ import Link from "next/link";
 
 import { ContentDiff } from "@/components/content-diff";
 import { TermMetadataDiff } from "@/components/term-metadata-diff";
-import { termSnapshot } from "@/lib/revision-snapshot";
+import { KeyTexts } from "@/components/key-texts";
 import { WikiContent } from "@/components/wiki-content";
 import { renderMarkdown } from "@/lib/markdown";
 import { ReviewActions } from "@/components/review-actions";
@@ -71,8 +71,9 @@ function QueueEntry({ item }: { item: QueueItem }) {
           对比当前版与提案
         </summary>
         <div className="mt-3">
+          {item.keyTexts && item.kind !== "edit" && <KeyTexts items={item.keyTexts} />}
           {item.currentMetadata ? (
-            <TermMetadataDiff from={item.currentMetadata} to={termSnapshot({ title: item.title!, summary: item.summary ?? "", aliases: item.aliases })} />
+            <TermMetadataDiff from={item.currentMetadata} to={{ ...item.currentMetadata, title: item.title!, summary: item.summary ?? "", ...(item.currentMetadata.type === "term" ? { aliases: item.aliases } : {}), keyTexts: item.keyTexts ?? item.currentMetadata.keyTexts }} />
           ) : item.kind === "edit" && item.currentContent !== null ? (
             <ContentDiff oldText={item.currentContent} newText={item.content} />
           ) : (

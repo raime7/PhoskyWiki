@@ -5,7 +5,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { DELETE, POST } from "@/app/api/admin/perspectives/[pageId]/pin/route";
@@ -15,12 +15,10 @@ import { seedAdminAccount } from "@/db/seed-admin";
 import { getDb } from "@/db";
 import { links, pages, perspectives, terms, user } from "@/db/schema";
 import {
-  getDisambiguationDetail,
   getHeadContent,
   getInterpreterDetail,
   getLivePage,
   getPerspectiveDetail,
-  getTermDisambiguation,
   getWikiLinkTargets,
   listBacklinks,
   listPerspectivesOfInterpreter,
@@ -173,7 +171,6 @@ describe("页面解析与软删除", () => {
     const subjectivity = await termIdByTitle("主体性");
     expect(await getPerspectiveDetail(subjectivity)).toBeNull();
     expect(await getInterpreterDetail(subjectivity)).toBeNull();
-    expect(await getDisambiguationDetail(subjectivity)).toBeNull();
   });
 });
 
@@ -210,8 +207,8 @@ describe("诠释者轴读路径", () => {
       .limit(1);
     const detail = await getInterpreterDetail(boardPage.id);
     expect(detail?.isBoard).toBe(true);
-    // 编委会对每个词条（含两个「价值」词条）都有通俗视角
-    expect((await listPerspectivesOfInterpreter(boardPage.id)).length).toBe(6);
+    // 编委会对每个词条（含统一「价值」词条）都有通俗视角
+    expect((await listPerspectivesOfInterpreter(boardPage.id)).length).toBe(5);
   });
 });
 
@@ -223,7 +220,7 @@ describe("反链面板（T04：词条页与视角页共用 links 直查）", () 
     const titles = backlinks.map((b) => b.title);
     expect(titles).toContain("编委会论异化");
     expect(titles).toContain("黑格尔论异化");
-    expect(titles).toContain("编委会论价值（哲学）");
+    expect(titles).toContain("编委会论价值");
     for (const item of backlinks) {
       expect(item.termTitle.length).toBeGreaterThan(0);
       // 反链项可寻址：视角页与所属词条页路径都能生成
@@ -280,79 +277,18 @@ describe("反链面板（T04：词条页与视角页共用 links 直查）", () 
   });
 });
 
-describe("消歧义（T04：同名多义词条经基准名分流）", () => {
-  it("种子双义示例：「价值」聚合两个括号限定词条", async () => {
-    const db = getDb();
-    const [disambigPage] = await db
-      .select({ id: pages.id })
-      .from(pages)
-      .where(and(eq(pages.type, "disambiguation"), eq(pages.title, "价值")))
-      .limit(1);
-    expect(disambigPage).toBeDefined();
-
-    const detail = await getDisambiguationDetail(disambigPage.id);
-    expect(detail?.members.map((m) => m.title)).toEqual([
-      "价值（哲学）",
-      "价值（政治经济学）",
-    ]);
-    for (const member of detail!.members) {
-      expect(member.summary.length).toBeGreaterThan(0);
-      expect(member.perspectiveCount).toBe(1);
-    }
-    // 分流页有自己的导语修订
-    expect((await getHeadContent(disambigPage.id))?.length).toBeGreaterThan(20);
-  });
-
-  it("括号限定词条反查所属消歧义页；无限定段词条没有", async () => {
-    expect(await getTermDisambiguation("价值（政治经济学）")).toMatchObject({
-      title: "价值",
-    });
-    expect(await getTermDisambiguation("价值（哲学）")).toMatchObject({
-      title: "价值",
-    });
-    expect(await getTermDisambiguation("主体性")).toBeNull();
-  });
-
-  it("恰好以基准名为题的词条不是分流成员（主词条，不是待分流项）", async () => {
-    const db = getDb();
-    const [disambigPage] = await db
-      .select({ id: pages.id })
-      .from(pages)
-      .where(and(eq(pages.type, "disambiguation"), eq(pages.title, "价值")))
-      .limit(1);
-    const [bareTerm] = await db
-      .insert(pages)
-      .values({ type: "term", title: "价值", slug: "jia-zhi" })
-      .returning({ id: pages.id });
-    await db.insert(terms).values({ pageId: bareTerm.id, summary: "主词条" });
-    try {
-      const detail = await getDisambiguationDetail(disambigPage.id);
-      expect(detail?.members.map((m) => m.title)).not.toContain("价值");
-      expect(detail?.members.map((m) => m.title)).toEqual([
-        "价值（哲学）",
-        "价值（政治经济学）",
-      ]);
-    } finally {
-      await db.delete(pages).where(eq(pages.id, bareTerm.id));
-    }
-  });
-
-  it("指向基准名的双链落消歧义页（分流入口）", async () => {
-    const db = getDb();
-    const [disambigPage] = await db
-      .select({ id: pages.id, slug: pages.slug })
-      .from(pages)
-      .where(eq(pages.title, "价值"))
-      .limit(1);
-
-    // 剩余价值-编委会 正文里的 [[价值]] 已解析到消歧义页
+describe("同名概念在词条内聚合", () => {
+  it("价值只有一个枢纽，编委会视角分章包含两类解释", async () => {
+    const matches = (await listTerms()).filter(t => t.title.startsWith("价值"));
+    expect(matches.map(t => t.title)).toEqual(["价值"]);
+    const viewpoints = await listPerspectivesOfTerm(matches[0].id);
+    expect(viewpoints.filter(p => p.isBoard)).toHaveLength(1);
+    const content = await getHeadContent(viewpoints.find(p => p.isBoard)!.pageId);
+    expect(content).toContain("## 哲学");
+    expect(content).toContain("## 政治经济学");
     const surplus = await termIdByTitle("剩余价值");
-    const board = (await listPerspectivesOfTerm(surplus)).find((p) => p.isBoard)!;
-    const targets = await getWikiLinkTargets(board.pageId);
-    expect(targets.get("价值")).toEqual({
-      href: pagePath("disambiguation", disambigPage.slug, disambigPage.id),
-      exists: true,
-    });
+    const board = (await listPerspectivesOfTerm(surplus)).find(p => p.isBoard)!;
+    expect((await getWikiLinkTargets(board.pageId)).get("价值")).toEqual({ exists: true, href: pagePath("term", matches[0].slug, matches[0].id) });
   });
 });
 
@@ -500,15 +436,13 @@ describe("软删除视角不出现在任何计数里", () => {
     return row;
   }
 
-  it("词条视角数（首页列表）与消歧义成员的 perspectiveCount 不含软删除视角", async () => {
+  it("词条视角数（首页列表）的 perspectiveCount 不含软删除视角", async () => {
     const db = getDb();
-    const title = "价值（哲学）";
+    const title = "价值";
     const before = await termRow(title);
     expect(before.perspectiveCount).toBeGreaterThanOrEqual(1);
 
     // 成员本体（词条页）在线，软删除的只是它的视角页
-    const disambiguation = await getTermDisambiguation(title);
-    expect(disambiguation).not.toBeNull();
 
     const livePageIds = (await listPerspectivesOfTerm(before.id)).map((p) => p.pageId);
     try {
@@ -519,9 +453,6 @@ describe("软删除视角不出现在任何计数里", () => {
 
       expect((await termRow(title)).perspectiveCount).toBe(0);
 
-      const members = (await getDisambiguationDetail(disambiguation!.id))!.members;
-      expect(members.map((m) => m.title)).toContain(title);
-      expect(members.find((m) => m.title === title)!.perspectiveCount).toBe(0);
     } finally {
       await db
         .update(pages)

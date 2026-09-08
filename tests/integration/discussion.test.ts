@@ -234,6 +234,21 @@ describe("一层嵌套回复", () => {
 });
 
 describe("视角锚点", () => {
+  it("诠释者删除后既有锚点失效且拒绝新锚点，恢复后重新有效", async () => {
+    const termId = await termIdByTitle("主体性");
+    const perspectiveId = await lacanPerspectiveId();
+    const [interpreter] = await getDb().select().from(pages).where(eq(pages.title, "拉康"));
+    await postFloor({ termId, perspectiveId, content: "公开讨论保留" });
+    const action = (action: string) => pageActionRoute(new Request(`http://localhost/api/admin/pages/${interpreter.id}`, {
+      method: "POST", headers: { cookie: admin.cookie, "content-type": "application/json" }, body: JSON.stringify({ action }),
+    }), { params: Promise.resolve({ pageId: String(interpreter.id) }) });
+    expect((await action("delete")).status).toBe(200);
+    try {
+      expect((await listDiscussionFloors(termId))[0].perspective?.live).toBe(false);
+      expect((await postFloor({ termId, perspectiveId, content: "不可锚定隐藏视角" })).status).toBe(400);
+    } finally { await action("restore"); }
+    expect((await listDiscussionFloors(termId))[0].perspective?.live).toBe(true);
+  });
   it("锚点必须指向该词条的在线视角：本词条视角 201，他词条视角 400", async () => {
     const subjectivity = await termIdByTitle("主体性");
     const lacan = await lacanPerspectiveId();

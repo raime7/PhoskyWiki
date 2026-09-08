@@ -484,7 +484,7 @@ describe("并发防护（base 过期自动驳回，ADR-0004 #2）", () => {
 describe("管理员直编（不经队列，与受理共用修订管线）", () => {
   it("同一端点：管理员提交直接生效，返回阅读地址并追加修订", async () => {
     await setAdminsExactly([admin1.id]);
-    const pageId = await perspectiveIdOf("价值（哲学）", "编委会");
+    const pageId = await perspectiveIdOf("价值", "编委会");
     const before = await history(pageId);
 
     const result = await submitEdit(admin1, pageId, "管理员直编的通俗视角。");

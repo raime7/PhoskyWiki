@@ -13,7 +13,8 @@
 import { randomUUID } from "node:crypto";
 
 import { sql } from "drizzle-orm";
-import type { TermSnapshot, RevisionSource } from "@/lib/revision-snapshot";
+import type { MetadataSnapshot, RevisionSource } from "@/lib/revision-snapshot";
+import type { KeyText } from "@/lib/key-texts";
 import {
   boolean,
   check,
@@ -71,6 +72,7 @@ export const pages = pgTable(
 
 /** 词条负载表：概念名的聚合枢纽页，知识内容存于其下的视角。 */
 export const terms = pgTable("terms", {
+  keyTexts: jsonb("key_texts").$type<KeyText[]>().notNull().default([]),
   pageId: integer("page_id")
     .primaryKey()
     .references(() => pages.id, { onDelete: "cascade" }),
@@ -85,6 +87,7 @@ export const terms = pgTable("terms", {
 
 /** 诠释者负载表：给出诠释的思想家（如拉康），不是页面的撰写者。 */
 export const interpreters = pgTable("interpreters", {
+  keyTexts: jsonb("key_texts").$type<KeyText[]>().notNull().default([]),
   pageId: integer("page_id")
     .primaryKey()
     .references(() => pages.id, { onDelete: "cascade" }),
@@ -196,7 +199,7 @@ export const revisions = pgTable(
     // Markdown 源文本，全量存储；diff 是展示期产物，不落库（ADR-0004）
     content: text("content").notNull(),
     // Term metadata snapshots are independent of perspective Markdown; null marks legacy rows.
-    snapshot: jsonb("snapshot").$type<TermSnapshot>(),
+    snapshot: jsonb("snapshot").$type<MetadataSnapshot>(),
     source: text("source").$type<RevisionSource>().notNull().default("legacy"),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     // 回滚创建新快照，来源指向同页既有修订（ADR-0004 #7）。
@@ -264,6 +267,7 @@ export type SubmissionKind = (typeof submissionKindEnum.enumValues)[number];
 export const submissions = pgTable(
   "submissions",
   {
+    keyTexts: jsonb("key_texts").$type<KeyText[]>(),
     id: serial("id").primaryKey(),
     // 编辑目标页（kind=edit 必填）；新建类提议为空，建什么由 kind + 各字段决定
     pageId: integer("page_id").references(() => pages.id, { onDelete: "cascade" }),

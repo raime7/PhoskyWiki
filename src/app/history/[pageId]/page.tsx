@@ -1,3 +1,4 @@
+import { formatKeyTexts } from "@/lib/key-texts";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageAction } from "@/components/page-action";
@@ -8,7 +9,7 @@ import { compareRevisions, getPageHistory, historyId } from "@/lib/history";
 import { ReviewError } from "@/lib/review";
 import { getSessionUser } from "@/lib/session";
 import { pagePath } from "@/lib/slug";
-import { legacyTermHistoryNote, revisionSourceLabels } from "@/lib/revision-snapshot";
+import { legacyTermHistoryNote, missingKeyTextsNote, revisionSourceLabels } from "@/lib/revision-snapshot";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "修订历史" };
@@ -68,15 +69,17 @@ export default async function HistoryPage({ params, searchParams }: {
               {index === 0 && <span className="text-sm text-muted-foreground">当前修订</span>}
               <span>{revisionSourceLabels[revision.source]}</span>
               {revision.rollbackFromId && <span>回滚自 #{revision.rollbackFromId}</span>}
-              {isAdmin && !page.deletedAt && (page.type !== "term" || revision.snapshot) && <PageAction pageId={page.id} action="rollback" revisionId={revision.id} />}
+              {isAdmin && !page.deletedAt && ((page.type !== "term" && page.type !== "interpreter") || revision.snapshot) && <PageAction pageId={page.id} action="rollback" revisionId={revision.id} />}
             </div>
-            {page.type === "term" && revision.snapshot
+            {revision.snapshot
               ? <details className="mt-2"><summary className="cursor-pointer text-sm">查看词条信息快照</summary>
                 <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded bg-muted p-3 text-sm">
                   <dt>标题</dt><dd className="min-w-0 whitespace-pre-wrap break-words">{revision.snapshot.title}</dd>
                   <dt>简介</dt><dd className="min-w-0 whitespace-pre-wrap break-words">{revision.snapshot.summary || "（空）"}</dd>
-                  <dt>别名</dt><dd className="min-w-0 whitespace-pre-wrap break-words">{revision.snapshot.aliases.length ? revision.snapshot.aliases.map((alias, i) => <div key={i}>{alias}</div>) : "（空）"}</dd>
+                  {revision.snapshot.type === "term" && <><dt>别名</dt><dd className="min-w-0 whitespace-pre-wrap break-words">{revision.snapshot.aliases.length ? revision.snapshot.aliases.map((alias, i) => <div key={i}>{alias}</div>) : "（空）"}</dd></>}
+                  <dt>关键文本</dt><dd className="whitespace-pre-wrap">{formatKeyTexts(revision.snapshot.keyTexts)}</dd>
                 </dl>
+                {revision.snapshot.keyTexts === undefined && <p>{missingKeyTextsNote}</p>}
               </details>
               : <>
                 {page.type === "term" && <p className="mt-2 text-sm text-muted-foreground">{legacyTermHistoryNote}</p>}
