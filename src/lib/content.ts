@@ -48,7 +48,7 @@ export async function getLivePage(id: number): Promise<LivePage | null> {
   return row ?? null;
 }
 
-/** 首页词条列表（含各词条视角数）。 */
+/** 词条索引（含各词条的在线视角数）。 */
 export async function listTerms(): Promise<
   { id: number; title: string; slug: string; summary: string; perspectiveCount: number }[]
 > {
@@ -61,7 +61,8 @@ export async function listTerms(): Promise<
       perspectiveCount: sql<number>`(
         select count(*) from ${perspectives} pc
         join ${pages} pcPage on pcPage.id = pc.page_id
-        where pc.term_id = ${pages.id} and pcPage.deleted_at is null
+        join ${pages} piPage on piPage.id = pc.interpreter_id
+        where pc.term_id = ${pages.id} and pcPage.deleted_at is null and piPage.deleted_at is null
       )`.mapWith(Number),
     })
     .from(pages)
@@ -185,16 +186,31 @@ export async function getHeadRevisionId(pageId: number): Promise<number | null> 
   return row?.id ?? null;
 }
 
-/** 全部在线诠释者（新建视角的选择器用）；编委会视角固定存在，不参与新建。 */
+/** 全部在线诠释者，供索引与新建视角选择器使用。 */
 export async function listInterpreters(): Promise<
-  { pageId: number; name: string; isBoard: boolean }[]
+  { pageId: number; name: string; slug: string; summary: string; isBoard: boolean }[]
 > {
   return getDb()
-    .select({ pageId: interpreters.pageId, name: pages.title, isBoard: interpreters.isEditorialBoard })
+    .select({ pageId: interpreters.pageId, name: pages.title, slug: pages.slug, summary: interpreters.summary, isBoard: interpreters.isEditorialBoard })
     .from(interpreters)
     .innerJoin(pages, eq(pages.id, interpreters.pageId))
     .where(and(eq(pages.type, "interpreter"), isNull(pages.deletedAt)))
     .orderBy(asc(pages.id));
+}
+
+/** 新发布的视角：所属词条与诠释者也必须在线。 */
+export async function listRecentPerspectives(limit = 6) {
+  const termPages = alias(pages, "recent_term_pages");
+  const interpreterPages = alias(pages, "recent_interpreter_pages");
+  return getDb()
+    .select({ id: pages.id, title: pages.title, slug: pages.slug, termTitle: termPages.title, interpreterName: interpreterPages.title })
+    .from(perspectives)
+    .innerJoin(pages, eq(pages.id, perspectives.pageId))
+    .innerJoin(termPages, eq(termPages.id, perspectives.termId))
+    .innerJoin(interpreterPages, eq(interpreterPages.id, perspectives.interpreterId))
+    .where(and(isNull(pages.deletedAt), isNull(termPages.deletedAt), isNull(interpreterPages.deletedAt)))
+    .orderBy(desc(pages.createdAt), desc(pages.id))
+    .limit(limit);
 }
 
 /** 视角详情：所属词条 + 诠释者（含生卒年）。 */

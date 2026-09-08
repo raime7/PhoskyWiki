@@ -22,7 +22,7 @@ export function SearchBox({
 }: {
   initialQuery?: string;
   autoFocus?: boolean;
-  /** sm = 页头；lg = 搜索页主入口 */
+  /** sm = 页头；lg = 首页 / 搜索页主入口 */
   size?: "sm" | "lg";
 }) {
   const router = useRouter();
@@ -106,7 +106,7 @@ export function SearchBox({
       aria-controls={showDropdown ? listId : undefined}
       aria-haspopup="listbox"
     >
-      <form action="/search" method="get" onSubmit={(event) => { event.preventDefault(); goToSearch(); }}>
+      <form className="relative" role="search" action="/search" method="get" onSubmit={(event) => { event.preventDefault(); goToSearch(); }}>
         <input
           name="q"
           value={query}
@@ -119,10 +119,11 @@ export function SearchBox({
           data-testid="search-input"
           className={
             size === "lg"
-              ? "w-full rounded-md border border-input bg-background px-4 py-2.5 text-base outline-none focus:border-ring"
+              ? "w-full rounded-lg border border-input bg-background py-4 pl-4 pr-20 text-base shadow-sm outline-none focus:border-ring sm:py-5 sm:pl-5 sm:text-lg"
               : "w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus:border-ring"
           }
         />
+        {size === "lg" && <button type="submit" className="absolute inset-y-2 right-2 rounded-md bg-foreground px-4 text-sm text-background hover:opacity-80">搜索</button>}
       </form>
       {showDropdown && (
         <ul

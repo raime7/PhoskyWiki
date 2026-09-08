@@ -18,6 +18,7 @@ export function GraphExplorer({ data }: { data: SiteGraphData }) {
   const router = useRouter();
   const canvasRef = useRef<GraphCanvasHandle>(null);
   const [query, setQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [located, setLocated] = useState<string | null>(null);
 
   const matches = useMemo(() => {
@@ -33,26 +34,29 @@ export function GraphExplorer({ data }: { data: SiteGraphData }) {
     const node = data.nodes.find((n) => n.title === title);
     if (!node) return;
     setLocated(node.title);
+    setSuggestionsOpen(false);
     canvasRef.current?.locate(node.id);
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-72">
+        <div className="relative w-full sm:w-72">
           <input
             type="search"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true); }}
+            onFocus={() => setSuggestionsOpen(true)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && matches.length > 0) locate(matches[0]!.title);
+              if (event.key === "Escape") setSuggestionsOpen(false);
             }}
             placeholder="搜索词条定位节点…"
             aria-label="图谱节点搜索"
             data-testid="graph-search"
             className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus:border-ring"
           />
-          {matches.length > 0 && (
+          {suggestionsOpen && matches.length > 0 && (
             <ul
               className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-md border border-border bg-background shadow-lg"
               role="listbox"

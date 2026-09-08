@@ -8,10 +8,9 @@ import { getUnreadNotificationCount } from "@/lib/notifications";
 import { getSessionUser } from "@/lib/session";
 import type { UserRole } from "@/db/schema";
 
-// TODO(列表页工单): 诠释者列表页落地后替换占位链接；词条暂以首页词条列表为入口
 const navItems = [
-  { href: "/#terms", label: "词条" },
-  { href: "/", label: "诠释者" },
+  { href: "/terms", label: "词条" },
+  { href: "/interpreters", label: "诠释者" },
   { href: "/schools", label: "学派" },
   { href: "/categories", label: "分类" },
   { href: "/graph", label: "图谱" },
@@ -31,23 +30,23 @@ export async function SiteHeader() {
   const unreadCount = user ? await getUnreadNotificationCount(user.id) : 0;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+    <header className="z-40 border-b border-border bg-background/95 backdrop-blur lg:sticky lg:top-0">
       <div className="mx-auto flex min-h-14 w-full max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2">
         <Link href="/" className="shrink-0 text-lg font-bold tracking-tight">
           PhoskyWiki
         </Link>
-        <nav className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+        <nav aria-label="主导航" className="order-last flex w-full flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
           {navItems.map((item) => (
             <Link
               key={item.label}
               href={item.href}
-              className="transition-colors hover:text-foreground"
+              className="inline-flex min-h-10 items-center transition-colors hover:text-foreground"
             >
               {item.label}
             </Link>
           ))}
         </nav>
-        <div className="order-last w-full sm:order-none sm:w-64">
+        <div className="hidden sm:block sm:w-64">
           <SearchBox />
         </div>
         <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2 text-sm">

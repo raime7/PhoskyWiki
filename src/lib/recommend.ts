@@ -11,6 +11,8 @@ import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db";
 import { interpreters, pages, perspectives, termCategories } from "@/db/schema";
+import { listTerms } from "@/lib/content";
+import { expandInterestedInterpreters } from "@/lib/interests";
 import type { LocalGraphData } from "@/lib/graph-types";
 import { hasAnyInterest, type InterestSet } from "@/lib/interest-tags";
 
@@ -52,6 +54,39 @@ export async function listRelatedTerms(
   const neighborIds = [...weightByNeighbor.keys()];
   const nodesById = new Map(graph.nodes.map((node) => [node.id, node]));
 
+  const matches = await countInterestMatches(neighborIds, interests, interestedInterpreterIds);
+
+  return neighborIds
+    .flatMap((id) => {
+      const node = nodesById.get(id);
+      if (!node) return [];
+      return [
+        {
+          id,
+          title: node.title,
+          href: node.url,
+          commonRefCount: weightByNeighbor.get(id)!,
+          interestMatchCount:
+            matches.get(id) ?? 0,
+        },
+      ];
+    })
+    .sort(
+      (a, b) =>
+        b.interestMatchCount - a.interestMatchCount ||
+        b.commonRefCount - a.commonRefCount ||
+        a.id - b.id,
+    )
+    .slice(0, limit);
+}
+
+/** 首页和相关词条共用兴趣计分；候选词条由各入口先过滤为在线页面。 */
+async function countInterestMatches(
+  termIds: number[],
+  interests: InterestSet | null,
+  interestedInterpreterIds: ReadonlySet<number>,
+): Promise<Map<number, number>> {
+  if (termIds.length === 0) return new Map();
   const interpreterMatch = new Map<number, number>();
   const categoryMatch = new Map<number, number>();
   const personalized = interests !== null && hasAnyInterest(interests);
@@ -64,7 +99,7 @@ export async function listRelatedTerms(
         .from(termCategories)
         .where(
           and(
-            inArray(termCategories.termId, neighborIds),
+            inArray(termCategories.termId, termIds),
             inArray(termCategories.categoryId, interests.categories),
           ),
         )
@@ -82,7 +117,7 @@ export async function listRelatedTerms(
         .innerJoin(interpreterPages, eq(interpreterPages.id, interpreters.pageId))
         .where(
           and(
-            inArray(perspectives.termId, neighborIds),
+            inArray(perspectives.termId, termIds),
             inArray(perspectives.interpreterId, interpreterIds),
             isNull(perspectivePages.deletedAt),
             isNull(interpreterPages.deletedAt),
@@ -93,26 +128,19 @@ export async function listRelatedTerms(
     }
   }
 
-  return neighborIds
-    .flatMap((id) => {
-      const node = nodesById.get(id);
-      if (!node) return [];
-      return [
-        {
-          id,
-          title: node.title,
-          href: node.url,
-          commonRefCount: weightByNeighbor.get(id)!,
-          interestMatchCount:
-            (interpreterMatch.get(id) ?? 0) + (categoryMatch.get(id) ?? 0),
-        },
-      ];
-    })
-    .sort(
-      (a, b) =>
-        b.interestMatchCount - a.interestMatchCount ||
-        b.commonRefCount - a.commonRefCount ||
-        a.id - b.id,
-    )
+  return new Map(termIds.map((id) => [id, (interpreterMatch.get(id) ?? 0) + (categoryMatch.get(id) ?? 0)]));
+}
+
+/** 首页只展示命中账号兴趣的在线词条；没有命中时由 UI 引导调整兴趣。 */
+export async function listHomeRecommendations(interests: InterestSet, limit = 6) {
+  if (!hasAnyInterest(interests)) return [];
+  const [candidates, interpreterIds] = await Promise.all([
+    listTerms(), expandInterestedInterpreters(interests),
+  ]);
+  const matches = await countInterestMatches(candidates.map((term) => term.id), interests, interpreterIds);
+  return candidates
+    .map((term) => ({ ...term, interestMatchCount: matches.get(term.id) ?? 0 }))
+    .filter((term) => term.interestMatchCount > 0)
+    .sort((a, b) => b.interestMatchCount - a.interestMatchCount || a.id - b.id)
     .slice(0, limit);
 }
