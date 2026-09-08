@@ -10,6 +10,10 @@ import { getDb } from "@/db";
 import { pages, terms, perspectives, revisions, interpreters, user, discussionPosts, termCategories, categories, submissions, links } from "@/db/schema";
 import { GET as history } from "@/app/api/pages/[pageId]/history/route";
 import { GET as graph } from "@/app/api/graph/site/route";
+import { unified } from "unified";
+import remarkParse from "remark-parse";
+import remarkRehype from "remark-rehype";
+import rehypeStringify from "rehype-stringify";
 
 const execute = promisify(execFile);
 let directory: string;
@@ -43,8 +47,8 @@ beforeAll(async () => {
   }
   renamedTarget = await term("第三方新名");
   reusedNameTarget = await term("实际保留词条");
-  first = await perspective(kept, `哲学解释完整保留 [[合并测试（经济学）|经济解释@编委会]] [[合并测试（经济学）]] [普通站内链接](/term/old-${removed})`);
-  second = await perspective(removed, `经济解释完整保留 [[合并测试（哲学）]] [[第三方旧名]] [精确站内链接](/perspective/old-${first})`);
+  first = await perspective(kept, `哲学解释完整保留 [[合并测试（经济学）|经济解释@编委会]] [[合并测试（经济学）]] [普通站内链接](/term/old-${removed}) [转义链接](/term/old&#45;${removed}?a=1&amp;b=2)\n\n[哲学出处][ref]\n\n[ref]: /term/old-${removed}`);
+  second = await perspective(removed, `经济解释完整保留 [[合并测试（哲学）]] [[第三方旧名]] [精确站内链接](/perspective/old-${first})\n\n[经济出处][ref] [ref][] [ref]\n\n[ref]: /perspective/old-${first}`);
   // 等价于保存后目标改名、旧名被新来源复用：既有链接仍以原 id 为准。
   await getDb().insert(links).values([
     { sourcePageId: first, targetName: "合并测试（经济学）", targetPageId: reusedNameTarget },
@@ -80,6 +84,11 @@ it("运维预览不改变公开页面；归并保留正文历史、清理来源�
   expect(state.revisions[0].content).toContain("[[实际保留词条|合并测试（经济学）]]");
   expect(state.revisions[0].content).toContain(`/term/合并测试-${kept}`);
   expect(state.revisions[0].content).not.toContain(`/term/old-${removed}`);
+  const html = String(await unified().use(remarkParse).use(remarkRehype).use(rehypeStringify).process(state.revisions[0].content));
+  expect(html).toContain(`href="/term/${encodeURI(`合并测试-${kept}`)}">哲学出处</a>`);
+  expect(html).toContain(`href="/term/${encodeURI(`合并测试-${kept}`)}?a=1&#x26;b=2">转义链接</a>`);
+  expect(html).toContain(`href="/perspective/${encodeURI(`编委会论合并测试-${first}`)}">经济出处</a>`);
+  expect(html.match(new RegExp(`href="/perspective/${encodeURI(`编委会论合并测试-${first}`)}">ref</a>`, "g"))).toHaveLength(2);
   expect(state.revisions.at(-1).content).toContain("哲学解释完整保留");
   const network = await (await graph()).json();
   expect(network.nodes.filter((node: { title: string }) => node.title.startsWith("合并测试"))).toMatchObject([{ id: kept, title: "合并测试", perspectiveCount: 1 }]);

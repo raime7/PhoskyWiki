@@ -14,8 +14,30 @@ export interface PreparedContent {
   targets: Map<string, number | null>;
 }
 
+/** AST 的 url 已解码，须按原始 Markdown 目的地址边界替换，而非搜索解码后的文字。 */
+function destinationRange(raw: string, node: Node, start: number) {
+  const lastChildEnd = (node as Parent).children?.at(-1)?.position?.end.offset;
+  const definition = /^\[(?:\\.|[^\]\\])*\]:/.exec(raw);
+  let from = node.type === "definition" ? definition?.[0].length ?? -1 : raw.indexOf("](", lastChildEnd === undefined ? 0 : lastChildEnd - start) + 2;
+  if (from < 2) return null;
+  while (/\s/.test(raw[from] ?? "") && from < raw.length) from++;
+  const angled = raw[from] === "<";
+  let depth = 0;
+  for (let end = from + Number(angled); end < raw.length; end++) {
+    if (raw[end] === "\\") { end++; continue; }
+    if (angled) {
+      if (raw[end] === ">") return { from, to: end + 1 };
+    } else {
+      if ((raw[end] === ")" && depth === 0) || /\s/.test(raw[end])) return { from, to: end };
+      if (raw[end] === "(") depth++;
+      if (raw[end] === ")") depth--;
+    }
+  }
+  return angled ? null : { from, to: raw.length };
+}
+
 /** 在删来源之前按已解析 id 规范化每份正文，避免来源之间的同名键互相抢占。 */
-export async function prepareConsolidationLinks(tx: Tx, ids: Map<number, number>, titles: Map<number, string>, names: Map<string, string>, removed: Set<number>) {
+export async function prepareConsolidationLinks(tx: Tx, ids: Map<number, number>, titles: Map<number, string>, names: Map<string, string>, removed: Set<number>, combinedSources: Set<number>) {
   const inventory = await tx.select().from(pages);
   const byId = new Map(inventory.map(page => [page.id, page]));
   const memberships = new Map((await tx.select().from(perspectives)).map(p => [p.pageId, p]));
@@ -40,6 +62,11 @@ export async function prepareConsolidationLinks(tx: Tx, ids: Map<number, number>
     const tree = markdownParser().parse(head.content);
     const replacements: { start: number; end: number; value: string }[] = [];
     const targets = new Map<string, number | null>();
+    const referenceNames = new Map<string, string>();
+    const referenceName = (identifier: string) => {
+      if (!referenceNames.has(identifier)) referenceNames.set(identifier, `source-${head.pageId}-ref-${referenceNames.size + 1}`);
+      return referenceNames.get(identifier)!;
+    };
     visitWikiLinks(tree, node => {
       const ref = parseWikiLink(node.value, node.data?.alias ?? null);
       const start = node.position?.start.offset, end = node.position?.end.offset;
@@ -57,10 +84,25 @@ export async function prepareConsolidationLinks(tx: Tx, ids: Map<number, number>
       if (value !== head.content.slice(start, end)) replacements.push({ start, end, value });
     });
     const visit = (node: Node) => {
+      // Markdown 定义的作用域是整篇正文；合并来源必须隔离标记，保留各章原目标。
+      if (combinedSources.has(head.pageId) && "identifier" in node && typeof node.identifier === "string") {
+        const start = node.position?.start.offset, end = node.position?.end.offset;
+        if (start !== undefined && end !== undefined) {
+          const raw = head.content.slice(start, end);
+          const name = referenceName(node.identifier);
+          if (node.type === "definition") {
+            const label = /^\[(?:\\.|[^\]\\])*\]:/.exec(raw);
+            if (label) replacements.push({ start, end: start + label[0].length - 1, value: `[${name}]` });
+          } else if (node.type === "linkReference" || node.type === "imageReference") {
+            const label = "referenceType" in node && node.referenceType !== "shortcut" ? /\[(?:\\.|[^\]\\])*\]$/.exec(raw) : null;
+            replacements.push({ start: label ? end - label[0].length : end, end, value: `[${name}]` });
+          }
+        }
+      }
       if ((node.type === "link" || node.type === "definition") && "url" in node && typeof node.url === "string") {
         let path = node.url;
         let origin = "";
-        if (/^https?:\/\//.test(path)) {
+        if (/^https?:\/\//.test(path) && URL.canParse(path)) {
           const url = new URL(path);
           if (url.origin === new URL(process.env.BETTER_AUTH_URL ?? "http://localhost:3000").origin) {
             origin = url.origin;
@@ -76,9 +118,8 @@ export async function prepareConsolidationLinks(tx: Tx, ids: Map<number, number>
           const title = titles.get(page.id);
           const url = origin + pagePath(page.type, title ? slugify(title) : page.slug, page.id) + match[3];
           const raw = head.content.slice(start, end);
-          const delimiter = node.type === "definition" ? raw.indexOf("]:") : raw.indexOf("](");
-          const offset = raw.indexOf(node.url, delimiter + 2);
-          if (offset >= 0 && url !== node.url) replacements.push({ start: start + offset, end: start + offset + node.url.length, value: url });
+          const range = destinationRange(raw, node, start);
+          if (range && url !== node.url) replacements.push({ start: start + range.from, end: start + range.to, value: `<${url.replaceAll("&", "&amp;").replaceAll("<", "%3C").replaceAll(">", "%3E").replaceAll("\\", "%5C")}>` });
         }
       }
       for (const child of (node as Parent).children ?? []) visit(child);

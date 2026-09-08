@@ -94,7 +94,8 @@ export async function consolidateMvp(apply = false, groups = mvpMergeGroups) {
       const keepId = planned.merges.find(g => g.title === old.title)?.keepId ?? term?.id;
       if (keepId !== undefined && !planned.removeIds.includes(keepId)) ids.set(old.id, keepId);
     }
-    const prepared = await prepareConsolidationLinks(tx, ids, titles, names, new Set(planned.removeIds));
+    const combinedSources = new Set(planned.merges.flatMap(group => group.perspectives.filter(p => p.items.length > 1).flatMap(p => p.items.map(item => item.pageId))));
+    const prepared = await prepareConsolidationLinks(tx, ids, titles, names, new Set(planned.removeIds), combinedSources);
     const combined = new Set<number>();
     if (planned.removedPosts.length) {
       // 被删楼层下的公开回复提升为楼层，保留文字；不复活被删除正文。
