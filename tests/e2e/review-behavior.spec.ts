@@ -50,9 +50,9 @@ async function history(request: APIRequestContext, pageId: number) {
   return response.json() as Promise<{ revisions: { id: number; content: string }[] }>;
 }
 
-async function edit(request: APIRequestContext, pageId: number, content: string, supersedes?: number) {
+async function edit(request: APIRequestContext, pageId: number, content: string) {
   const base = (await history(request, pageId)).revisions[0].id;
-  return submit(request, { kind: "edit", pageId, content, baseRevisionId: base, supersedes });
+  return submit(request, { kind: "edit", pageId, content, baseRevisionId: base });
 }
 
 async function fixture(request: APIRequestContext) {
@@ -132,8 +132,13 @@ test("队列显示票数、批准者、过期基准与两侧 diff；提交详情
   await detail(page, staleProposal.submissionId, "已驳回");
   await expect(page.locator("main")).toContainText("重新提交");
 
-  // 以同一提交者身份修改重提。
-  const retried = await edit(page.request, source.perspective.pageId, "补充论据后的重提版本。", fresh.submissionId);
+  // 原提案之后 head 已推进：读最新版并明确确认整理结果，不能只静默替换 base。
+  const latest = (await history(page.request, source.perspective.pageId)).revisions[0];
+  expect(latest.content).toBe("再次直编，不进入审核队列。");
+  const retried = await submit(page.request, {
+    kind: "edit", pageId: source.perspective.pageId, content: "补充论据后的重提版本。",
+    baseRevisionId: latest.id, confirmedBaseRevisionId: latest.id, supersedes: fresh.submissionId,
+  });
   expect(retried.submissionId).not.toBe(fresh.submissionId);
   expect(await review(request, retried.submissionId, "approve")).toEqual({ outcome: "approved" });
   await detail(page, retried.submissionId, "已受理");
