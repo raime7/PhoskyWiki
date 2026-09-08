@@ -6,18 +6,17 @@
 //   全量替换，并把结果镜像回 localStorage（登出后本设备仍是同一份，
 //   用户故事 23「随账号同步」）。
 // 本地兴趣经 useGuestInterests 读取（外部存储快照，水合后可用）；
-// 用户一旦改过选择（edited 非空）即以编辑为准，不再跟随快照重算。
+// 账号编辑优先于快照；游客成功写入后继续订阅，以响应后续跨标签页修改。
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { useGuestInterests } from "@/lib/guest-interest-store";
+import { persistGuestInterests, useGuestInterests } from "@/lib/guest-interest-store";
 import {
   EMPTY_INTEREST_SET,
   mergeInterestSets,
   sameInterestSet,
-  writeGuestInterests,
   type InterestSet,
 } from "@/lib/interest-tags";
 
@@ -78,7 +77,9 @@ export function InterestTagManager({
     setSavedAt(null);
     if (!isAccount) {
       // 游客即改即存，无保存按钮
-      writeGuestInterests(window.localStorage, next);
+      const saved = persistGuestInterests(next);
+      if (saved) setEdited(null);
+      setError(saved ? null : "浏览器无法保存兴趣，当前选择暂留本页。请允许本地存储后重试。");
     }
   }
 
@@ -99,7 +100,7 @@ export function InterestTagManager({
       setEdited(data.interests);
       setSavedAt(new Date().toLocaleTimeString());
       // 镜像到本浏览器：登出后本设备仍保留同一份（下次登录也以此为并入基线）
-      writeGuestInterests(window.localStorage, data.interests);
+      persistGuestInterests(data.interests);
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存失败，请稍后再试");
     } finally {
@@ -155,13 +156,16 @@ export function InterestTagManager({
           )}
         </div>
       ) : (
-        <p data-testid="guest-storage-hint" className="text-sm text-muted-foreground">
-          改动即保存在本浏览器；
-          <Link href="/login" className="text-foreground underline-offset-4 hover:underline">
-            登录
-          </Link>
-          后可同步到账号。
-        </p>
+        <div>
+          <p data-testid="guest-storage-hint" className="text-sm text-muted-foreground">
+            改动即保存在本浏览器；
+            <Link href="/login" className="text-foreground underline-offset-4 hover:underline">
+              登录
+            </Link>
+            后可同步到账号。
+          </p>
+          {error && <p role="status" className="text-sm text-destructive">{error}</p>}
+        </div>
       )}
     </div>
   );

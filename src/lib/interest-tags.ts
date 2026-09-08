@@ -144,7 +144,7 @@ export type ParsedInterestBody =
  * （省略 = 清空该类），在场则必须是正整数数组；去重后不得超过每类上限。
  */
 export function parseInterestRequestBody(body: unknown): ParsedInterestBody {
-  if (typeof body !== "object" || body === null) {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
     return { ok: false, error: "请求体必须是 JSON 对象" };
   }
   const source = body as Record<string, unknown>;

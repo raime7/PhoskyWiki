@@ -278,6 +278,19 @@ export async function getLocalGraph(
   termId: number,
   hops: 1 | 2,
 ): Promise<LocalGraphData | null> {
+  return readLocalGraph(termId, hops, MAX_LOCAL_NODES);
+}
+
+/** 推荐在完整一跳候选集上计分，不能使用图谱的显示上限。 */
+export async function getDiscoveryGraph(termId: number): Promise<LocalGraphData | null> {
+  return readLocalGraph(termId, 1, Infinity);
+}
+
+async function readLocalGraph(
+  termId: number,
+  hops: 1 | 2,
+  maxNodes: number,
+): Promise<LocalGraphData | null> {
   const [term] = await getDb()
     .select({ id: pages.id })
     .from(pages)
@@ -309,11 +322,11 @@ export async function getLocalGraph(
   }
 
   const kept =
-    depth.size <= MAX_LOCAL_NODES
+    depth.size <= maxNodes
       ? [...depth.keys()]
       : [termId, ...[...depth.entries()].filter(([id]) => id !== termId)
           .sort((a, b) => a[1] - b[1])
-          .slice(0, MAX_LOCAL_NODES - 1)
+          .slice(0, maxNodes - 1)
           .map(([id]) => id)];
   const keptSet = new Set(kept);
 

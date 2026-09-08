@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { PinControl } from "@/components/pin-control";
-import { useGuestInterests } from "@/lib/guest-interest-store";
 import { reorderPerspectivesByInterest } from "@/lib/interest-tags";
 
 export interface PerspectiveListProps {
@@ -23,8 +22,7 @@ export interface PerspectiveListProps {
   isAdmin?: boolean;
   /**
    * 服务端（登录态）兴趣重排用的诠释者 id 集：items 已按它排好，这里幂等地
-   * 再排一次即可；null/undefined = 游客路径，读本浏览器 localStorage 的兴趣重排
-   * （只看直接选择的诠释者——学派→成员的展开要查库，登录路径在服务端做）。
+   * 再排一次即可；游客和账号均由发现模块提供经过有效对象过滤与学派展开的集合。
    */
   interestInterpreterIds?: number[] | null;
 }
@@ -34,8 +32,7 @@ const DEFAULT_VISIBLE = 5;
 
 export function PerspectiveList({ items, isAdmin, interestInterpreterIds = null }: PerspectiveListProps) {
   const [expanded, setExpanded] = useState(false);
-  const guest = useGuestInterests();
-  const interestedIds = interestInterpreterIds ?? guest?.interpreters ?? null;
+  const interestedIds = interestInterpreterIds;
 
   // 编委会 → 置顶 → 兴趣诠释者 → 其余；组内保持传入序（服务端已按热度排好）
   const ordered = useMemo(() => {

@@ -1,5 +1,5 @@
 // 保存当前用户的兴趣标签（T12）：PUT 全量替换。任何登录角色可写自己的；
-// 游客 401——游客的兴趣只存浏览器 localStorage，不经服务端（用户故事 22/23）。
+// 游客 401——游客的兴趣只存浏览器 localStorage，发现接口仅做匿名只读计算。
 
 import { auth } from "@/lib/auth";
 import { saveInterestTags } from "@/lib/interests";

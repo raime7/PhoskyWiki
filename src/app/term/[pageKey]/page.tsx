@@ -7,8 +7,7 @@ import type { Metadata } from "next";
 import { BacklinkPanel } from "@/components/backlink-panel";
 import { Infobox, InfoboxLinks, WikiContent } from "@/components/wiki-content";
 import { LocalGraph } from "@/components/local-graph";
-import { PerspectiveList } from "@/components/perspective-list";
-import { RelatedTermsPanel } from "@/components/related-terms";
+import { TermDiscoveryPanel } from "@/components/term-discovery";
 import {
   getTermDetail,
   getTermDisambiguation,
@@ -21,10 +20,9 @@ import {
 import { categoryPath } from "@/lib/categories";
 import { countDiscussionPosts } from "@/lib/discussion";
 import { getLocalGraph } from "@/lib/graph";
-import { getInterestTags, expandInterestedInterpreters } from "@/lib/interests";
-import { hasAnyInterest, reorderPerspectivesByInterest } from "@/lib/interest-tags";
+import { getInterestTags } from "@/lib/interests";
 import { renderMarkdown, wikiLinkResolver } from "@/lib/markdown";
-import { listRelatedTerms } from "@/lib/recommend";
+import { getTermDiscovery } from "@/lib/term-discovery";
 import { pageIdFromKey, pageKey, pagePath } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
 import { getSessionUser } from "@/lib/session";
@@ -56,23 +54,10 @@ export default async function TermPage({ params }: Params) {
       countDiscussionPosts(page.id),
     ]);
   const board = perspectives.find((p) => p.isBoard);
-  const others = perspectives.filter((p) => !p.isBoard);
 
-  // 兴趣个性化（T12）：登录用户读账号兴趣（游客无服务端兴趣，客户端读 localStorage）。
-  // 相关词条与视角重排共用同一份展开，不重复查询。
   const interests = sessionUser ? await getInterestTags(sessionUser.id) : null;
-  const interestedInterpreterIds =
-    interests && hasAnyInterest(interests)
-      ? await expandInterestedInterpreters(interests)
-      : new Set<number>();
-  const relatedTerms = localGraph
-    ? await listRelatedTerms(localGraph, interests, interestedInterpreterIds)
-    : [];
-  // 服务端预排（登录态 SSR 即个性化）；游客保持默认序，水合后客户端再排
-  const orderedOthers =
-    interestedInterpreterIds.size > 0
-      ? reorderPerspectivesByInterest(others, interestedInterpreterIds)
-      : others;
+  const discovery = await getTermDiscovery(page.id, interests);
+  if (!discovery) notFound();
 
   const [boardContent, boardTargets] = board
     ? await Promise.all([getHeadContent(board.pageId), getWikiLinkTargets(board.pageId)])
@@ -143,47 +128,12 @@ export default async function TermPage({ params }: Params) {
             </section>
           )}
 
-          <section aria-labelledby="perspectives-heading" className="mt-12">
-            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-              <h2 id="perspectives-heading" className="text-xl font-semibold">
-                诠释者视角（{others.length}）
-              </h2>
-              {sessionUser && (
-                <Link
-                  href={`/new/perspective?term=${page.id}`}
-                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                >
-                  撰写视角 +
-                </Link>
-              )}
-            </div>
-            {others.length > 0 ? (
-              <PerspectiveList
-                isAdmin={sessionUser?.role === "admin"}
-                interestInterpreterIds={sessionUser ? [...interestedInterpreterIds] : null}
-                items={orderedOthers.map((p) => ({
-                  pageId: p.pageId,
-                  title: p.title,
-                  href: pagePath("perspective", p.slug, p.pageId),
-                  interpreterId: p.interpreterId,
-                  interpreterName: p.interpreterName,
-                  interpreterHref: pagePath(
-                    "interpreter",
-                    p.interpreterSlug,
-                    p.interpreterId,
-                  ),
-                  pinned: p.pinned,
-                  linkCount: p.linkCount,
-                }))}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                该词条暂无其他诠释者的视角。
-              </p>
-            )}
-          </section>
-
-          <RelatedTermsPanel items={relatedTerms} />
+          <TermDiscoveryPanel
+            termId={page.id}
+            initial={discovery}
+            guest={!sessionUser}
+            isAdmin={sessionUser?.role === "admin"}
+          />
 
           <BacklinkPanel items={backlinks} />
 

@@ -50,11 +50,13 @@ async function existingCategoryIds(ids: number[]): Promise<number[]> {
 }
 
 /** 过滤到在线目标并取规范形态（读与写共用同一口径）。 */
-async function filterLiveInterests(set: InterestSet): Promise<InterestSet> {
+export async function filterLiveInterests(set: InterestSet): Promise<InterestSet> {
+  // PostgreSQL 页面/分类 id 是 int4；超出范围的旧选择等价于不存在。
+  const ids = (values: number[]) => values.filter((id) => id <= 2_147_483_647);
   const [interpretersLive, schoolsLive, categoriesLive] = await Promise.all([
-    liveInterpreterIds(set.interpreters),
-    liveSchoolIds(set.schools),
-    existingCategoryIds(set.categories),
+    liveInterpreterIds(ids(set.interpreters)),
+    liveSchoolIds(ids(set.schools)),
+    existingCategoryIds(ids(set.categories)),
   ]);
   return normalizeInterestSet({
     interpreters: interpretersLive,
