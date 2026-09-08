@@ -3,10 +3,11 @@ import "server-only";
 import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pages, revisions } from "@/db/schema";
-import { applyContentChange, lockLivePage, ReviewError, type Actor } from "@/lib/review";
+import { applyContentChange, applyTermMetadataChange, isUniqueViolation, lockLivePage, ReviewError, type Actor } from "@/lib/review";
 import { queueSearchSync, transactionWithSearchSync } from "@/lib/search/search-sync";
 import { diffLines } from "@/lib/diff";
 import { getLivePage } from "@/lib/content";
+import { compareTermMetadata, legacyTermHistoryNote } from "@/lib/revision-snapshot";
 
 export function historyId(value: unknown): number {
   if (typeof value !== "string" && typeof value !== "number") {
@@ -36,18 +37,33 @@ export function compareRevisions(history: Awaited<ReturnType<typeof getPageHisto
   const from = history.revisions.find((revision) => revision.id === fromId);
   const to = history.revisions.find((revision) => revision.id === toId);
   if (!from || !to) throw new ReviewError(404, "修订不存在或不属于此页面");
-  return { from, to, rows: diffLines(from.content, to.content) };
+  if (history.page.type === "term") {
+    return {
+      kind: "term" as const, from, to,
+      metadataRows: from.snapshot && to.snapshot ? compareTermMetadata(from.snapshot, to.snapshot) : null,
+      limitation: from.snapshot && to.snapshot ? null : legacyTermHistoryNote,
+    };
+  }
+  return { kind: "content" as const, from, to, rows: diffLines(from.content, to.content) };
 }
 
 export async function rollbackPage(pageId: number, revisionId: number, actor: Actor) {
   if (actor.role !== "admin") throw new ReviewError(403, "需要管理员角色");
   return transactionWithSearchSync(getDb(), async (tx) => {
-    await lockLivePage(tx, pageId);
+    const page = await lockLivePage(tx, pageId);
     const [target] = await tx.select().from(revisions)
       .where(and(eq(revisions.pageId, pageId), eq(revisions.id, revisionId)));
     if (!target) throw new ReviewError(404, "修订不存在或不属于此页面");
-    const id = await applyContentChange(tx, pageId, target.content, target.id);
+    if (page.type === "term" && !target.snapshot) {
+      throw new ReviewError(409, legacyTermHistoryNote);
+    }
+    const id = page.type === "term" && target.snapshot
+      ? await applyTermMetadataChange(tx, pageId, target.snapshot, target.id, { createdBy: actor.id })
+      : await applyContentChange(tx, pageId, target.content, target.id, { createdBy: actor.id });
     return { revisionId: id };
+  }).catch((error: unknown) => {
+    if (isUniqueViolation(error)) throw new ReviewError(409, "回滚失败：历史标题已存在于另一词条，当前词条信息保持不变。");
+    throw error;
   });
 }
 

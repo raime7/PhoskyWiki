@@ -2,11 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageAction } from "@/components/page-action";
 import { RevisionDiff } from "@/components/revision-diff";
+import { TermMetadataDiff } from "@/components/term-metadata-diff";
 import { Button } from "@/components/ui/button";
 import { compareRevisions, getPageHistory, historyId } from "@/lib/history";
 import { ReviewError } from "@/lib/review";
 import { getSessionUser } from "@/lib/session";
 import { pagePath } from "@/lib/slug";
+import { legacyTermHistoryNote, revisionSourceLabels } from "@/lib/revision-snapshot";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "修订历史" };
@@ -52,7 +54,11 @@ export default async function HistoryPage({ params, searchParams }: {
         </form>
         {comparison && <section aria-label="修订对比" className="mb-8">
           <h2 className="mb-3 text-xl font-semibold">修订 #{comparison.from.id} → #{comparison.to.id}</h2>
-          <RevisionDiff oldText={comparison.from.content} newText={comparison.to.content} />
+          {comparison.kind === "term"
+            ? comparison.from.snapshot && comparison.to.snapshot
+              ? <TermMetadataDiff from={comparison.from.snapshot} to={comparison.to.snapshot} fromLabel="起始修订" toLabel="目标修订" />
+              : <p className="text-muted-foreground">无法比较词条信息：{comparison.limitation}</p>
+            : <RevisionDiff oldText={comparison.from.content} newText={comparison.to.content} />}
         </section>}
         <ol aria-label="全部修订" className="divide-y divide-border">
           {revisions.map((revision, index) => <li key={revision.id} className="py-4" data-testid="history-revision">
@@ -60,10 +66,22 @@ export default async function HistoryPage({ params, searchParams }: {
               <strong>修订 #{revision.id}</strong>
               <time dateTime={revision.createdAt.toISOString()}>{revision.createdAt.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}</time>
               {index === 0 && <span className="text-sm text-muted-foreground">当前修订</span>}
+              <span>{revisionSourceLabels[revision.source]}</span>
               {revision.rollbackFromId && <span>回滚自 #{revision.rollbackFromId}</span>}
-              {isAdmin && !page.deletedAt && <PageAction pageId={page.id} action="rollback" revisionId={revision.id} />}
+              {isAdmin && !page.deletedAt && (page.type !== "term" || revision.snapshot) && <PageAction pageId={page.id} action="rollback" revisionId={revision.id} />}
             </div>
-            <details className="mt-2"><summary className="cursor-pointer text-sm">查看修订正文</summary><pre className="mt-2 whitespace-pre-wrap break-words rounded bg-muted p-3 text-sm">{revision.content}</pre></details>
+            {page.type === "term" && revision.snapshot
+              ? <details className="mt-2"><summary className="cursor-pointer text-sm">查看词条信息快照</summary>
+                <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded bg-muted p-3 text-sm">
+                  <dt>标题</dt><dd className="min-w-0 whitespace-pre-wrap break-words">{revision.snapshot.title}</dd>
+                  <dt>简介</dt><dd className="min-w-0 whitespace-pre-wrap break-words">{revision.snapshot.summary || "（空）"}</dd>
+                  <dt>别名</dt><dd className="min-w-0 whitespace-pre-wrap break-words">{revision.snapshot.aliases.length ? revision.snapshot.aliases.map((alias, i) => <div key={i}>{alias}</div>) : "（空）"}</dd>
+                </dl>
+              </details>
+              : <>
+                {page.type === "term" && <p className="mt-2 text-sm text-muted-foreground">{legacyTermHistoryNote}</p>}
+                <details className="mt-2"><summary className="cursor-pointer text-sm">查看修订正文</summary><pre className="mt-2 whitespace-pre-wrap break-words rounded bg-muted p-3 text-sm">{revision.content}</pre></details>
+              </>}
           </li>)}
         </ol>
       </> : <p className="mt-6 text-muted-foreground">此页面暂无正文修订。</p>}

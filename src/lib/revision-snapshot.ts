@@ -9,6 +9,13 @@ export interface TermSnapshot {
 
 export type RevisionSource = "legacy" | "baseline" | "create" | "approval" | "direct" | "rollback";
 
+export const revisionSourceLabels: Record<RevisionSource, string> = {
+  legacy: "旧历史（来源未记录）", baseline: "起始快照（当时的词条信息）", create: "新建",
+  approval: "普通受理", direct: "管理员直编", rollback: "回滚",
+};
+
+export const legacyTermHistoryNote = "此旧修订未保存词条信息快照，无法恢复标题、简介和别名；历史正文仍可查看。";
+
 export function termSnapshot(value: { title: string; summary: string; aliases: string[] }): TermSnapshot {
   return { version: 1, type: "term", title: value.title, summary: value.summary, aliases: [...value.aliases] };
 }
