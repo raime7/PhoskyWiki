@@ -23,6 +23,7 @@ skills-lock.json
 
 # production
 /build
+/deploy/secrets/
 
 # misc
 .DS_Store

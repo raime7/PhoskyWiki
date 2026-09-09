@@ -1,0 +1,25 @@
+# Dedicated disposable services for the legacy test suite, never production volumes.
+name: phoskywiki-tests
+services:
+  postgres:
+    image: postgres:18.3-alpine3.23@sha256:54451ecb8ab38c24c3ec123f2fd501303a3a1856a5c66e98cecf2460d5e1e9d7
+    environment:
+      POSTGRES_USER: phosky
+      POSTGRES_PASSWORD: phosky
+      POSTGRES_DB: phoskywiki_test
+    ports: ["127.0.0.1:55435:5432"]
+    tmpfs: ["/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phosky -d phoskywiki_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  meilisearch:
+    image: getmeili/meilisearch:v1.15.0@sha256:1bb4bc096c7467ccb5db77bc0bc584c21623ecfc6f8f27e9802f67f809f30333
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: isolated-test-meili-master-key
+      MEILI_MAX_INDEXING_MEMORY: 128Mb
+      MEILI_MAX_INDEXING_THREADS: "1"
+    ports: ["127.0.0.1:57735:7700"]
+    tmpfs: ["/meili_data"]

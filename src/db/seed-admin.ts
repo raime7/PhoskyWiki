@@ -11,7 +11,8 @@ import { getDb } from "@/db";
 import { account, user } from "@/db/schema";
 
 /** 与 better-auth 的 createLocalAccountIssuer("credential") 一致（账号表命名空间） */
-export const CREDENTIAL_ISSUER = "local:credential";
+import { CREDENTIAL_ISSUER } from "@/lib/credential";
+export { CREDENTIAL_ISSUER } from "@/lib/credential";
 
 export interface SeedAdminResult {
   email: string;
@@ -27,6 +28,9 @@ export async function seedAdminAccount(overrides?: {
   email?: string;
   password?: string;
 }): Promise<SeedAdminResult> {
+  if (process.env.NODE_ENV === "production" || process.env.PHOSKYWIKI_ENV === "production") {
+    throw new Error("Demo seed is forbidden in production; use ops:production bootstrap");
+  }
   const email = (
     overrides?.email ?? process.env.SEED_ADMIN_EMAIL ?? "admin@phoskywiki.local"
   ).toLowerCase();

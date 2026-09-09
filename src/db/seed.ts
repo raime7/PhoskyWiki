@@ -378,6 +378,9 @@ export async function seedDatabase(): Promise<{
   categories: number;
   links: { resolved: number; red: number };
 }> {
+  if (process.env.NODE_ENV === "production" || process.env.PHOSKYWIKI_ENV === "production") {
+    throw new Error("Demo seed is forbidden in production; use ops:production bootstrap");
+  }
   const db = getDb();
   await db.execute(
     sql`truncate table ${termDiscussions}, ${discussionPosts}, ${submissionVotes}, ${submissions}, ${links}, ${revisions}, ${perspectives}, ${termCategories}, ${categories}, ${schoolMembers}, ${schools}, ${interpreters}, ${terms}, ${pages} restart identity cascade`,

@@ -1,4 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
+import "dotenv/config";
+import { assertIsolatedTestEnvironment } from "./tests/isolated-environment";
+
+assertIsolatedTestEnvironment();
+process.env.MEILI_HOST = process.env.E2E_MEILI_HOST ?? "";
 
 // 本地可用 PW_PORT 换端口起被测服务器（例如同机并行跑多份检出时避免占用 3000）
 const PORT = Number(process.env.PW_PORT ?? 3000);
@@ -28,10 +33,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // CI 用产物服务器（前置 build），本地默认起 dev server；已有服务器则复用
+    // Never reuse a server whose database/storage identity the runner cannot verify.
     command: process.env.CI ? "pnpm start" : `pnpm dev --port ${PORT}`,
     url: `${baseURL}/`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     stdout: "ignore",
     timeout: 120_000,
   },

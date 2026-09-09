@@ -1,0 +1,10 @@
+{
+    admin off
+    auto_https off
+}
+
+:8080 {
+    # Preserve Next's streaming and cache headers. No access log (URLs can
+    # carry authentication capabilities); no shared response cache.
+    reverse_proxy app:3000
+}

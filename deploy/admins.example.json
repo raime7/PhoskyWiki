@@ -1,0 +1,4 @@
+[
+  { "name": "管理员一", "email": "first@example.com", "password": "REPLACE_IN_PROTECTED_FILE" },
+  { "name": "管理员二", "email": "second@example.com", "password": "REPLACE_IN_PROTECTED_FILE" }
+]

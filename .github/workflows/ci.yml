@@ -9,26 +9,26 @@ jobs:
     name: lint + typecheck + vitest
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgres://phosky:phosky@localhost:5432/phoskywiki
+      DATABASE_URL: postgres://phosky:phosky@localhost:5432/phoskywiki_test
       BETTER_AUTH_SECRET: ci-better-auth-secret-0123456789abcdef0123456789abcdef
       # 契约测试（search-meili.contract.test.ts）打这个真 Meili；主缝测试用 fake 不受影响
       MEILI_MASTER_KEY: ci-meili-master-key
     services:
       postgres:
-        image: postgres:18-alpine
+        image: postgres:18.3-alpine3.23@sha256:54451ecb8ab38c24c3ec123f2fd501303a3a1856a5c66e98cecf2460d5e1e9d7
         env:
           POSTGRES_USER: phosky
           POSTGRES_PASSWORD: phosky
-          POSTGRES_DB: phoskywiki
+          POSTGRES_DB: phoskywiki_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U phosky -d phoskywiki"
+          --health-cmd "pg_isready -U phosky -d phoskywiki_test"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 12
       meilisearch:
-        image: getmeili/meilisearch:v1.15.0
+        image: getmeili/meilisearch:v1.15.0@sha256:1bb4bc096c7467ccb5db77bc0bc584c21623ecfc6f8f27e9802f67f809f30333
         env:
           MEILI_ENV: development
           MEILI_MASTER_KEY: ci-meili-master-key
@@ -44,7 +44,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.14.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
@@ -56,21 +56,21 @@ jobs:
     name: playwright
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgres://phosky:phosky@localhost:5432/phoskywiki
+      DATABASE_URL: postgres://phosky:phosky@localhost:5432/phoskywiki_test
       # 一次性 CI 库用的签名密钥；种子管理员密码每次运行随机生成，不进仓库
       BETTER_AUTH_SECRET: ci-better-auth-secret-0123456789abcdef0123456789abcdef
       BETTER_AUTH_URL: http://localhost:3000
     services:
       postgres:
-        image: postgres:18-alpine
+        image: postgres:18.3-alpine3.23@sha256:54451ecb8ab38c24c3ec123f2fd501303a3a1856a5c66e98cecf2460d5e1e9d7
         env:
           POSTGRES_USER: phosky
           POSTGRES_PASSWORD: phosky
-          POSTGRES_DB: phoskywiki
+          POSTGRES_DB: phoskywiki_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U phosky -d phoskywiki"
+          --health-cmd "pg_isready -U phosky -d phoskywiki_test"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 12
@@ -79,7 +79,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.14.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium

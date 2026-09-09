@@ -28,9 +28,12 @@ pnpm dev            # http://localhost:3000
 
 ## 测试
 
+先按[隔离验证说明](docs/production.md#隔离验证)启动 `compose.test.yml` 并显式设置以 `_test` 结尾的 `DATABASE_URL`。测试会重灌数据，不使用本地站点库。
+
 ```bash
-pnpm test           # Vitest：单元 + 集成（集成测试连真实 PG，需先 docker compose up；内容集成测试自灌种子）
-pnpm test:e2e       # Playwright：真实浏览器（自动起 dev server，已有则复用；依赖 pnpm db:seed 的演示内容）
+pnpm test           # Vitest：单元 + 集成，连接隔离 PostgreSQL
+pnpm test:e2e       # Playwright：启动独立服务器，需先在测试库中 db:seed，不复用已有服务器
+pnpm test:containers # 真实生产镜像、随机项目/卷、浏览器与持久性验收
 pnpm lint           # ESLint
 pnpm typecheck      # tsc --noEmit
 ```
@@ -61,7 +64,7 @@ CI（GitHub Actions）在每次 push 时跑 lint + typecheck + Vitest + Playwrig
 
 - 角色枚举 `user_role`：`editor`（注册默认）/ `admin`（受理提交等管理权限，随 T06 落地）/ `trusted`（二期免审编者预留位）；
 - 端点挂载在 `/api/auth/*`（better-auth 全套路由）；页头右侧展示登录态与登出按钮；
-- 管理员由 `pnpm db:seed` 灌入，凭据走 `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` 环境变量，不进仓库。
+- 开发演示管理员由 `pnpm db:seed` 灌入；生产使用独立的安全初始化入口，见[生产容器与初始化手册](docs/production.md)。生产禁止运行演示 seed。
 
 ## 修订历史与页面恢复（T08）
 

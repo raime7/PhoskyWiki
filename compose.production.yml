@@ -1,0 +1,126 @@
+name: phoskywiki
+
+x-common: &common
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  postgres:
+    <<: *common
+    image: postgres:18.3-alpine3.23@sha256:54451ecb8ab38c24c3ec123f2fd501303a3a1856a5c66e98cecf2460d5e1e9d7
+    # Official entrypoint starts as root only to initialize volume ownership,
+    # then execs postgres as the image's postgres user.
+    user: "0:0"
+    environment:
+      POSTGRES_USER: phosky
+      POSTGRES_DB: phoskywiki
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres-password
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ${SECRETS_DIR:?set absolute SECRETS_DIR}/postgres-password:/run/secrets/postgres-password:ro
+    networks: [backend]
+    mem_limit: 384m
+    shm_size: 128m
+    command: ["postgres", "-c", "shared_buffers=96MB", "-c", "max_connections=40", "-c", "work_mem=2MB"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phosky -d phoskywiki"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+  meilisearch:
+    <<: *common
+    image: getmeili/meilisearch:v1.15.0@sha256:1bb4bc096c7467ccb5db77bc0bc584c21623ecfc6f8f27e9802f67f809f30333
+    # This image runs as root to create its named volume; it has no host mounts
+    # other than the read-only key and no exposed host port.
+    user: "0:0"
+    environment:
+      MEILI_ENV: production
+      MEILI_NO_ANALYTICS: "true"
+      MEILI_MAX_INDEXING_MEMORY: 128Mb
+      MEILI_MAX_INDEXING_THREADS: "1"
+    entrypoint: ["/bin/sh", "-ec", 'export MEILI_MASTER_KEY="$$(cat /run/secrets/meili-key)"; exec /bin/meilisearch']
+    volumes:
+      - meili_data:/meili_data
+      - ${SECRETS_DIR}/meili-key:/run/secrets/meili-key:ro
+    networks: [backend]
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:7700/health > /dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+  app:
+    <<: *common
+    image: ${APP_IMAGE:?set immutable APP_IMAGE digest}
+    init: true
+    user: "1000:1000"
+    environment:
+      NODE_OPTIONS: --max-old-space-size=384
+    volumes:
+      - ${SECRETS_DIR}/runtime.json:/run/secrets/runtime.json:ro
+    networks: [backend, egress]
+    mem_limit: 640m
+    stop_grace_period: 30s
+    depends_on:
+      postgres: { condition: service_healthy }
+      meilisearch: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 6s
+      start_period: 30s
+      retries: 6
+
+  ops:
+    <<: *common
+    image: ${APP_IMAGE}
+    profiles: [ops]
+    restart: "no"
+    init: true
+    user: "1000:1000"
+    environment:
+      NODE_OPTIONS: --max-old-space-size=256
+    command: ["verify", "--target", "postgres:5432/phoskywiki/phosky"]
+    volumes:
+      - ${SECRETS_DIR}/runtime.json:/run/secrets/runtime.json:ro
+      - ${SECRETS_DIR}/admins.json:/run/secrets/admins.json:ro
+    networks: [backend, egress]
+    mem_limit: 384m
+
+  proxy:
+    <<: *common
+    image: caddy:2.11.2-alpine@sha256:834468128c7696cec0ceea6172f7d692daf645ae51983ca76e39da54a97c570d
+    user: "0:0"
+    # D01 ships a loopback HTTP origin. D07 owns public TLS/Cloudflare rollout.
+    ports: ["127.0.0.1:${ORIGIN_PORT:-8080}:8080"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    # A non-internal bridge is required for Docker's loopback port publishing.
+    # Only the proxy joins ingress; data services remain on backend alone.
+    networks: [backend, ingress]
+    mem_limit: 64m
+    depends_on:
+      app: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 6s
+      retries: 6
+
+networks:
+  backend: { internal: true }
+  egress: {}
+  ingress: {}
+
+volumes:
+  pgdata:
+  meili_data:
+  caddy_data:
+  caddy_config:
