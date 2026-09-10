@@ -3,7 +3,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { invitationFixture } from "../auth-fixture";
 
 test.describe("游客（未登录）", () => {

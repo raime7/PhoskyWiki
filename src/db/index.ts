@@ -4,7 +4,7 @@ import { Pool } from "pg";
 export type Db = NodePgDatabase<Record<string, never>>;
 
 const globalForDb = globalThis as unknown as {
-  phoskyDbs?: Map<string, Db>;
+  phoskyDbs?: Map<string, Db & { $client: Pool }>;
 };
 
 /**
@@ -32,4 +32,12 @@ export function getDb(databaseUrl = process.env.DATABASE_URL): Db {
     globalForDb.phoskyDbs.set(url, db);
   }
   return db;
+}
+
+/** Short-lived operations must drain pooled connections before normal exit. */
+export async function closeDatabases(): Promise<void> {
+  const databases = globalForDb.phoskyDbs;
+  if (!databases) return;
+  await Promise.all([...databases.values()].map(db => db.$client.end()));
+  databases.clear();
 }

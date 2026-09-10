@@ -3,7 +3,8 @@ import { promisify } from "node:util";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vitest";
+import { Meilisearch } from "meilisearch";
 import { eq } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
 import { getDb } from "@/db";
@@ -14,8 +15,15 @@ import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import rehypeStringify from "rehype-stringify";
+import { GET as search } from "@/app/api/search/route";
+import { injectSearchIndex, resetSearchIndex } from "@/lib/search/search-service";
+import { meiliSearchIndex } from "@/lib/search/meili-index";
 
 const execute = promisify(execFile);
+const searchHost = process.env.SEARCH_CONTRACT_HOST ?? "http://localhost:7700";
+const searchUid = "consolidation-test";
+const searchClient = new Meilisearch({ host: searchHost, apiKey: process.env.MEILI_MASTER_KEY ?? "dev-meili-master-key" });
+afterAll(async () => { resetSearchIndex(); await searchClient.index(searchUid).delete().waitTask(); });
 let directory: string;
 let kept: number, removed: number, first: number, second: number, hidden: number;
 let renamedTarget: number, reusedNameTarget: number;
@@ -25,7 +33,7 @@ async function readHistory(id: number) {
 }
 async function run(apply: boolean) {
   const database = new URL(process.env.DATABASE_URL!).pathname.slice(1);
-  const result = await execute(process.execPath, ["--conditions", "react-server", "--import", "tsx", "scripts/consolidate-mvp.ts", "--database", database, "--groups", join(directory, "groups.json"), ...(apply ? ["--apply", "--backup", join(directory, "fixture-backup.txt")] : [])], { env: { ...process.env, MEILI_HOST: "" } });
+  const result = await execute(process.execPath, ["--conditions", "react-server", "--import", "tsx", "scripts/consolidate-mvp.ts", "--database", database, "--groups", join(directory, "groups.json"), ...(apply ? ["--apply", "--backup", join(directory, "fixture-backup.txt")] : [])], { env: { ...process.env, MEILI_HOST: searchHost, MEILI_INDEX_UID: searchUid } });
   return JSON.parse(result.stdout);
 }
 beforeAll(async () => {
@@ -73,6 +81,10 @@ it("运维预览不改变公开页面；归并保留正文历史、清理来源�
   expect((await readHistory(second)).status).toBe(200);
   const applied = await run(true);
   expect(applied.applied).toBe(true);
+  injectSearchIndex(meiliSearchIndex({ host: searchHost, apiKey: process.env.MEILI_MASTER_KEY ?? "dev-meili-master-key", indexUid: searchUid }));
+  const found = await (await search(new Request(`http://localhost/api/search?q=${encodeURIComponent("合并测试")}`))).json();
+  expect(found.hits.map((hit: { pageId: number }) => hit.pageId)).toContain(kept);
+  expect(found.hits.map((hit: { pageId: number }) => hit.pageId)).not.toContain(removed);
   expect((await readHistory(second)).status).toBe(404);
   expect((await readHistory(removed)).status).toBe(404);
   expect((await readHistory(hidden)).status).toBe(404);

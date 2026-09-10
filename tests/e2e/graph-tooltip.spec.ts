@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { Pool } from "pg";
 
 // Run after db:migrate + db:seed in an isolated test database, like graph.spec.ts.

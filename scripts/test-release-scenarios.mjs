@@ -55,17 +55,24 @@ export async function runReleaseScenarios({ directory, project, env, override, o
     await mkdir(faultDirectory);
     const baseTag = `${project}:base`;
     await exec('docker', ['tag', env.APP_IMAGE, baseTag], undefined, true);
-    for (const mode of ['unhealthy', 'migration', 'incompatible']) {
+    for (const mode of ['backwards', 'unhealthy', 'migration', 'incompatible']) {
       const fault = join(faultDirectory, 'fault.mjs');
       const partialMigration = `const {readFileSync}=await import('node:fs');const {default:pg}=await import('pg');const p=new pg.Pool({connectionString:JSON.parse(readFileSync('/run/secrets/runtime.json')).DATABASE_URL});await p.query('CREATE TABLE d04_partial (evidence text)');await p.end();process.exit(1);`;
       await writeFile(fault, `import {spawn} from 'node:child_process';\nconst args=process.argv.slice(2);if(args[0]===${JSON.stringify(mode === 'migration' ? 'migrate' : 'serve')}){${mode === 'migration' ? partialMigration : 'process.exit(1);'}}const c=spawn(process.execPath,['scripts/container-entrypoint.mjs',...args],{stdio:'inherit'});c.on('exit',code=>process.exit(code??1));\n`);
       const dockerfile = join(faultDirectory, 'Dockerfile');
       // Build faults on the exact tested image; never rebuild application code.
-      await writeFile(dockerfile, `FROM ${baseTag}\nCOPY fault.mjs /app/fault.mjs\n${mode === 'incompatible' ? 'USER root\nRUN echo "-- changed schema requires manual review" > /app/drizzle/d04-extra.sql\nUSER node\n' : ''}ENTRYPOINT ["node", "/app/fault.mjs"]\nCMD ["serve"]\n`);
+      const change = mode === 'backwards' ? `USER root\nRUN node -e "const fs=require('fs'),p='drizzle/meta/_journal.json',j=JSON.parse(fs.readFileSync(p));j.entries.pop();fs.writeFileSync(p,JSON.stringify(j))"\nUSER node\n` : mode === 'incompatible' ? 'USER root\nRUN echo "-- changed schema requires manual review" > /app/drizzle/d04-extra.sql\nUSER node\n' : '';
+      await writeFile(dockerfile, `FROM ${baseTag}\nCOPY fault.mjs /app/fault.mjs\n${change}ENTRYPOINT ["node", "/app/fault.mjs"]\nCMD ["serve"]\n`);
       const tag = `${project}:${mode}`;
       await exec('docker', ['build', '--provenance=false', '-t', tag, faultDirectory], undefined, true);
       const image = await exec('docker', ['image', 'inspect', tag, '--format', '{{.Id}}'], undefined, true);
       const result = await run({ receipt: { ...receipt, image, imageId: image } });
+      if (mode === 'backwards') {
+        assert.equal(result.error, 'MIGRATION_HISTORY_DIVERGED');
+        assert.equal(result.phase, 'preflight');
+        await contentSurvives();
+        continue;
+      }
       if (mode === 'unhealthy') {
         assert.equal(result.result, 'failed-old-app-restored', JSON.stringify(result));
         assert((await (await page.request.get(`${origin}${addedTerm.href}`)).text()).includes('备份之后的新增内容仍然存在'));

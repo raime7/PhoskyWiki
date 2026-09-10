@@ -2,7 +2,7 @@
 // Configuration and Compose files are installed by an operator, never over SSH.
 import { execFile } from 'node:child_process';
 import { promisify, isDeepStrictEqual } from 'node:util';
-import { readFile, writeFile, mkdir, open, unlink, rename, stat, statfs } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, open, unlink, rename, stat, statfs, chown, chmod } from 'node:fs/promises';
 import { totalmem } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -17,7 +17,12 @@ async function privateJSON(path) {
   return JSON.parse(await readFile(path, 'utf8'));
 }
 async function atomic(path, value) {
+  const existing = await stat(path).catch(error => { if (error.code !== 'ENOENT') throw error; return null; });
   await writeFile(`${path}.tmp`, value, { mode: 0o600 });
+  if (existing && process.platform !== 'win32') {
+    await chown(`${path}.tmp`, existing.uid, existing.gid);
+    await chmod(`${path}.tmp`, existing.mode & 0o777);
+  }
   await rename(`${path}.tmp`, path);
 }
 
@@ -49,7 +54,7 @@ export async function deployRelease(config, receipt, request) {
     return compose(['run', '--rm', '-T', '--no-deps', 'ops', action, '--target', config.target]);
   };
   const inspect = async image => JSON.parse(await command('docker', ['image', 'inspect', image]))[0];
-  const schema = image => command('docker', ['run', '--rm', '--network', 'none', '--entrypoint', 'node', image, '-e', "const fs=require('fs'),c=require('crypto');const h=c.createHash('sha256');for(const n of fs.readdirSync('drizzle').filter(n=>n.endsWith('.sql')).sort()){h.update(n);h.update(fs.readFileSync('drizzle/'+n));}h.update(fs.readFileSync('drizzle/meta/_journal.json'));console.log(h.digest('hex'));" ]);
+  const schema = async image => JSON.parse(await command('docker', ['run', '--rm', '--network', 'none', '--entrypoint', 'node', image, '-e', "const fs=require('fs'),c=require('crypto');const hash=n=>c.createHash('sha256').update(fs.readFileSync('drizzle/'+n)).digest('hex');const journal=JSON.parse(fs.readFileSync('drizzle/meta/_journal.json'));console.log(JSON.stringify({journal,files:Object.fromEntries(fs.readdirSync('drizzle').filter(n=>n.endsWith('.sql')).sort().map(n=>[n,hash(n)]))}));" ]));
   try {
     await lock.writeFile(JSON.stringify({ pid: process.pid, recordPath }));
     await save();
@@ -75,7 +80,13 @@ export async function deployRelease(config, receipt, request) {
     if (receipt.image.includes('@')) await command('docker', ['pull', receipt.image], 300_000);
     const next = await inspect(receipt.image);
     if (next.Id !== receipt.imageId || next.Config.Labels?.['org.opencontainers.image.revision'] !== receipt.sha) fail('IMAGE_RECEIPT_MISMATCH');
-    record.rollbackCompatible = (await schema(old)) === (await schema(receipt.image));
+    const before = await schema(old), after = await schema(receipt.image);
+    if (before.journal.version !== after.journal.version || before.journal.dialect !== after.journal.dialect || !isDeepStrictEqual(before.journal.entries, after.journal.entries.slice(0, before.journal.entries.length)) || Object.entries(before.files).some(([name, hash]) => after.files[name] !== hash)) fail('MIGRATION_HISTORY_DIVERGED');
+    record.rollbackCompatible = isDeepStrictEqual(before, after);
+    env.APP_IMAGE = old;
+    const applied = JSON.parse(await compose(['run', '--rm', '-T', '--no-deps', '--entrypoint', 'node', 'ops', '-e', "const fs=require('fs'),{Pool}=require('pg');const p=new Pool({connectionString:JSON.parse(fs.readFileSync('/run/secrets/runtime.json')).DATABASE_URL});p.query('SELECT hash, created_at FROM drizzle.__drizzle_migrations ORDER BY created_at').then(r=>console.log(JSON.stringify(r.rows))).finally(()=>p.end());"]));
+    const expected = before.journal.entries.map(entry => ({ hash: before.files[`${entry.tag}.sql`], created_at: String(entry.when) }));
+    if (!isDeepStrictEqual(applied, expected)) fail('DATABASE_MIGRATION_DRIFT');
     await ops('verify', receipt.image);
     // Pin and download all images before stopping writers.
     await inspect(env.BACKUP_IMAGE);

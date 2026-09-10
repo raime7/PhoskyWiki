@@ -5,7 +5,7 @@
 
 import "dotenv/config";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "admin@phoskywiki.local";
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD;

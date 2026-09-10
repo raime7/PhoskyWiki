@@ -5,6 +5,7 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { bootstrapProduction, type InitialAdmin } from "../src/db/production-bootstrap";
+import { closeDatabases } from "../src/db";
 
 function required(key: string): string {
   const value = process.env[key];
@@ -33,8 +34,8 @@ async function readAdmins(path: string | undefined): Promise<InitialAdmin[]> {
 async function main() {
   const { positionals, values } = parseArgs({ allowPositionals: true, options: { target: { type: "string" }, credentials: { type: "string" }, search: { type: "string" }, environment: { type: "string" }, "user-id": { type: "string" }, email: { type: "string" } } });
   const command = positionals[0];
-  if (positionals.length !== 1 || !["verify", "migrate", "bootstrap", "reindex", "recover-admin"].includes(command)) {
-    throw new Error("USAGE: ops:production verify|migrate|bootstrap|reindex|recover-admin --target host:port/database/user [--credentials file] [--search http://host:port/index]; recover-admin additionally requires --environment, --user-id and --email");
+  if (positionals.length !== 1 || !["verify", "migrate", "bootstrap", "reindex", "search-status", "recover-admin"].includes(command)) {
+    throw new Error("USAGE: ops:production verify|migrate|bootstrap|reindex|search-status|recover-admin --target host:port/database/user [--credentials file] [--search http://host:port/index]; recover-admin additionally requires --environment, --user-id and --email");
   }
   const url = new URL(required("DATABASE_URL"));
   if (!["postgres:", "postgresql:"].includes(url.protocol) || url.search || url.hash || !url.hostname || !url.username || !url.password || url.pathname.length < 2) {
@@ -59,7 +60,7 @@ async function main() {
     if (!["http:", "https:"].includes(origin.protocol) || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/") throw new Error("AUTH_CONFIG: valid site origin required");
     admins = await readAdmins(values.credentials);
   }
-  if (command === "reindex") {
+  if (command === "reindex" || command === "search-status") {
     const host = new URL(required("MEILI_HOST"));
     const index = required("MEILI_INDEX_UID");
     required("MEILI_MASTER_KEY");
@@ -85,17 +86,24 @@ async function main() {
       const { reindexAll } = await import("../src/lib/search/search-sync");
       result = await reindexAll();
     }
+    if (command === "search-status") {
+      const { searchStatus } = await import("../src/lib/search/search-maintenance");
+      const search = await searchStatus();
+      console.log(JSON.stringify({ ok: search.available && !search.degraded, search }));
+      return;
+    }
     console.log(JSON.stringify({ ok: true, command, target, ...result, peakRssBytes: process.resourceUsage().maxRSS * 1024 }));
   } finally {
     await pool.end();
+    await closeDatabases();
   }
 }
 
-main().then(() => process.exit(0)).catch((error: unknown) => {
+main().catch((error: unknown) => {
   // Database/JSON/library errors may contain credentials or bound parameters.
   // Only our literal diagnostics are safe to emit.
   const message = error instanceof Error ? error.message : "";
   const safe = /^(CONFIG_REQUIRED|CREDENTIAL_FILE|RECOVERY_CONFIG|RECOVERY_TARGET|ADMIN_CONFIG|ADMIN_CONFLICT|ADMIN_CREDENTIAL_CONFLICT|BOARD_CONFLICT|DATABASE_CONFIG|TARGET_MISMATCH|AUTH_CONFIG|SEARCH_TARGET_MISMATCH|USAGE):/.test(message);
   console.error(safe ? message : "OPERATION_FAILED: check target, protected configuration, database availability and migrations; no credentials logged");
-  process.exit(1);
+  process.exitCode = 1;
 });

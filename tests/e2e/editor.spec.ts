@@ -1,6 +1,6 @@
 import { invitationFixture } from "../auth-fixture";
 import { randomUUID } from "node:crypto";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 async function openNewPerspective(page: Page) {
   await page.goto(`/register#${await invitationFixture()}`);

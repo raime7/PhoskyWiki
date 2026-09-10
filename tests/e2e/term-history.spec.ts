@@ -2,7 +2,7 @@ import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "./fixtures";
 
 async function submit(request: APIRequestContext, data: object) {
   const response = await request.post("/api/submissions", { data });

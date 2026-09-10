@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 // 游客读路径全流程（依赖 pnpm db:seed 灌入的演示内容，见 CI 与 README）
 

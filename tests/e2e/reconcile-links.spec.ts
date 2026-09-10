@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 import { Pool } from "pg";
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "./fixtures";
 
 const execute = promisify(execFile);
 const database = decodeURIComponent(new URL(process.env.DATABASE_URL!).pathname.slice(1));

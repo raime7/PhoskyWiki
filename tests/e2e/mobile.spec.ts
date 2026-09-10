@@ -1,6 +1,6 @@
 import { invitationFixture } from "../auth-fixture";
 import { randomUUID } from "node:crypto";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
 

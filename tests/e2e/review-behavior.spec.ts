@@ -4,7 +4,7 @@ import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "./fixtures";
 import { getDb } from "../../src/db";
 import { submissions } from "../../src/db/schema";
 

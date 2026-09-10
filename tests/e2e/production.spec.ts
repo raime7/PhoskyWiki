@@ -1,7 +1,7 @@
 import { invitationFixture } from "../auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("编者用词条骨架向导填写信息框与通俗解读并提交审核", async ({ page }) => {
   await page.goto(`/register#${await invitationFixture()}`);

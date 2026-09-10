@@ -1,5 +1,9 @@
 import { createServer } from "node:http";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
+
+// Guest-only cross-origin streaming fixture must not send proxy headers to the
+// external model endpoint (whose deliberate CORS policy permits only API fields).
+test.use({ extraHTTPHeaders: {} });
 
 async function configure(page: Page, endpoint: string) {
   const panel = page.getByRole("complementary", { name: "Agent 解读" });

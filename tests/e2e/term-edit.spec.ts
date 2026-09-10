@@ -2,7 +2,7 @@ import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "./fixtures";
 
 const password = process.env.SEED_ADMIN_PASSWORD!;
 async function create(request: APIRequestContext, data: object) {

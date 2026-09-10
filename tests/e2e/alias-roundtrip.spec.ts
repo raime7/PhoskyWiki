@@ -1,7 +1,7 @@
 import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 const originalAliases = ["甲、乙", "Alpha, Beta", "中文，逗号", '引号 "示例"', "路径\\名称", "换行\n别名"];
 async function signIn(page: Page) {

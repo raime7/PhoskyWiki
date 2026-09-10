@@ -1,7 +1,7 @@
 name: Production containers
 on:
-  push:
-  pull_request:
+  # Routine push/PR coverage now runs in CI against the single release image.
+  # Keep an explicit standalone D01 diagnostic run for operators.
   workflow_dispatch:
 
 permissions:

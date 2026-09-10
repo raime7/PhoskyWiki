@@ -1,5 +1,5 @@
 import { invitationFixture } from "../auth-fixture";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { randomUUID } from "node:crypto";
 
 test("首页以搜索为中心，提供编辑陈列和可用的三轴入口", async ({ page }) => {
