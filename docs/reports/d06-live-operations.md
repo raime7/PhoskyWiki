@@ -23,8 +23,27 @@
 
 通知通道首次恢复运行 [34452036701](https://github.com/raime7/PhoskyWiki/actions/runs/34452036701) 曾因 `SITE_UNREACHABLE` 失败；同期另行公网检查正常，后续恢复运行成功。保留该瞬时外部请求失败，不将首次恢复记作通过。
 
-## 部署准备与剩余验收
+## 生产部署
 
-已准备独立受 forced-command 限制的 `phoskydeploy` 身份、发布 SSH 密钥与 GitHub secrets，以及宿主 Node 24.14.0 和 gh。尚未安装未验证的发布脚本或切换应用，等待 D04 最终通过 CI 的 main 产物。
+通过 [受控发布运行 34458630678](https://github.com/raime7/PhoskyWiki/actions/runs/34458630678) 部署成功。应用为 `e52832c5609a70e89043b555e2a695f39a15f195`，来源为 main CI `34455454444` attempt 1 的合格收据；固定镜像为 `ghcr.io/raime7/phoskywiki@sha256:7277ea092bc3d44f4c30737da8e0acc6ae8562898ba06cc0fbdb866b860d7318`，测试过的 config digest 为 `sha256:c4fd8a003047261837706ab16d5ccb480efaac1dbf0d8a9bcc81f4527454501c`。
 
-仍需部署 D06 镜像/数据库迁移/搜索 timer/采集器，执行生产搜索校对，更新真实 R2 保留与容量回执；阈值事件邮件、整机停止、资源峰值、实际日志轮转、证书续期与费用提醒尚未完成。本报告不关闭 #40 或宣称 D07 试运行验收通过。
+发布停写开始于 09:05:09.490，09:05:23.511 完成，入口向上取整记录中断 **15 秒**，达到十分钟目标。停写后创建并完整验证恢复点 `261099cc-d3a5-4ac4-b33c-3ffdbe9a4323`，迁移成功（16 → 18 条，新增 0016/0017），新容器 healthy，固定新镜像与备份 appRevision 已持久化。新增迁移使自动回退不兼容，本次未回退或导入旧备份。
+
+主机发布入口独立于应用：`release.mjs` 使用受审查的 `6816ef560e5f109ef656dfc64d6e8d309df8739e`，`release-migrations.mjs` 使用 `d0803cd`；监控、备份 runner、搜索 unit 和 maintenance Compose 来自应用提交 e52832c。`phoskydeploy` forced-command、root 文件权限、拒绝任意 SSH shell 已实际验证；没有持久保存 workflow GitHub token。
+
+前三次发布均在停写前拒绝，完整保留失败记录：旧 runtime 缺少 production 标识；Docker 29 containerd 的 manifest ID 与经典 Docker config ID 语义不同；Windows 旧镜像与 Linux 新镜像历史 SQL 换行不同。分别补齐 runtime 和 backup runtime 一致配置、严格校验固定 manifest 的 config digest、采用逐文件审查过的 13 对哈希别名解决。实际账本为早期 LF 与最后一次 CRLF 混合；未修改数据库旧账本。正确收据/账本通过，错误 config digest/未知迁移哈希拒绝，未来 LF 镜像兼容在内存模拟验证通过。
+
+脱敏主机发布记录、运行状态、备份/保留回执及搜索指标见 [生产部署 JSON](d06-production-deployment.json)，历史文件与账本证据见 [文件哈希](d06-legacy-migration-hashes.json) 和 [迁移账本](d06-legacy-migration-ledger.json)。
+
+## 部署后验证
+
+- 搜索校对实际成功，indexed=1、peakRssBytes=132898816（约 127 MiB）；公开 `/api/search?q=编委会` 返回唯一既有编委会页面。未添加演示内容。搜索 available=true、degraded=false、lastReindexResult=success。
+- 搜索六小时 timer 与备份十二小时 timer 均 enabled/active；新版两个 service 手动运行 Result=success。新版备份恢复点为 `39c80f04-09ea-4e67-8e14-66fb7a589d89`，已完整校验。工作完成后专用维护容器由正常路径清理；强制超时清理仍未在生产注入验证。
+- 真实 R2 保留任务成功：10 个恢复点、681034 字节、删除 0 对象、共享图片保留；新容量回执已上传。Windows 每日保留任务上次结果为 0，下次计划 2026-09-11 09:20 北京时间。
+- 公网 `/healthz` 200、`/login` 200、未登录 `/api/admin/search/status` 401。新采集器显示全部容器健康、restartCount=0、日志配置符合 10m/3 文件；磁盘约 32.4%、内存约 37.5%，这是一次采样，不代表组合峰值。
+- [新版外部监控 34458858037](https://github.com/raime7/PhoskyWiki/actions/runs/34458858037) 成功。
+- 容量阈值演练将原先未设置的 `MONITOR_BACKUP_BYTES_LIMIT` 临时设为 1，使用真实容量采样触发 [#58](https://github.com/raime7/PhoskyWiki/issues/58) 的 `BACKUP_CAPACITY`（[运行](https://github.com/raime7/PhoskyWiki/actions/runs/34458959646)）；随后删除临时变量，恢复默认 10 GiB，并触发 [恢复检查](https://github.com/raime7/PhoskyWiki/actions/runs/34459039822)。本演练不表示实际超出费用预算；收件确认及恢复结果待补记。
+
+## 剩余验收
+
+整机停止、其他资源/过期/证书阈值邮件、2 GB 主机组合资源峰值、实际日志文件滚动、源站证书续期、费用提醒和生产强制超时清理尚未完成。本报告不关闭 #40 或宣称 D07 全部试运行验收通过。
