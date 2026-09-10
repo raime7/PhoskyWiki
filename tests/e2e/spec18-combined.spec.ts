@@ -1,3 +1,4 @@
+import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { expect, test, type APIRequestContext } from "@playwright/test";
@@ -21,7 +22,7 @@ for (const parent of ["term", "interpreter"] as const) {
     test.setTimeout(120_000);
     await signIn(request);
     const token = randomUUID();
-    expect((await page.request.post("/api/auth/sign-up/email", { data: {
+    expect((await fixtureRegister(page.request, { data: {
       email: `combined-${token}@example.com`, name: "组合验收编者", password: "password123",
     } })).ok()).toBe(true);
     const term = await submit(request, { kind: "new_term", title: `组合父词条 ${token}`, content: "入门正文" });

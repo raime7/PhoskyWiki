@@ -1,3 +1,4 @@
+import { fixtureSignUp } from "./auth-fixture";
 // 全站搜索集成测试（T10 验收，主缝）：写路径经真实 route handlers（受理/直编/回滚/
 // 软删除/恢复），搜索索引用注入的 FakeSearchIndex——真 Meilisearch 由契约测试覆盖。
 // 验证：生效事件驱动增量同步（ADR-0004 #8）、索引故障不阻断写路径、
@@ -43,7 +44,7 @@ async function createUser(role: "editor" | "admin", name: string): Promise<TestU
   const email = `t10-${randomUUID()}@example.com`;
   createdEmails.push(email);
   const password = "t10-pass-123";
-  const signUp = await auth.api.signUpEmail({ body: { name, email, password } });
+  const signUp = await fixtureSignUp({ body: { name, email, password } });
   if (role === "admin") {
     await getDb().update(user).set({ role: "admin" }).where(eq(user.id, signUp.user.id));
   }

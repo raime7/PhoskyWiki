@@ -1,3 +1,4 @@
+import { fixtureSignUp } from "./auth-fixture";
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { beforeAll, afterAll, expect, it } from "vitest";
@@ -10,7 +11,7 @@ import { user, pages, submissions } from "@/db/schema";
 const ids: string[] = [];
 async function account(role: "admin" | "editor") {
   const email = `resubmit-${randomUUID()}@example.com`;
-  const result = await auth.api.signUpEmail({ body: { email, name: role, password: "password123" } });
+  const result = await fixtureSignUp({ body: { email, name: role, password: "password123" } });
   ids.push(result.user.id);
   await getDb().update(user).set({ role }).where(eq(user.id, result.user.id));
   const response = await auth.api.signInEmail({ body: { email, password: "password123" }, asResponse: true });

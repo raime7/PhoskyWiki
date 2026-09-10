@@ -1,9 +1,10 @@
+import { invitationFixture } from "../auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
 test("编者用词条骨架向导填写信息框与通俗解读并提交审核", async ({ page }) => {
-  await page.goto("/register");
+  await page.goto(`/register#${await invitationFixture()}`);
   await page.getByLabel("名称").fill("T15向导编者");
   await page.getByLabel("邮箱").fill(`t15-wizard-${randomUUID()}@example.com`);
   await page.getByLabel("密码（至少 8 位）").fill("password123");

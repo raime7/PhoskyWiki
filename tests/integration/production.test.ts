@@ -1,3 +1,4 @@
+import { fixtureSignUp } from "./auth-fixture";
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -23,7 +24,7 @@ beforeAll(async () => {
   for (const role of ["admin", "admin", "editor", "editor"] as const) {
     const email = `t15-${randomUUID()}@example.com`;
     const password = "production-test-123";
-    const result = await auth.api.signUpEmail({ body: { name: role, email, password } });
+    const result = await fixtureSignUp({ body: { name: role, email, password } });
     await getDb().update(user).set({ role }).where(eq(user.id, result.user.id));
     const login = await auth.api.signInEmail({ body: { email, password }, asResponse: true });
     accounts.push({ id: result.user.id, cookie: login.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ") });

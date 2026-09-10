@@ -1,3 +1,4 @@
+import { fixtureSignUp } from "./auth-fixture";
 // 审核流核心集成测试（T06 验收）：提交状态机全转移、两票受理（含冷启动退化与
 // quorum 快照）、base 过期并发防护、驳回必填理由、受理产生修订、
 // 管理员直编。主缝 = route handlers 直调，
@@ -46,7 +47,7 @@ async function createUser(
 ): Promise<TestUser> {
   const email = `t06-${randomUUID()}@example.com`;
   createdEmails.push(email);
-  const signUp = await auth.api.signUpEmail({ body: { name, email, password } });
+  const signUp = await fixtureSignUp({ body: { name, email, password } });
   if (role === "admin") {
     await getDb().update(user).set({ role: "admin" }).where(eq(user.id, signUp.user.id));
   }

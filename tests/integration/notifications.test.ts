@@ -1,3 +1,4 @@
+import { fixtureSignUp } from "./auth-fixture";
 import { randomUUID } from "node:crypto";
 
 import { eq, inArray } from "drizzle-orm";
@@ -20,7 +21,7 @@ let admin2: string;
 async function createUser(role: "editor" | "admin") {
   const email = `t09-${randomUUID()}@example.com`;
   const password = "test-notifications-123";
-  const account = await auth.api.signUpEmail({ body: { name: "T09 编者", email, password } });
+  const account = await fixtureSignUp({ body: { name: "T09 编者", email, password } });
   userIds.push(account.user.id);
   await getDb().update(user).set({ role }).where(eq(user.id, account.user.id));
   const response = await auth.api.signInEmail({ body: { email, password }, asResponse: true });

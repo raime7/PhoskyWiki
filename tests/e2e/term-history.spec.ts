@@ -1,3 +1,4 @@
+import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
@@ -31,7 +32,7 @@ test("词条两次编辑、非相邻字段比较、带来源回滚、id链接与
   const middle = (await (await page.request.get(api)).json()).revisions[0].id;
   const editorContext = await browser.newContext({ baseURL });
   try {
-    expect((await editorContext.request.post("/api/auth/sign-up/email", { data: { email: `history-editor-${token}@example.com`, password: "password123", name: "历史编者" } })).ok()).toBe(true);
+    expect((await fixtureRegister(editorContext.request, { data: { email: `history-editor-${token}@example.com`, password: "password123", name: "历史编者" } })).ok()).toBe(true);
     const proposal = await submit(editorContext.request, { kind: "edit", pageId: term.pageId, baseRevisionId: middle, title: newestTitle, summary: "最新简介", aliases: ["最新别名", "另一别名"] });
     expect(proposal.quorum).toBe(1);
     const approved = await page.request.post(`/api/admin/submissions/${proposal.submissionId}/review`, { data: { action: "approve" } });

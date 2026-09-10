@@ -1,8 +1,9 @@
+import { invitationFixture } from "../auth-fixture";
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 
 async function openNewPerspective(page: Page) {
-  await page.goto("/register");
+  await page.goto(`/register#${await invitationFixture()}`);
   await page.getByLabel("名称").fill("编辑器测试编者");
   await page.getByLabel("邮箱").fill(`t07-${randomUUID()}@example.com`);
   await page.getByLabel("密码（至少 8 位）").fill("password123");

@@ -1,3 +1,4 @@
+import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { expect, test, type APIRequestContext } from "@playwright/test";
@@ -62,7 +63,7 @@ test("历史选择任意修订并高亮行内差异，回滚更新正文，删�
     await expect(reader.getByRole("button", { name: /回滚到|软删除页面|恢复页面/ })).toHaveCount(0);
 
     // 编者自己的提案可保留，但其提交详情不能绕过删除门禁读取 base 修订。
-    const registered = await reader.request.post("/api/auth/sign-up/email", {
+    const registered = await fixtureRegister(reader.request, {
       data: { email: `history-reader-${suffix}@example.com`, password: "history-reader-pass123", name: "历史测试编者" },
     });
     expect(registered.ok()).toBe(true);

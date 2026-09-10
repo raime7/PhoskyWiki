@@ -1,3 +1,4 @@
+import { invitationFixture } from "../auth-fixture";
 // T12 兴趣标签全流程：游客 localStorage 路径（不注册也有体验）+
 // 登录账号同步路径（换设备不丢）→ 词条页视角列表按兴趣重排。
 // 每个用例独立浏览器上下文，localStorage 互不串扰。
@@ -60,7 +61,7 @@ test("游客主题、三类组合、跨标签页修改保持同步，与账号�
   expect(await perspectiveTitles(separatePage)).toEqual(defaultTitles);
   await expect(separatePage.getByTestId("related-terms").locator("li").first()).toContainText("异化");
   await separateVisitor.close();
-  await page.goto("/register");
+  await page.goto(`/register#${await invitationFixture()}`);
   await page.getByLabel("名称").fill("游客兴趣等价编者");
   await page.getByLabel("邮箱").fill(`r09-equivalent-${randomUUID()}@example.com`);
   await page.getByLabel("密码（至少 8 位）").fill("password123");
@@ -177,7 +178,7 @@ test("登录：兴趣保存到账号并跨页持久，词条页视角按兴趣�
   const before = await perspectiveTitles(page);
 
   const email = `t12-e2e-${randomUUID()}@example.com`;
-  await page.goto("/register");
+  await page.goto(`/register#${await invitationFixture()}`);
   await page.getByLabel("名称").fill("兴趣同步编者");
   await page.getByLabel("邮箱").fill(email);
   await page.getByLabel("密码（至少 8 位）").fill("password123");

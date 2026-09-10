@@ -1,3 +1,4 @@
+import { invitationFixture } from "../auth-fixture";
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -43,7 +44,7 @@ test("375px：搜索提交、词条阅读、图谱定位与讨论发言可用", 
   await page.getByTestId("graph-located").getByRole("link", { name: "主体性" }).tap();
   await expect(page.getByRole("heading", { level: 1, name: "主体性" })).toBeVisible();
 
-  await page.goto("/register");
+  await page.goto(`/register#${await invitationFixture()}`);
   await page.getByLabel("名称").fill("移动端编者");
   await page.getByLabel("邮箱").fill(`t16-mobile-${randomUUID()}@example.com`);
   await page.getByLabel("密码（至少 8 位）").fill("password123");

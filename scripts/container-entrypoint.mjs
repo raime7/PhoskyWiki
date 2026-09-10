@@ -13,8 +13,14 @@ try {
     if (typeof config[key] !== "string" || !config[key].trim()) throw new Error();
     process.env[key] = config[key];
   }
+  for (const key of ["INVITATION_TTL_SECONDS", "PASSWORD_RESET_TTL_SECONDS", "PHOSKYWIKI_ENV"]) {
+    if (config[key] !== undefined) {
+      if (typeof config[key] !== "string" || !config[key].trim()) throw new Error();
+      process.env[key] = config[key];
+    }
+  }
   const [command, ...args] = process.argv.slice(2);
-  if (!["serve", "verify", "migrate", "bootstrap", "reindex"].includes(command)) throw new Error();
+  if (!["serve", "verify", "migrate", "bootstrap", "reindex", "recover-admin"].includes(command)) throw new Error();
   const child = spawn(process.execPath, command === "serve"
     ? ["node_modules/next/dist/bin/next", "start", "--hostname", "0.0.0.0"]
     : ["--conditions=react-server", "--import=tsx", "scripts/production.ts", command, ...args], { stdio: "inherit" });

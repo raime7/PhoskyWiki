@@ -2,9 +2,11 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { RegisterForm } from "@/components/register-form";
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "注册",
+  referrer: "no-referrer",
 };
 
 export default function RegisterPage() {

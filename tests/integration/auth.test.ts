@@ -1,3 +1,4 @@
+import { fixtureSignUp } from "./auth-fixture";
 // 认证与角色集成测试（T05）：better-auth 服务端 API + 数据库断言，连真实 PG。
 // 浏览器全流程（注册→登出→再登录）由 tests/e2e/auth.spec.ts 覆盖。
 // 注意：只碰 user/session/account 表，不与并行跑的种子测试（内容表 TRUNCATE）冲突。
@@ -17,7 +18,7 @@ const createdEmails: string[] = [];
 async function signUpFixture(password = "password123") {
   const email = `t05-${randomUUID()}@example.com`;
   createdEmails.push(email);
-  const res = await auth.api.signUpEmail({
+  const res = await fixtureSignUp({
     body: { name: "测试编者", email, password },
   });
   return { email, res };
@@ -44,7 +45,7 @@ describe("注册（邮箱 + 密码）", () => {
   it("注册请求携带 role 一律忽略（角色只能由服务端写入）", async () => {
     const email = `t05-${randomUUID()}@example.com`;
     createdEmails.push(email);
-    const res = await auth.api.signUpEmail({
+    const res = await fixtureSignUp({
       // role 在输入 schema 之外（input:false）——类型与运行时都必须被忽略
       body: { name: "注入尝试", email, password: "password123", role: "admin" } as never,
     });
@@ -55,13 +56,13 @@ describe("注册（邮箱 + 密码）", () => {
     const { email } = await signUpFixture();
 
     await expect(
-      auth.api.signUpEmail({
+      fixtureSignUp({
         body: { name: "重复", email, password: "password123" },
       }),
     ).rejects.toMatchObject({ statusCode: 422 });
 
     await expect(
-      auth.api.signUpEmail({
+      fixtureSignUp({
         body: { name: "过短", email: `t05-${randomUUID()}@example.com`, password: "short" },
       }),
     ).rejects.toMatchObject({ statusCode: 400 });

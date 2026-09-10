@@ -1,3 +1,4 @@
+import { fixtureSignUp } from "./auth-fixture";
 // T13 讨论区（主缝 = route handlers 直调 + lib 组合）：词条级楼层 + 一层嵌套回复、
 // 游客只读/编者可发言（权限验收）、视角锚点、版务软删/锁定、讨论帖进搜索索引
 // （FakeSearchIndex 注入，真 Meili 由契约测试覆盖）。
@@ -42,7 +43,7 @@ async function createUser(role: "editor" | "admin", name: string): Promise<TestU
   const email = `t13-${randomUUID()}@example.com`;
   createdEmails.push(email);
   const password = "t13-pass-123";
-  const signUp = await auth.api.signUpEmail({ body: { name, email, password } });
+  const signUp = await fixtureSignUp({ body: { name, email, password } });
   if (role === "admin") {
     await getDb().update(user).set({ role: "admin" }).where(eq(user.id, signUp.user.id));
   }

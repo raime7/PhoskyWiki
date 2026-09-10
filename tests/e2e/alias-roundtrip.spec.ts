@@ -1,3 +1,4 @@
+import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
@@ -66,7 +67,7 @@ test("新词条和词条编辑驳回重提预填及草稿保留完整别名数�
   const editorContext = await browser.newContext({ baseURL });
   const editor = await editorContext.newPage();
   try {
-    const signedUp = await editor.request.post("/api/auth/sign-up/email", { data: { email: `${randomUUID()}@example.com`, name: "别名编者", password: "password123" } });
+    const signedUp = await fixtureRegister(editor.request, { data: { email: `${randomUUID()}@example.com`, name: "别名编者", password: "password123" } });
     expect(signedUp.ok()).toBe(true);
     const ownerId = (await signedUp.json()).user.id;
     const created = await page.request.post("/api/submissions", { data: { kind: "new_term", title: `Alias target ${randomUUID()}` } });

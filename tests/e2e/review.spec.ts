@@ -1,3 +1,4 @@
+import { invitationFixture } from "../auth-fixture";
 // 审核流全流程（T06 验收）：编者提交 → 管理员在队列看 diff 后受理 → 游客可见新内容。
 // 走种子数据（主体性 词条的编委会通俗视角）；种子管理员登录受理。
 // 本地库只有一名种子管理员，quorum = min(2, 1) = 1——单票即生效（冷启动退化路径）。
@@ -49,7 +50,7 @@ test("编者提交 → 管理员受理 → 游客可见新内容", async ({ page
 
   // 注册新编者并登录
   const email = `e2e-review-${randomUUID()}@example.com`;
-  await page.goto("/register");
+  await page.goto(`/register#${await invitationFixture()}`);
   await page.getByLabel("名称").fill("E2E 审核编者");
   await page.getByLabel("邮箱").fill(email);
   await page.getByLabel("密码（至少 8 位）").fill("password123");
@@ -104,7 +105,7 @@ test("编者提交 → 管理员受理 → 游客可见新内容", async ({ page
 test("驳回必填理由：不填无法提交驳回", async ({ page }) => {
   // 用一个新编者对拉康视角提交，管理员尝试无理由驳回
   const email = `e2e-reject-${randomUUID()}@example.com`;
-  await page.goto("/register");
+  await page.goto(`/register#${await invitationFixture()}`);
   await page.getByLabel("名称").fill("E2E 驳回编者");
   await page.getByLabel("邮箱").fill(email);
   await page.getByLabel("密码（至少 8 位）").fill("password123");

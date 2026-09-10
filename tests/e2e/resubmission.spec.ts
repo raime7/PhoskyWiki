@@ -1,3 +1,4 @@
+import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
@@ -13,7 +14,7 @@ test("驳回词条从详情完整预填、网络失败保留独立草稿、重�
   let secondAdmin: string | undefined;
   const title = `Resubmit ${randomUUID()}`;
   try {
-    await editor.request.post("/api/auth/sign-up/email", { data: { email: `${randomUUID()}@example.com`, password: "password123", name: "重提编者" } });
+    await fixtureRegister(editor.request, { data: { email: `${randomUUID()}@example.com`, password: "password123", name: "重提编者" } });
     const created = await editor.request.post("/api/submissions", { data: { kind: "new_term", title, summary: "原提案简介", aliases: ["别名甲", "别名乙"], content: "完整原提案正文" } });
     const { submissionId } = await created.json();
     await page.goto("/review");
@@ -24,7 +25,7 @@ test("驳回词条从详情完整预填、网络失败保留独立草稿、重�
     await expect(rejectedEntry).toHaveCount(0);
     await editor.goto(`/profile/submissions/${submissionId}`);
     const oldReview = await editor.getByRole("region", { name: "审核记录" }).innerText();
-    const signed = await reviewer.request.post("/api/auth/sign-up/email", { data: { email: `${randomUUID()}@example.com`, password: "password123", name: "第二管理员" } });
+    const signed = await fixtureRegister(reviewer.request, { data: { email: `${randomUUID()}@example.com`, password: "password123", name: "第二管理员" } });
     secondAdmin = (await signed.json()).user.id;
     await pool.query('UPDATE "user" SET role = $1 WHERE id = $2', ["admin", secondAdmin]);
     await editor.getByRole("link", { name: "修改后重新提交", exact: true }).click();
@@ -85,8 +86,8 @@ test("词条和视角过期提案需人工整理，校验失败与目标删除�
   const editor = await context.newPage();
   const create = async (data: object) => { const r = await page.request.post("/api/submissions", { data }); expect(r.status()).toBe(201); return r.json(); };
   try {
-    await editor.request.post("/api/auth/sign-up/email", { data: { email: `${randomUUID()}@example.com`, password: "password123", name: "整理编者" } });
-    await outsider.request.post("/api/auth/sign-up/email", { data: { email: `${randomUUID()}@example.com`, password: "password123", name: "其他编者" } });
+    await fixtureRegister(editor.request, { data: { email: `${randomUUID()}@example.com`, password: "password123", name: "整理编者" } });
+    await fixtureRegister(outsider.request, { data: { email: `${randomUUID()}@example.com`, password: "password123", name: "其他编者" } });
     const term = await create({ kind: "new_term", title: `Rebase ${randomUUID()}`, summary: "当前简介" });
     const interpreter = await create({ kind: "new_interpreter", title: `Rebase reader ${randomUUID()}` });
     const perspective = await create({ kind: "new_perspective", termId: term.pageId, interpreterId: interpreter.pageId, content: "当前正文" });
@@ -142,7 +143,7 @@ test("新诠释者与新视角完整恢复，父页失效保留选择且可以�
   const editor = await context.newPage();
   const create = async (data: object) => { const r = await page.request.post("/api/submissions", { data }); expect(r.status()).toBe(201); return r.json(); };
   try {
-    await editor.request.post("/api/auth/sign-up/email", { data: { email: `${randomUUID()}@example.com`, password: "password123", name: "视角编者" } });
+    await fixtureRegister(editor.request, { data: { email: `${randomUUID()}@example.com`, password: "password123", name: "视角编者" } });
     const title = `Interpreter retry ${randomUUID()}`;
     const { submissionId } = await (await editor.request.post("/api/submissions", { data: { kind: "new_interpreter", title, summary: "诠释者完整简介" } })).json();
     await page.request.post(`/api/admin/submissions/${submissionId}/review`, { data: { action: "reject", reason: "补充人物资料" } });
@@ -192,7 +193,7 @@ test("编者成为管理员后重提直接生效，仅清理该重提草稿", as
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   let editorId: string | undefined;
   try {
-    const account = await editor.request.post("/api/auth/sign-up/email", { data: { email: `${randomUUID()}@example.com`, password: "password123", name: "晋升编者" } });
+    const account = await fixtureRegister(editor.request, { data: { email: `${randomUUID()}@example.com`, password: "password123", name: "晋升编者" } });
     editorId = (await account.json()).user.id;
     const title = `Promoted ${randomUUID()}`;
     const { submissionId } = await (await editor.request.post("/api/submissions", { data: { kind: "new_interpreter", title, summary: "原资料" } })).json();

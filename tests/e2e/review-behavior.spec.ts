@@ -1,3 +1,4 @@
+import { fixtureRegister } from "./auth-fixture";
 // R02：只能从页面观察的审核结果。HTTP 状态机回归留在 integration/review.test.ts。
 // 每个用例通过公开提交入口创建独立页面；数据库仅准备历史 quorum 夹具，不读取结果。
 import "dotenv/config";
@@ -24,7 +25,7 @@ async function loginAdmin(request: APIRequestContext) {
 
 async function register(request: APIRequestContext) {
   const credentials = { email: `review-behavior-${randomUUID()}@example.com`, password: "review-behavior-pass123" };
-  const response = await request.post("/api/auth/sign-up/email", {
+  const response = await fixtureRegister(request, {
     headers: { origin: process.env.BETTER_AUTH_URL ?? "http://localhost:3000" },
     data: { ...credentials, name: "审核行为编者" },
   });

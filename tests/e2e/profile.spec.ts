@@ -1,3 +1,4 @@
+import { fixtureRegister } from "./auth-fixture";
 // T09：个人主页的提交历史、审核通知与私有差异，走真实 HTTP + SSR/浏览器主缝。
 // 每个用例创建独立编者和新页面，不依赖既有提交，也不改变种子内容。
 
@@ -21,7 +22,7 @@ async function loginAdmin(request: APIRequestContext) {
 async function register(request: APIRequestContext, name = "T09 个人主页编者") {
   const email = `e2e-profile-${randomUUID()}@example.com`;
   const password = "profile-password123";
-  const response = await request.post("/api/auth/sign-up/email", {
+  const response = await fixtureRegister(request, {
     data: { name, email, password },
   });
   expect(response.ok()).toBe(true);

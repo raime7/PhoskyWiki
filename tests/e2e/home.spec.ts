@@ -1,3 +1,4 @@
+import { invitationFixture } from "../auth-fixture";
 import { expect, test } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 
@@ -28,7 +29,7 @@ test("首页以搜索为中心，提供编辑陈列和可用的三轴入口", as
 test("登录首页使用账号兴趣推荐，未设置兴趣时引导选择", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("region", { name: "为你发现" })).toHaveCount(0);
-  await page.goto("/register");
+  await page.goto(`/register#${await invitationFixture()}`);
   await page.getByLabel("名称").fill("首页推荐编者");
   await page.getByLabel("邮箱").fill(`t16-${randomUUID()}@example.com`);
   await page.getByLabel("密码（至少 8 位）").fill("password123");

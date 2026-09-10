@@ -1,6 +1,6 @@
 "use client";
 
-// 注册表单（T05）：better-auth signUp.email，成功即自动登录（autoSignIn 默认开启）。
+// 先原子兑换邀请创建账号，再经既有认证接口登录。
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
@@ -20,13 +20,24 @@ export function RegisterForm() {
     setPending(true);
     setError(null);
     const form = new FormData(event.currentTarget);
-    const { data, error } = await authClient.signUp.email({
+    const credentials = {
       name: String(form.get("name") ?? "").trim(),
       email: String(form.get("email") ?? "").trim(),
       password: String(form.get("password") ?? ""),
-    });
+    };
+    let response: Response;
+    try {
+      response = await fetch("/api/access/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...credentials, token: String(form.get("token") ?? "").trim() || window.location.hash.slice(1) }), cache: "no-store" });
+    } catch {
+      setError("网络连接失败，请重试"); setPending(false); return;
+    }
+    if (!response.ok) {
+      setError((await response.json()).error); setPending(false); return;
+    }
+    window.history.replaceState(null, "", window.location.pathname);
+    const { data, error } = await authClient.signIn.email(credentials);
     if (error || !data) {
-      setError(authErrorMessage(error));
+      setError(`账号已创建，请到登录页登录：${authErrorMessage(error)}`);
       setPending(false);
       return;
     }
@@ -36,6 +47,8 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-5" noValidate>
+      <p className="text-sm text-muted-foreground">仅接受管理员邀请。通过邀请链接进入可直接填写下方资料；也可手动粘贴邀请码。</p>
+      <label className="flex flex-col gap-2 text-sm font-medium">邀请码<Input name="token" type="password" autoComplete="off" /></label>
       <label className="flex flex-col gap-2 text-sm font-medium">
         名称
         <Input name="name" type="text" required autoComplete="name" placeholder="站内展示的编者名称" />

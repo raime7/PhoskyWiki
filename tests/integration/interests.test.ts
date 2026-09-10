@@ -1,3 +1,4 @@
+import { fixtureSignUp } from "./auth-fixture";
 // T12 兴趣标签与推荐：账号侧读写（主缝 = PUT /api/interests 直调）、
 // 视角列表兴趣重排（lib 组合）与相关词条推荐（共同引用 + 兴趣匹配）。
 // 种子自灌；注册用户按 email 级联清理（interest_tags 随 user 级联删除）。
@@ -45,7 +46,7 @@ afterAll(async () => {
 async function createEditor(password: string): Promise<{ cookie: string; userId: string }> {
   const email = `t12-${randomUUID()}@example.com`;
   createdEmails.push(email);
-  const signUp = await auth.api.signUpEmail({
+  const signUp = await fixtureSignUp({
     body: { name: "兴趣测试编者", email, password },
   });
   const res = await auth.api.signInEmail({

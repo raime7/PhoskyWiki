@@ -1,3 +1,4 @@
+import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { expect, test, type APIRequestContext } from "@playwright/test";
@@ -15,7 +16,7 @@ for (const parent of ["term", "interpreter"] as const) {
     expect((await request.post("/api/auth/sign-in/email", { data: {
       email: process.env.SEED_ADMIN_EMAIL, password: process.env.SEED_ADMIN_PASSWORD,
     } })).ok()).toBe(true);
-    expect((await page.request.post("/api/auth/sign-up/email", { data: {
+    expect((await fixtureRegister(page.request, { data: {
       name: "父页面提案编者", email: `parents-${randomUUID()}@example.com`, password: "parents-browser-password",
     } })).ok()).toBe(true);
     const term = await submit(request, { kind: "new_term", title: `浏览父词条 ${randomUUID()}` });

@@ -454,6 +454,22 @@ export const verification = pgTable(
   (t) => [index("verification_identifier_idx").on(t.identifier)],
 );
 
+/** 限时单次准入/恢复能力。原始令牌只在签发响应中出现。 */
+export const accessGrants = pgTable("access_grants", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  purpose: text("purpose").$type<"invitation" | "reset">().notNull(),
+  digest: text("digest").notNull().unique(),
+  targetUserId: text("target_user_id").references(() => user.id, { onDelete: "cascade" }),
+  issuedBy: text("issued_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+}, (t) => [
+  check("access_grant_purpose_target", sql`(${t.purpose} = 'invitation' and ${t.targetUserId} is null) or (${t.purpose} = 'reset' and ${t.targetUserId} is not null)`),
+  index("access_grants_target_idx").on(t.targetUserId),
+]);
+
 // ---------------------------------------------------------------------------
 // 发现域（T12）：兴趣标签。三类自选关注维度——诠释者 / 学派 / 主题（主题轴
 // 即分类，CONTEXT.md「兴趣标签」），驱动词条页视角重排与相关词条推荐。

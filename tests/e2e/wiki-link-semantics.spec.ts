@@ -1,3 +1,4 @@
+import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
@@ -62,7 +63,7 @@ test("混合正文的预览、受理、直编与回滚只为真实双链生成�
     await expect(page.locator("li").filter({ has: page.locator(`a[href="${target.href}"]`) })).toContainText(`${present ? 1 : 0} 次引用`);
   }
   // 普通编者的真实预览与审核发布。
-  expect((await page.request.post("/api/auth/sign-up/email", { data: {
+  expect((await fixtureRegister(page.request, { data: {
     email: `wiki-${suffix}@example.com`, password: "wiki-semantics-password", name: "双链编者",
   } })).ok()).toBe(true);
   await page.goto(`/edit/${source.pageId}`);

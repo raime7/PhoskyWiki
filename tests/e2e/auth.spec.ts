@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto";
 
 import { expect, test } from "@playwright/test";
+import { invitationFixture } from "../auth-fixture";
 
 test.describe("游客（未登录）", () => {
   test("页头显示登录/注册入口，浏览不受限", async ({ page }) => {
@@ -22,7 +23,7 @@ test.describe("编者账号全流程", () => {
 
   test("注册 → 登出 → 再登录，会话持久", async ({ page }) => {
     // 注册成功即自动登录
-    await page.goto("/register");
+    await page.goto(`/register#${await invitationFixture()}`);
     await page.getByLabel("名称").fill(name);
     await page.getByLabel("邮箱").fill(email);
     await page.getByLabel("密码（至少 8 位）").fill(password);

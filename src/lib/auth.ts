@@ -4,9 +4,13 @@
 
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError } from "better-auth/api";
+import { verifyPassword } from "better-auth/crypto";
+import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { account, session, user, verification } from "@/db/schema";
+import { CREDENTIAL_ISSUER } from "@/lib/credential";
 
 export const auth = betterAuth({
   database: drizzleAdapter(getDb(), {
@@ -15,7 +19,27 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    disableSignUp: true,
     minPasswordLength: 8,
+  },
+  databaseHooks: {
+    session: {
+      create: {
+        after: async (created, context) => {
+          if (context?.path !== "/sign-in/email") return;
+          // The session exists, but Better Auth has not returned its cookie yet.
+          // FOR SHARE waits for an in-flight reset's credential UPDATE to commit.
+          // A later reset necessarily sees this session and deletes it; an earlier
+          // reset changes the hash and we reject this stale-password login here.
+          const [credential] = await getDb().select({ password: account.password }).from(account)
+            .where(and(eq(account.userId, created.userId), eq(account.providerId, "credential"), eq(account.issuer, CREDENTIAL_ISSUER), eq(account.accountId, created.userId))).for("share");
+          if (!credential?.password || typeof context.body?.password !== "string" || !await verifyPassword({ hash: credential.password, password: context.body.password })) {
+            await getDb().delete(session).where(eq(session.id, created.id));
+            throw new APIError("UNAUTHORIZED", { code: "INVALID_EMAIL_OR_PASSWORD", message: "邮箱或密码错误" });
+          }
+        },
+      },
+    },
   },
   user: {
     additionalFields: {

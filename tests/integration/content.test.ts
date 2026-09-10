@@ -1,3 +1,4 @@
+import { fixtureSignUp } from "./auth-fixture";
 // 读路径数据层集成测试：连真实 PG（docker），种子自灌（幂等）。
 // 注意：seedDatabase 会 TRUNCATE 内容表——同批并行的测试文件不得依赖既有内容行
 //（healthz 只碰 pg_extension 与探活路由，不受影响）。T04 的反链/消歧义/置顶
@@ -348,7 +349,7 @@ describe("POST/DELETE /api/admin/perspectives/:pageId/pin", () => {
     if (role === "admin") {
       await seedAdminAccount({ email, password });
     } else {
-      await auth.api.signUpEmail({ body: { name: "测试编者", email, password } });
+      await fixtureSignUp({ body: { name: "测试编者", email, password } });
     }
     const res = await auth.api.signInEmail({
       body: { email, password },

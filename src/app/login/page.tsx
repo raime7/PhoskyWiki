@@ -27,6 +27,7 @@ export default async function LoginPage({
         未登录也可以浏览全站内容；登录后才能提交编辑。
       </p>
       <LoginForm redirectTo={redirectTo} />
+      <Link href="/reset-password" className="mt-4 text-sm underline">忘记密码？联系管理员恢复</Link>
       <p className="mt-6 text-sm text-muted-foreground">
         还没有账号？{" "}
         <Link href="/register" className="text-foreground underline-offset-4 hover:underline">

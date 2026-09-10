@@ -1,3 +1,4 @@
+import { fixtureSignUp } from "./auth-fixture";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -18,7 +19,7 @@ beforeAll(async () => {
   await seedDatabase();
   const email = `visibility-${randomUUID()}@example.com`;
   const password = "visibility-test-password";
-  const signed = await auth.api.signUpEmail({ body: { email, password, name: "可见性管理员" } });
+  const signed = await fixtureSignUp({ body: { email, password, name: "可见性管理员" } });
   userId = signed.user.id;
   await getDb().update(user).set({ role: "admin" }).where(eq(user.id, userId));
   const response = await auth.api.signInEmail({ body: { email, password }, asResponse: true });

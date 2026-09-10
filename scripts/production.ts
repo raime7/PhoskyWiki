@@ -31,10 +31,10 @@ async function readAdmins(path: string | undefined): Promise<InitialAdmin[]> {
 }
 
 async function main() {
-  const { positionals, values } = parseArgs({ allowPositionals: true, options: { target: { type: "string" }, credentials: { type: "string" }, search: { type: "string" } } });
+  const { positionals, values } = parseArgs({ allowPositionals: true, options: { target: { type: "string" }, credentials: { type: "string" }, search: { type: "string" }, environment: { type: "string" }, "user-id": { type: "string" }, email: { type: "string" } } });
   const command = positionals[0];
-  if (positionals.length !== 1 || !["verify", "migrate", "bootstrap", "reindex"].includes(command)) {
-    throw new Error("USAGE: ops:production verify|migrate|bootstrap|reindex --target host:port/database/user [--credentials file] [--search http://host:port/index]");
+  if (positionals.length !== 1 || !["verify", "migrate", "bootstrap", "reindex", "recover-admin"].includes(command)) {
+    throw new Error("USAGE: ops:production verify|migrate|bootstrap|reindex|recover-admin --target host:port/database/user [--credentials file] [--search http://host:port/index]; recover-admin additionally requires --environment, --user-id and --email");
   }
   const url = new URL(required("DATABASE_URL"));
   if (!["postgres:", "postgresql:"].includes(url.protocol) || url.search || url.hash || !url.hostname || !url.username || !url.password || url.pathname.length < 2) {
@@ -45,6 +45,14 @@ async function main() {
   const target = `${url.hostname}:${url.port || "5432"}/${database}/${username}`;
   if (values.target !== target) throw new Error("TARGET_MISMATCH: --target must match host:port/database/user; no changes made");
   let admins: InitialAdmin[] = [];
+  let recoveryPassword: unknown;
+  if (command === "recover-admin") {
+    if (!values.environment || values.environment !== required("PHOSKYWIKI_ENV") || !values["user-id"] || !values.email || !values.credentials) throw new Error("RECOVERY_CONFIG: explicit matching environment, --user-id, --email and --credentials required");
+    const info = await stat(values.credentials);
+    if (!info.isFile() || info.size > 4096 || (process.platform !== "win32" && (info.mode & 0o077) !== 0)) throw new Error("CREDENTIAL_FILE: owner-only recovery JSON required");
+    const config = JSON.parse(await readFile(values.credentials, "utf8"));
+    recoveryPassword = config?.password;
+  }
   if (command === "bootstrap") {
     if (required("BETTER_AUTH_SECRET").length < 32) throw new Error("AUTH_CONFIG: signing secret needs at least 32 characters");
     const origin = new URL(required("BETTER_AUTH_URL"));
@@ -68,6 +76,11 @@ async function main() {
     let result: object = {};
     if (command === "migrate") await migrate(db, { migrationsFolder: "drizzle" });
     if (command === "bootstrap") result = await bootstrapProduction(db, admins);
+    if (command === "recover-admin") {
+      const { recoverAdministrator } = await import("../src/lib/access-grants");
+      await recoverAdministrator(db, values["user-id"]!, values.email!, recoveryPassword);
+      result = { recovered: true, environment: values.environment };
+    }
     if (command === "reindex") {
       const { reindexAll } = await import("../src/lib/search/search-sync");
       result = await reindexAll();
@@ -82,7 +95,7 @@ main().then(() => process.exit(0)).catch((error: unknown) => {
   // Database/JSON/library errors may contain credentials or bound parameters.
   // Only our literal diagnostics are safe to emit.
   const message = error instanceof Error ? error.message : "";
-  const safe = /^(CONFIG_REQUIRED|CREDENTIAL_FILE|ADMIN_CONFIG|ADMIN_CONFLICT|ADMIN_CREDENTIAL_CONFLICT|BOARD_CONFLICT|DATABASE_CONFIG|TARGET_MISMATCH|AUTH_CONFIG|SEARCH_TARGET_MISMATCH|USAGE):/.test(message);
+  const safe = /^(CONFIG_REQUIRED|CREDENTIAL_FILE|RECOVERY_CONFIG|RECOVERY_TARGET|ADMIN_CONFIG|ADMIN_CONFLICT|ADMIN_CREDENTIAL_CONFLICT|BOARD_CONFLICT|DATABASE_CONFIG|TARGET_MISMATCH|AUTH_CONFIG|SEARCH_TARGET_MISMATCH|USAGE):/.test(message);
   console.error(safe ? message : "OPERATION_FAILED: check target, protected configuration, database availability and migrations; no credentials logged");
   process.exit(1);
 });

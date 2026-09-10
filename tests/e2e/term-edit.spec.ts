@@ -1,3 +1,4 @@
+import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
@@ -31,8 +32,8 @@ test("词条草稿、独立编辑、两票逐字段审核、旧 URL 与普通及
   let secondAdminId: string | undefined;
   try {
     const editor = await editorContext.newPage();
-    expect((await editor.request.post("/api/auth/sign-up/email", { data: { email: `term-editor-${token}@example.com`, password: "password123", name: "词条编者" } })).ok()).toBe(true);
-    const adminSignup = await reviewerContext.request.post("/api/auth/sign-up/email", { data: { email: `term-admin-${token}@example.com`, password: "password123", name: "第二管理员" } });
+    expect((await fixtureRegister(editor.request, { data: { email: `term-editor-${token}@example.com`, password: "password123", name: "词条编者" } })).ok()).toBe(true);
+    const adminSignup = await fixtureRegister(reviewerContext.request, { data: { email: `term-admin-${token}@example.com`, password: "password123", name: "第二管理员" } });
     secondAdminId = (await adminSignup.json()).user.id;
     await pool.query('UPDATE "user" SET role = $1 WHERE id = $2', ["admin", secondAdminId]);
     const visitor = await visitorContext.newPage();
