@@ -3,6 +3,8 @@
 D04（#38）的入口是 Actions **Manual production release**。合并代码不发布生产。
 CI 构建一次应用镜像，容器验收和完整 Playwright 使用相同镜像 ID；lint、类型检查、Vitest 和浏览器检查全部通过后，主分支 push 才上传该镜像并记录 digest。上传后按 digest 拉取并再次核对测试过的镜像 ID。`release-<attempt>/release.json` 保存源码 SHA、CI run、attempt、镜像 ID 和 digest。
 
+经典 Docker 存储的 `.Id` 是配置摘要，containerd 存储可能返回 manifest 摘要。主机在后一种情况下要求本地 Id/Descriptor 都等于收据的固定 registry digest，再通过 `docker manifest inspect` 核对该单镜像 manifest 的 config digest 等于 CI 的 imageId，并核对源码标签；不会把 manifest digest 直接当作配置摘要放行。这个只读 registry 查询使用本次发布的临时登录凭据。
+
 ## 一次性安装
 
 1. 主分支保护要求 `lint + typecheck + vitest` 和 `playwright + container`，strict=true，绑定 GitHub Actions app，并对管理员生效。发布脚本还独立检查 **指定提交**、main push、仓库、CI workflow、当前 attempt 的三项成功 jobs 和收据；monitor 绿灯、PR 绿灯、旧 attempt 或 mutable tag 均不能发布。不能仅靠手写 commit status 放行。

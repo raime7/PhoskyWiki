@@ -11,6 +11,16 @@ import { fetchQualifiedRelease } from './release-gate.mjs';
 const exec = promisify(execFile);
 const immutable = value => typeof value === 'string' && /^([a-z0-9.:/_-]+@)?sha256:[a-f0-9]{64}$/.test(value);
 const fail = code => { throw new Error(code); };
+// Classic Docker reports the config digest as Id; containerd reports the
+// manifest digest. A pinned registry manifest still binds the exact CI config.
+export function verifyImageReceipt(receipt, image, manifest) {
+  const digest = receipt.image.split('@')[1];
+  const containerd = digest && image.Id === digest && image.Descriptor?.digest === digest
+    && manifest?.schemaVersion === 2
+    && ['application/vnd.docker.distribution.manifest.v2+json', 'application/vnd.oci.image.manifest.v1+json'].includes(manifest.mediaType)
+    && !manifest.manifests && manifest.config?.digest === receipt.imageId;
+  if ((image.Id !== receipt.imageId && !containerd) || image.Config?.Labels?.['org.opencontainers.image.revision'] !== receipt.sha) fail('IMAGE_RECEIPT_MISMATCH');
+}
 async function privateJSON(path) {
   const info = await stat(path);
   if (!info.isFile() || info.size > 65536 || (process.platform !== 'win32' && (info.mode & 0o077))) fail('PROTECTED_CONFIG_REQUIRED');
@@ -95,7 +105,9 @@ export async function deployRelease(config, receipt, request, credentials) {
     // Registry digest is checked against the exact tested configuration ID.
     if (receipt.image.includes('@')) await command('docker', ['pull', receipt.image], 300_000);
     const next = await inspect(receipt.image);
-    if (next.Id !== receipt.imageId || next.Config.Labels?.['org.opencontainers.image.revision'] !== receipt.sha) fail('IMAGE_RECEIPT_MISMATCH');
+    const manifest = next.Id !== receipt.imageId && receipt.image.includes('@')
+      ? JSON.parse(await command('docker', ['manifest', 'inspect', receipt.image])) : undefined;
+    verifyImageReceipt(receipt, next, manifest);
     const before = await schema(old), after = await schema(receipt.image);
     if (before.journal.version !== after.journal.version || before.journal.dialect !== after.journal.dialect || !isDeepStrictEqual(before.journal.entries, after.journal.entries.slice(0, before.journal.entries.length)) || Object.entries(before.files).some(([name, hash]) => after.files[name] !== hash)) fail('MIGRATION_HISTORY_DIVERGED');
     record.rollbackCompatible = isDeepStrictEqual(before, after);

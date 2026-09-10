@@ -43,3 +43,11 @@ Linux root 容器回归还验证连续两次发布后，备份配置仍属 UID 1
 本地 lint、typecheck 和 13 个资格边界测试通过。独立数据库全量 Vitest：41 文件通过、2 文件跳过，285 用例通过、6 跳过；缺少专用凭据的供应商契约不算通过，R2 发布契约另以上述真实演练覆盖。干净数据库和专用搜索服务上的完整浏览器套件：85 项通过、1 项条件跳过，3.5 分钟，禁用重试。两位独立审查者分别复查工程标准和 D04 规格，修复配置所有权与迁移倒退问题后均无剩余发现。
 
 生产升级、真实公网/搜索维护验收和 1 vCPU / 2 GB 容量观察由 D06/D07 后续使用合格 main 产物执行；本报告不将本地资源峰值当作生产容量证明。
+
+## main 产物与生产预检兼容修复
+
+main `e52832c5609a70e89043b555e2a695f39a15f195` 的 [CI 34455454444](https://github.com/raime7/PhoskyWiki/actions/runs/34455454444) 三项作业成功，真实资格 CLI 已接受 attempt 1 收据：manifest digest `sha256:7277ea092bc3d44f4c30737da8e0acc6ae8562898ba06cc0fbdb866b860d7318`，config digest `sha256:c4fd8a003047261837706ab16d5ccb480efaac1dbf0d8a9bcc81f4527454501c`。云端 292 个单元/集成、10 个运维、13 个发布资格用例通过。
+
+D06 随后执行真实受控发布，两次均在停写前拒绝：run 34456551202 暴露旧 runtime 缺少已约定的 PHOSKYWIKI_ENV，部署任务同步补齐 runtime/备份副本；run 34456712050 暴露 Docker 29 containerd 的 `.Id` 返回 manifest digest，与经典 CI 存储返回 config digest 不同。主机只读 ctr 检查确认实际 manifest 内 config digest 与收据完全相同，旧应用保持健康。
+
+后续发布入口补齐上述存储兼容验证，仍要求固定 manifest、本地 Descriptor、准确 config digest 和源码标签全部一致。新增 9 个边界回归，与原 13 项资格测试一起通过；lint/typecheck 通过，独立工程审查无剩余发现。该修复只改变主机资格验证，不改变已测试应用镜像或数据库迁移。
