@@ -42,7 +42,7 @@
 - 真实 R2 保留任务成功：10 个恢复点、681034 字节、删除 0 对象、共享图片保留；新容量回执已上传。Windows 每日保留任务上次结果为 0，下次计划 2026-09-11 09:20 北京时间。
 - 公网 `/healthz` 200、`/login` 200、未登录 `/api/admin/search/status` 401。新采集器显示全部容器健康、restartCount=0、日志配置符合 10m/3 文件；磁盘约 32.4%、内存约 37.5%，这是一次采样，不代表组合峰值。
 - [新版外部监控 34458858037](https://github.com/raime7/PhoskyWiki/actions/runs/34458858037) 成功。
-- 容量阈值演练将原先未设置的 `MONITOR_BACKUP_BYTES_LIMIT` 临时设为 1，使用真实容量采样触发 [#58](https://github.com/raime7/PhoskyWiki/issues/58) 的 `BACKUP_CAPACITY`（[运行](https://github.com/raime7/PhoskyWiki/actions/runs/34458959646)）；随后删除临时变量，恢复默认 10 GiB，并触发 [恢复检查](https://github.com/raime7/PhoskyWiki/actions/runs/34459039822)。本演练不表示实际超出费用预算；收件确认及恢复结果待补记。
+- 容量阈值演练将原先未设置的 `MONITOR_BACKUP_BYTES_LIMIT` 临时设为 1，使用真实容量采样触发 [#58](https://github.com/raime7/PhoskyWiki/issues/58) 的 `BACKUP_CAPACITY`（[运行](https://github.com/raime7/PhoskyWiki/actions/runs/34458959646)）；随后删除临时变量，恢复默认 10 GiB。[恢复检查](https://github.com/raime7/PhoskyWiki/actions/runs/34459039822) 成功，09:11:44 Issue 自动关闭。本演练不表示实际超出费用预算；收件确认待补记。
 
 ## 剩余验收
 
