@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   lint-test:
     name: lint + typecheck + vitest
@@ -51,9 +54,10 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm db:migrate
       - run: pnpm test
+      - run: node --test scripts/release-gate.test.mjs
 
   e2e:
-    name: playwright
+    name: playwright + container
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgres://phosky:phosky@localhost:5432/phoskywiki_test
@@ -83,8 +87,73 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm build
+      - name: Build once without runtime credentials
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          docker build --build-arg "APP_REVISION=$REVISION" --tag phosky-ci:test .
+          echo "TEST_APP_IMAGE=$(docker image inspect phosky-ci:test --format '{{.Id}}')" >> "$GITHUB_ENV"
+      - run: pnpm test:containers
       - run: pnpm db:migrate
       - run: echo "SEED_ADMIN_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
       - run: pnpm db:seed
       - run: pnpm test:e2e
+      - name: Save tested image
+        run: |
+          docker save phosky-ci:test -o /tmp/application.tar
+          printf '%s' "$TEST_APP_IMAGE" > /tmp/image-id.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tested-image-${{ github.run_attempt }}
+          path: |
+            /tmp/application.tar
+            /tmp/image-id.txt
+          retention-days: 3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-evidence-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+
+  publish:
+    name: release-ready
+    needs: [lint-test, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: tested-image-${{ github.run_attempt }}
+          path: /tmp/tested
+      - name: Publish the tested image, without rebuilding
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker load -i /tmp/tested/application.tar
+          IMAGE_ID=$(cat /tmp/tested/image-id.txt)
+          test "$(docker image inspect phosky-ci:test --format '{{.Id}}')" = "$IMAGE_ID"
+          test "$(docker image inspect "$IMAGE_ID" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$REVISION"
+          REPO="ghcr.io/${REPOSITORY,,}"
+          TAG="$REPO:$REVISION-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker tag "$IMAGE_ID" "$TAG"
+          docker push "$TAG"
+          IMAGE=$(docker image inspect "$TAG" --format '{{index .RepoDigests 0}}')
+          docker pull "$IMAGE"
+          test "$(docker image inspect "$IMAGE" --format '{{.Id}}')" = "$IMAGE_ID"
+          jq -n --arg sha "$REVISION" --arg runId "$GITHUB_RUN_ID" --argjson attempt "$GITHUB_RUN_ATTEMPT" --arg image "$IMAGE" --arg imageId "$IMAGE_ID" '{sha:$sha,runId:$runId,attempt:$attempt,image:$image,imageId:$imageId}' > release.json
+          docker logout ghcr.io
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.run_attempt }}
+          path: release.json
+          retention-days: 90

@@ -34,7 +34,7 @@ export default defineConfig({
   ],
   webServer: {
     // Never reuse a server whose database/storage identity the runner cannot verify.
-    command: process.env.CI ? "pnpm start" : `pnpm dev --port ${PORT}`,
+    command: process.env.TEST_APP_IMAGE ? "node scripts/serve-ci-image.mjs" : process.env.CI ? "pnpm start" : `pnpm dev --port ${PORT}`,
     url: `${baseURL}/`,
     reuseExistingServer: false,
     stdout: "ignore",
