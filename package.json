@@ -16,6 +16,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "ops:production": "node --conditions=react-server --import=tsx scripts/production.ts",
     "test:containers": "node scripts/test-containers.mjs",
+    "backup": "node scripts/backup.mjs",
+    "test:backups": "node scripts/test-backups.mjs",
     "search:reindex": "node --conditions react-server --import tsx scripts/reindex-search.ts",
     "content:consolidate": "node --conditions react-server --import tsx scripts/consolidate-mvp.ts",
     "links:reconcile": "node --conditions react-server --import tsx scripts/reconcile-links.ts"

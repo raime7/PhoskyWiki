@@ -1,0 +1,12 @@
+ARG APP_IMAGE
+FROM ${APP_IMAGE}
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+    && mkdir -p /usr/share/postgresql-common/pgdg \
+    && curl -fsS https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && printf 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main\n' > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update && apt-get install -y --no-install-recommends postgresql-client-18 \
+    && rm -rf /var/lib/apt/lists/*
+COPY scripts/backup.mjs /app/scripts/backup.mjs
+USER node
+ENTRYPOINT ["node", "scripts/backup.mjs"]

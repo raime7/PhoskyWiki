@@ -1,0 +1,9 @@
+# Apply after the protected runtime configuration and administrators exist.
+# DNS must proxy phoskywiki.org to this host; Cloudflare uses Full (strict).
+services:
+  proxy:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile.public:/etc/caddy/Caddyfile:ro

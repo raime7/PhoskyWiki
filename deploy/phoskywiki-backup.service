@@ -1,0 +1,12 @@
+[Unit]
+Description=PhoskyWiki encrypted recovery point
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/phoskywiki
+EnvironmentFile=/etc/phoskywiki/deployment.env
+ExecStart=/usr/bin/flock -n /run/lock/phoskywiki-backup.lock /usr/bin/docker compose -f compose.production.yml -f compose.backup.yml --profile backup run --rm -T --interactive=false backup
+TimeoutStartSec=1h
+UMask=0077

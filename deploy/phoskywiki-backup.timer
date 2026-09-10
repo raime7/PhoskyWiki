@@ -1,0 +1,11 @@
+[Unit]
+Description=PhoskyWiki backup every twelve hours
+
+[Timer]
+OnCalendar=*-*-* 00,12:00:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=phoskywiki-backup.service
+
+[Install]
+WantedBy=timers.target

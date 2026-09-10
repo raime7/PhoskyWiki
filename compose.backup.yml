@@ -1,0 +1,17 @@
+services:
+  backup:
+    image: ${BACKUP_IMAGE:?set immutable BACKUP_IMAGE digest}
+    profiles: [backup]
+    restart: "no"
+    init: true
+    user: "1000:1000"
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      NODE_OPTIONS: --max-old-space-size=128
+    volumes:
+      - ${SECRETS_DIR}/backup-config.json:/run/secrets/backup-config.json:ro
+      - ${SECRETS_DIR}/backup-encryption.key:/run/secrets/backup-encryption.key:ro
+    networks: [backend, egress]
+    mem_limit: 256m
+    cpus: 0.5
+    command: ["create", "--config", "/run/secrets/backup-config.json", "--key-file", "/run/secrets/backup-encryption.key", "--target", "postgres:5432/phoskywiki/phosky", "--bucket", "phoskywiki-backups"]
