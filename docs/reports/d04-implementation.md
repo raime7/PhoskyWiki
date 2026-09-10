@@ -51,3 +51,5 @@ main `e52832c5609a70e89043b555e2a695f39a15f195` 的 [CI 34455454444](https://git
 D06 随后执行真实受控发布，两次均在停写前拒绝：run 34456551202 暴露旧 runtime 缺少已约定的 PHOSKYWIKI_ENV，部署任务同步补齐 runtime/备份副本；run 34456712050 暴露 Docker 29 containerd 的 `.Id` 返回 manifest digest，与经典 CI 存储返回 config digest 不同。主机只读 ctr 检查确认实际 manifest 内 config digest 与收据完全相同，旧应用保持健康。
 
 后续发布入口补齐上述存储兼容验证，仍要求固定 manifest、本地 Descriptor、准确 config digest 和源码标签全部一致。新增 9 个边界回归，与原 13 项资格测试一起通过；lint/typecheck 通过，独立工程审查无剩余发现。该修复只改变主机资格验证，不改变已测试应用镜像或数据库迁移。
+
+第三次 run 34457353512 在停写前拒绝历史迁移哈希差异。实际[旧、新镜像只读证据](d06-legacy-migration-hashes.json)确认 13 个历史 SQL 仅 CRLF/LF 不同。两位审查者核对所有受影响 SQL，差异不在字符串或标识符内。发布入口仅添加这 13 组明确文件的旧→新哈希别名；未对任意 SQL 归一化，未改变数据库账本。6 项回归覆盖初次升级、后续发布沿用旧账本、拒绝反向转换、未知内容、错误时间戳和 journal 分叉。Git 属性将后续迁移检出固定为 LF。

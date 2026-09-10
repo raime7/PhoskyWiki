@@ -1,1 +1,2 @@
 deploy/phoskywiki-release text eol=lf
+drizzle/*.sql text eol=lf

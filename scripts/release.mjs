@@ -7,6 +7,7 @@ import { totalmem, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fetchQualifiedRelease } from './release-gate.mjs';
+import { verifyMigrationHistory, verifyMigrationLedger } from './release-migrations.mjs';
 
 const exec = promisify(execFile);
 const immutable = value => typeof value === 'string' && /^([a-z0-9.:/_-]+@)?sha256:[a-f0-9]{64}$/.test(value);
@@ -109,12 +110,10 @@ export async function deployRelease(config, receipt, request, credentials) {
       ? JSON.parse(await command('docker', ['manifest', 'inspect', receipt.image])) : undefined;
     verifyImageReceipt(receipt, next, manifest);
     const before = await schema(old), after = await schema(receipt.image);
-    if (before.journal.version !== after.journal.version || before.journal.dialect !== after.journal.dialect || !isDeepStrictEqual(before.journal.entries, after.journal.entries.slice(0, before.journal.entries.length)) || Object.entries(before.files).some(([name, hash]) => after.files[name] !== hash)) fail('MIGRATION_HISTORY_DIVERGED');
-    record.rollbackCompatible = isDeepStrictEqual(before, after);
+    record.rollbackCompatible = verifyMigrationHistory(before, after);
     env.APP_IMAGE = old;
     const applied = JSON.parse(await compose(['run', '--rm', '-T', '--no-deps', '--entrypoint', 'node', 'ops', '-e', "const fs=require('fs'),{Pool}=require('pg');const p=new Pool({connectionString:JSON.parse(fs.readFileSync('/run/secrets/runtime.json')).DATABASE_URL});p.query('SELECT hash, created_at FROM drizzle.__drizzle_migrations ORDER BY created_at').then(r=>console.log(JSON.stringify(r.rows))).finally(()=>p.end());"]));
-    const expected = before.journal.entries.map(entry => ({ hash: before.files[`${entry.tag}.sql`], created_at: String(entry.when) }));
-    if (!isDeepStrictEqual(applied, expected)) fail('DATABASE_MIGRATION_DRIFT');
+    verifyMigrationLedger(before, applied);
     await ops('verify', receipt.image);
     // Pin and download all images before stopping writers.
     await inspect(env.BACKUP_IMAGE);
