@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 // 学派轴与分类轴的游客浏览全流程（依赖 pnpm db:seed 灌入的演示内容）
 

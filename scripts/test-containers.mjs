@@ -2,7 +2,7 @@
 // Creates a random Compose project and private volume; never loads .env or R2.
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdtemp, writeFile, rm, mkdir } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, rm, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
@@ -14,6 +14,11 @@ const directory = await mkdtemp(join(tmpdir(), project));
 const secretVolume = `${project}_secrets`;
 const imageTag = `${project}:test`;
 const secrets = [randomBytes(24).toString("hex"), randomBytes(24).toString("hex"), randomBytes(24).toString("hex")];
+const releaseSettings = process.env.RELEASE_CONTRACT_CONFIG ? JSON.parse(await readFile(process.env.RELEASE_CONTRACT_CONFIG, 'utf8')) : null;
+if (releaseSettings) {
+  assert(releaseSettings.bucket.endsWith('-test'), 'Release drills require a dedicated test bucket');
+  secrets.push(releaseSettings.accessKeyId, releaseSettings.secretAccessKey);
+}
 const admins = [
   { name: "首位管理员", email: "first@example.com", password: randomBytes(24).toString("hex") },
   { name: "第二位管理员", email: "second@example.com", password: randomBytes(24).toString("hex") },
@@ -40,7 +45,7 @@ async function exec(file, args, input, quiet = false) {
   });
 }
 const override = join(directory, "compose.yml");
-const composeArgs = ["compose", "--project-name", project, "--env-file", join(directory, "empty.env"), "-f", resolve("compose.production.yml"), "-f", override];
+const composeArgs = ["compose", "--project-name", project, "--env-file", join(directory, "empty.env"), "-f", resolve("compose.production.yml"), ...(releaseSettings ? ['-f', resolve('compose.backup.yml')] : []), "-f", override];
 const compose = (args, input, quiet) => exec("docker", [...composeArgs, ...args], input, quiet);
 const target = "postgres:5432/phoskywiki_test/phosky";
 async function ops(...args) {
@@ -72,10 +77,14 @@ try {
   const revision = await exec("git", ["rev-parse", "HEAD"], undefined, true);
   report.revision = revision;
   report.dirty = Boolean(await exec("git", ["status", "--porcelain", "--untracked-files=no"], undefined, true));
-  console.log("Building production image without runtime secrets or database access…");
-  await exec("docker", ["build", "--build-arg", `APP_REVISION=${revision}`, "--tag", imageTag, "."]);
-  env.APP_IMAGE = await exec("docker", ["image", "inspect", imageTag, "--format", "{{.Id}}"], undefined, true);
+  if (!process.env.TEST_APP_IMAGE) {
+    console.log("Building production image without runtime secrets or database access…");
+    await exec("docker", ["build", "--build-arg", `APP_REVISION=${revision}`, "--tag", imageTag, "."]);
+  }
+  env.APP_IMAGE = await exec("docker", ["image", "inspect", process.env.TEST_APP_IMAGE || imageTag, "--format", "{{.Id}}"], undefined, true);
+  assert.equal(await exec("docker", ["image", "inspect", env.APP_IMAGE, "--format", '{{index .Config.Labels "org.opencontainers.image.revision"}}'], undefined, true), revision);
   report.image = env.APP_IMAGE;
+  if (releaseSettings) env.BACKUP_IMAGE = await exec('docker', ['image', 'inspect', process.env.TEST_BACKUP_IMAGE, '--format', '{{.Id}}'], undefined, true);
   const port = await new Promise((resolve, reject) => {
     const listener = createServer();
     listener.on("error", reject);
@@ -100,6 +109,7 @@ try {
     volumes: !override ["test_secrets:/run/secrets:ro"]
   proxy:
     ports: !override ["127.0.0.1:${port}:8080"]
+${releaseSettings ? '  backup:\n    volumes: !override ["test_secrets:/run/secrets:ro"]\n' : ''}
 volumes:
   test_secrets:
     external: true
@@ -113,8 +123,15 @@ volumes:
       BETTER_AUTH_URL: origin, BETTER_AUTH_SECRET: secrets[1],
       MEILI_HOST: "http://meilisearch:7700", MEILI_MASTER_KEY: secrets[2], MEILI_INDEX_UID: "pages-test",
       R2_ENDPOINT: "https://isolated-d01.invalid", R2_BUCKET: "phosky-d01-test", R2_ACCESS_KEY_ID: "isolated", R2_SECRET_ACCESS_KEY: "isolated-not-real",
+      PHOSKYWIKI_ENV: releaseSettings ? 'test' : 'production',
     };
+    if (releaseSettings) Object.assign(runtime, { R2_ENDPOINT: releaseSettings.endpoint, R2_BUCKET: releaseSettings.bucket, R2_ACCESS_KEY_ID: releaseSettings.accessKeyId, R2_SECRET_ACCESS_KEY: releaseSettings.secretAccessKey });
     const files = { "runtime.json": JSON.stringify(runtime), "admins.json": JSON.stringify(admins), "postgres-password": secrets[0], "meili-key": secrets[2] };
+    if (releaseSettings) {
+      files['backup-config.json'] = JSON.stringify({ databaseUrl: runtime.DATABASE_URL, appRevision: revision, runtime, source: releaseSettings, backup: { ...releaseSettings, prefix: `d04/${project}/` } });
+      files['backup-encryption.key'] = randomBytes(24).toString('base64');
+      for (const [name, value] of Object.entries(files)) await writeFile(join(directory, name), value, { mode: 0o600 });
+    }
     await exec("docker", ["run", "--rm", "-i", "--user", "0:0", "--entrypoint", "node", "-v", `${secretVolume}:/secrets`, env.APP_IMAGE, "-e", "let s='';process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>{const fs=require('node:fs');for(const [name,value] of Object.entries(JSON.parse(s))){const p='/secrets/'+name;fs.writeFileSync(p,value,{mode:0o600});fs.chownSync(p,1000,1000)}})"], JSON.stringify(files), true);
   }
   await writeSecrets(origin);
@@ -195,12 +212,16 @@ volumes:
     await recordMemory();
   }
   assert.deepEqual(failures, []);
+  if (releaseSettings) {
+    const { runReleaseScenarios } = await import('./test-release-scenarios.mjs');
+    report.release = await runReleaseScenarios({ directory, project, env, override, origin, revision, page, term, compose, exec, releaseSettings });
+  }
   report.passed = true;
 } finally {
   await browser?.close();
   report.finishedAt = new Date().toISOString();
-  await mkdir("test-results", { recursive: true });
-  await writeFile("test-results/d01-containers.json", JSON.stringify(report, null, 2));
+  await mkdir("artifacts/operations", { recursive: true });
+  await writeFile("artifacts/operations/d01-containers.json", JSON.stringify(report, null, 2));
   // All cleanup names were generated above; no inherited project or volume.
   if (createdProject) await compose(["down", "--volumes", "--remove-orphans"]).catch(() => {});
   if (createdVolume) await exec("docker", ["volume", "rm", secretVolume], undefined, true).catch(() => {});

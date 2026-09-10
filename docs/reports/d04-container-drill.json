@@ -1,0 +1,255 @@
+{
+  "project": "phosky-d01-test-00fde52276",
+  "startedAt": "2026-09-10T08:01:18.445Z",
+  "passed": true,
+  "memory": {
+    "app": {
+      "cgroupPeakBytes": 176541696,
+      "limitBytes": 671088640,
+      "oomKilled": false
+    },
+    "postgres": {
+      "cgroupPeakBytes": 110407680,
+      "limitBytes": 402653184,
+      "oomKilled": false
+    },
+    "meilisearch": {
+      "cgroupPeakBytes": 145993728,
+      "limitBytes": 402653184,
+      "oomKilled": false
+    },
+    "proxy": {
+      "cgroupPeakBytes": 23003136,
+      "limitBytes": 67108864,
+      "oomKilled": false
+    }
+  },
+  "limitations": [
+    "Local Docker resource observations do not establish capacity on the 1 vCPU / 2 GB Vultr instance.",
+    "Image metadata fixture only; no real R2 image bytes or public domain tested."
+  ],
+  "revision": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680",
+  "dirty": true,
+  "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+  "opsPeakRssBytes": 125378560,
+  "release": {
+    "passed": true,
+    "records": [
+      {
+        "code": 1,
+        "startedAt": "2026-09-10T08:02:47.035Z",
+        "environment": "test",
+        "notice": "Isolated D04 maintenance drill",
+        "next": {
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680",
+          "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "imageId": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b"
+        },
+        "phase": "preflight",
+        "migration": "not-started",
+        "result": "failed",
+        "error": "TARGET_MISMATCH",
+        "finishedAt": "2026-09-10T08:02:47.038Z"
+      },
+      {
+        "code": 1,
+        "startedAt": "2026-09-10T08:02:47.168Z",
+        "environment": "test",
+        "notice": "Isolated D04 maintenance drill",
+        "next": {
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680",
+          "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "imageId": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b"
+        },
+        "phase": "preflight",
+        "migration": "not-started",
+        "result": "failed",
+        "error": "INSUFFICIENT_RESOURCES",
+        "finishedAt": "2026-09-10T08:02:47.172Z"
+      },
+      {
+        "code": 1,
+        "startedAt": "2026-09-10T08:02:47.235Z",
+        "environment": "test",
+        "notice": "Isolated D04 maintenance drill",
+        "next": {
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680",
+          "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "imageId": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b"
+        },
+        "phase": "preflight",
+        "migration": "not-started",
+        "result": "failed",
+        "previous": {
+          "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "imageId": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680"
+        },
+        "error": "ENOENT: no such file or directory, stat 'C:\\Users\\raime\\AppData\\Local\\Temp\\phosky-d01-test-00fde52276rTKD7p\\backup-config.json'",
+        "finishedAt": "2026-09-10T08:02:48.230Z"
+      },
+      {
+        "code": 1,
+        "startedAt": "2026-09-10T08:02:48.356Z",
+        "environment": "test",
+        "notice": "Isolated D04 maintenance drill",
+        "next": {
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680",
+          "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "imageId": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b"
+        },
+        "phase": "backup",
+        "migration": "not-started",
+        "result": "failed-old-app-restored",
+        "previous": {
+          "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "imageId": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680"
+        },
+        "rollbackCompatible": true,
+        "maintenanceStartedAt": "2026-09-10T08:02:54.871Z",
+        "error": "RELEASE_COMMAND_FAILED",
+        "finishedAt": "2026-09-10T08:03:04.076Z",
+        "maintenanceSeconds": 10,
+        "maintenanceTargetMet": true
+      },
+      {
+        "code": 1,
+        "error": "RELEASE_LOCKED: inspect previous evidence before clearing stale lock"
+      },
+      {
+        "code": 0,
+        "startedAt": "2026-09-10T08:03:04.420Z",
+        "environment": "test",
+        "notice": "Isolated D04 maintenance drill",
+        "next": {
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680",
+          "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "imageId": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b"
+        },
+        "phase": "complete",
+        "migration": "succeeded",
+        "result": "succeeded",
+        "previous": {
+          "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "imageId": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680"
+        },
+        "rollbackCompatible": true,
+        "maintenanceStartedAt": "2026-09-10T08:03:11.381Z",
+        "recoveryPoint": "53a2e838-a1d4-42a4-a386-c33aa3650072",
+        "finishedAt": "2026-09-10T08:03:28.701Z",
+        "maintenanceSeconds": 18,
+        "maintenanceTargetMet": true
+      },
+      {
+        "code": 1,
+        "startedAt": "2026-09-10T08:03:31.478Z",
+        "environment": "test",
+        "notice": "Isolated D04 maintenance drill",
+        "next": {
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680",
+          "image": "sha256:6b35e078139b3c75c6af0dc88053b6a5c27740ece596d03a3258a11f3cf22b7e",
+          "imageId": "sha256:6b35e078139b3c75c6af0dc88053b6a5c27740ece596d03a3258a11f3cf22b7e"
+        },
+        "phase": "preflight",
+        "migration": "not-started",
+        "result": "failed",
+        "previous": {
+          "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "imageId": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680"
+        },
+        "error": "MIGRATION_HISTORY_DIVERGED",
+        "finishedAt": "2026-09-10T08:03:34.078Z"
+      },
+      {
+        "code": 1,
+        "startedAt": "2026-09-10T08:03:35.890Z",
+        "environment": "test",
+        "notice": "Isolated D04 maintenance drill",
+        "next": {
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680",
+          "image": "sha256:ac7b98a9d11d9f6ed72cfa199ff38b2f7f646b7e853eaae97ea799470aabc382",
+          "imageId": "sha256:ac7b98a9d11d9f6ed72cfa199ff38b2f7f646b7e853eaae97ea799470aabc382"
+        },
+        "phase": "switching",
+        "migration": "succeeded",
+        "result": "failed-old-app-restored",
+        "previous": {
+          "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "imageId": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680"
+        },
+        "rollbackCompatible": true,
+        "maintenanceStartedAt": "2026-09-10T08:03:42.741Z",
+        "recoveryPoint": "a06caa17-b4c8-47c9-9d3b-7fa34ff12e02",
+        "error": "RELEASE_COMMAND_FAILED",
+        "finishedAt": "2026-09-10T08:04:03.342Z",
+        "maintenanceSeconds": 21,
+        "maintenanceTargetMet": true
+      },
+      {
+        "code": 1,
+        "startedAt": "2026-09-10T08:04:05.170Z",
+        "environment": "test",
+        "notice": "Isolated D04 maintenance drill",
+        "next": {
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680",
+          "image": "sha256:373de2143a12811bca5ac9426278030a15d1fe24591c86574d5e9af615873702",
+          "imageId": "sha256:373de2143a12811bca5ac9426278030a15d1fe24591c86574d5e9af615873702"
+        },
+        "phase": "migrating",
+        "migration": "in-progress",
+        "result": "manual-recovery-required",
+        "previous": {
+          "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "imageId": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680"
+        },
+        "rollbackCompatible": true,
+        "maintenanceStartedAt": "2026-09-10T08:04:11.569Z",
+        "recoveryPoint": "1a11caea-375f-4206-aa06-2c24b987e54b",
+        "error": "RELEASE_COMMAND_FAILED",
+        "finishedAt": "2026-09-10T08:04:25.050Z",
+        "maintenanceSeconds": 14,
+        "maintenanceTargetMet": false
+      },
+      {
+        "code": 1,
+        "error": "RELEASE_LOCKED: inspect previous evidence before clearing stale lock"
+      },
+      {
+        "code": 1,
+        "startedAt": "2026-09-10T08:04:34.134Z",
+        "environment": "test",
+        "notice": "Isolated D04 maintenance drill",
+        "next": {
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680",
+          "image": "sha256:9455e1ae8665b4a21a2ab2ecdad0eb8a0db10e2c1ea417e0161009f6e5cd4c8b",
+          "imageId": "sha256:9455e1ae8665b4a21a2ab2ecdad0eb8a0db10e2c1ea417e0161009f6e5cd4c8b"
+        },
+        "phase": "switching",
+        "migration": "succeeded",
+        "result": "manual-recovery-required",
+        "previous": {
+          "image": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "imageId": "sha256:3b919aaba5220fcce20b383120317e8888425254de279c0ab45e6af5b03f4c9b",
+          "sha": "d1d9792ed55a0f80d7d0ee583eb6d5dd95aba680"
+        },
+        "rollbackCompatible": false,
+        "maintenanceStartedAt": "2026-09-10T08:04:40.775Z",
+        "recoveryPoint": "a4444efa-a352-4a52-b6bb-2f85bfa9dc8b",
+        "error": "RELEASE_COMMAND_FAILED",
+        "finishedAt": "2026-09-10T08:05:00.389Z",
+        "maintenanceSeconds": 20,
+        "maintenanceTargetMet": false
+      },
+      {
+        "code": 1,
+        "error": "RELEASE_LOCKED: inspect previous evidence before clearing stale lock"
+      }
+    ]
+  },
+  "finishedAt": "2026-09-10T08:05:08.904Z"
+}

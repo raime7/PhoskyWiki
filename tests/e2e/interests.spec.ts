@@ -5,7 +5,7 @@ import { invitationFixture } from "../auth-fixture";
 
 import { randomUUID } from "node:crypto";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 // 词条页的视角列表区（编委会通俗视角单独渲染，不在本列表里）
 const SECTION = '[aria-labelledby="perspectives-heading"]';

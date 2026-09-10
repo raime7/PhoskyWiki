@@ -1,0 +1,73 @@
+name: Manual production release
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful main CI run ID
+        required: true
+        type: string
+      sha:
+        description: Exact 40-character commit from that CI run
+        required: true
+        type: string
+      notice:
+        description: Previously announced maintenance window and notice reference
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+  packages: read
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+      - name: Verify selected commit and tested artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ inputs.run_id }}
+          SHA: ${{ inputs.sha }}
+        run: node scripts/release-gate.mjs "$REPO" "$RUN_ID" "$SHA"
+      - name: Install restricted SSH identity
+        env:
+          KEY: ${{ secrets.PRODUCTION_RELEASE_KEY }}
+          HOSTS: ${{ secrets.PRODUCTION_RELEASE_HOSTS }}
+        run: |
+          test -n "$KEY" && test -n "$HOSTS"
+          umask 077
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/release-key"
+          printf '%s\n' "$HOSTS" > "$RUNNER_TEMP/release-hosts"
+      - name: Release through the forced host command
+        env:
+          SSH_TARGET: ${{ vars.PRODUCTION_RELEASE_TARGET }}
+          RUN_ID: ${{ inputs.run_id }}
+          SHA: ${{ inputs.sha }}
+          NOTICE: ${{ inputs.notice }}
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          [[ "$SSH_TARGET" =~ ^[a-z_][a-z0-9_-]*@[a-zA-Z0-9.-]+$ ]]
+          jq -n --arg runId "$RUN_ID" --arg sha "$SHA" --arg notice "$NOTICE" '{runId:$runId,sha:$sha,notice:$notice,environment:"production",githubToken:env.GH_TOKEN,registryUser:env.ACTOR}' |
+            ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o IdentitiesOnly=yes -o "UserKnownHostsFile=$RUNNER_TEMP/release-hosts" -i "$RUNNER_TEMP/release-key" "$SSH_TARGET" | tee release-result.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-result-${{ github.run_id }}
+          path: release-result.json
+      - name: Remove SSH identity
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release-key" "$RUNNER_TEMP/release-hosts"

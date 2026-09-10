@@ -1,0 +1,15 @@
+{
+  "environment": "production",
+  "repository": "raime7/PhoskyWiki",
+  "directory": "/opt/phoskywiki",
+  "project": "phoskywiki",
+  "envFile": "/etc/phoskywiki/deployment.env",
+  "stateDir": "/var/lib/phoskywiki/releases",
+  "composeFiles": ["compose.production.yml", "compose.backup.yml", "compose.public.yml"],
+  "target": "postgres:5432/phoskywiki/phosky",
+  "bucket": "phoskywiki-backups",
+  "healthUrl": "https://phoskywiki.org/healthz",
+  "minDiskBytes": 3221225472,
+  "minMemoryBytes": 1887436800,
+  "backupTimeoutMs": 240000
+}

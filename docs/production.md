@@ -98,6 +98,6 @@ pnpm test
 
 PowerShell 使用 `$env:变量='值'`。数据库名必须以 `_test` 结束；初始化契约在其中再创建随机命名测试库并于结束后删除。测试设置清除应用 R2 凭据；真实 R2 契约单独要求 `R2_CONTRACT_*`、不同于应用的 `*-test` 桶。无真实 R2 配置仍明确跳过，不计为供应商验收。搜索契约用专用 `pages-contract-test`，网站测试用 `pages-test`；建议始终使用本票专属测试 Meilisearch 服务。
 
-`pnpm test:containers` 从当前源码构建真实镜像，生成随机 Compose 项目和秘密卷，启动 PG、Meilisearch、应用、Caddy；验证错误目标被拒、迁移、生产初始化、管理员浏览器登录、网站 HTTP 创建首条带正文词条、直编修订、搜索重建、并发重试、应用重启和替换后账号/正文/图片元数据保留及健康检查。退出只清理本次生成的项目及卷，不接受外部数据库或对象存储目标；凭据不写入仓库。报告写入 `test-results/d01-containers.json`，包含源码/镜像标识、是否脏工作区、cgroup 峰值与限制。
+`pnpm test:containers` 从当前源码构建真实镜像，生成随机 Compose 项目和秘密卷，启动 PG、Meilisearch、应用、Caddy；验证错误目标被拒、迁移、生产初始化、管理员浏览器登录、网站 HTTP 创建首条带正文词条、直编修订、搜索重建、并发重试、应用重启和替换后账号/正文/图片元数据保留及健康检查。退出只清理本次生成的项目及卷，不接受外部数据库或对象存储目标；凭据不写入仓库。报告写入 `artifacts/operations/d01-containers.json`，包含源码/镜像标识、是否脏工作区、cgroup 峰值与限制。
 
-图片检查使用真实上传 API 生成元数据，尚不上传字节，不替代真实 R2 测试。容器报告也不替代 Vultr 宿主峰值和大陆网络验收。CI 的 `Production containers` workflow 执行同一脚本并保存报告；它不推送镜像、不调用真实服务器或发送消息。
+图片检查使用真实上传 API 生成元数据，尚不上传字节，不替代真实 R2 测试。容器报告也不替代 Vultr 宿主峰值和大陆网络验收。常规 CI 对同一镜像执行容器与浏览器验收，通过后仅 main 发布该镜像；`Production containers` 保留为手动隔离复验入口。发布流程见 [releases.md](releases.md)。

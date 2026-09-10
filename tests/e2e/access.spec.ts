@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { seedAdminAccount } from "../../src/db/seed-admin";
 import { getDb } from "../../src/db";
@@ -85,7 +85,15 @@ test("管理员签发邀请、编者注册与双人受理，恢复密码使旧�
       await page.getByRole("button", { name: "登录", exact: true }).click();
       await expect(page.getByTestId("form-error")).toContainText("邮箱或密码错误");
       await page.getByLabel("密码", { exact: true }).fill("browser-new-password456");
+      const signIn = page.waitForResponse(response => response.url().endsWith('/api/auth/sign-in/email') && response.request().method() === 'POST');
       await page.getByRole("button", { name: "登录", exact: true }).click();
+      const response = await signIn;
+      if (response.status() === 429) {
+        // This scenario deliberately makes four sign-ins with one visitor.
+        // Respect the production limiter before retrying the new password.
+        await page.waitForTimeout(Number(response.headers()['retry-after'] ?? 10) * 1000 + 100);
+        await page.getByRole("button", { name: "登录", exact: true }).click();
+      }
       await expect(page.getByTestId("session-user")).toContainText("邀请编者");
     } finally { await resetContext.close(); }
     await first.getByRole("button", { name: "签发编者邀请" }).click();

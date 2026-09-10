@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { fixtureRegister } from "./auth-fixture";
 
 test("浏览器正常写入后并发超限得到明确响应，另一账号及公开阅读不受影响", async ({ page, browser }) => {

@@ -1,5 +1,9 @@
 import { createServer } from "node:http";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
+
+// Guest-only cross-origin streaming fixture must not send proxy headers to the
+// external model endpoint (whose deliberate CORS policy permits only API fields).
+test.beforeEach(async ({ context }) => { await context.setExtraHTTPHeaders({}); });
 
 async function configure(page: Page, endpoint: string) {
   const panel = page.getByRole("complementary", { name: "Agent 解读" });
@@ -83,6 +87,7 @@ test("视角页生成有序跨词条阅读路径，引用可跳到视角且未�
   await page.goto("/");
   await page.getByRole("link", { name: "主体性", exact: true }).click();
   await page.getByRole("link", { name: "查看视角页 →" }).click();
+  await expect(page).toHaveURL(/\/perspective\//);
   const panel = await configure(page, "https://model.example/v1/");
   let nextTitle = "", perspectiveURL = "";
   await page.route("https://model.example/v1/chat/completions", async (route) => {

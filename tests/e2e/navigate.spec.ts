@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 // T04 读路径：反链面板、显式视角链接、消歧义分流（依赖 pnpm db:seed 的演示内容）。
 

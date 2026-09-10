@@ -1,7 +1,7 @@
 import { fixtureRegister } from "./auth-fixture";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { Pool } from "pg";
 
 test("驳回词条从详情完整预填、网络失败保留独立草稿、重提两票公开", async ({ page, browser, baseURL }) => {

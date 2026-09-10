@@ -1,7 +1,7 @@
 // 图谱 e2e（T11）：全站图谱页（缩放/拖拽/搜索定位/学派着色）+ 词条页局部图谱。
 // 依赖 pnpm db:seed 灌入的演示内容（与其他 e2e 相同前置）。
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("全站图谱页：画布渲染、学派图例、缩放拖拽冒烟", async ({ page }) => {
   await page.goto("/graph");
