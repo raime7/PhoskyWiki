@@ -51,6 +51,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm db:migrate
       - run: pnpm test
+      - run: pnpm test:ops
 
   e2e:
     name: playwright

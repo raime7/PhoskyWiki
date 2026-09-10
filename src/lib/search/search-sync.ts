@@ -21,7 +21,8 @@ import {
   terms,
   type PageType,
 } from "@/db/schema";
-import { getSearchIndex } from "@/lib/search/search-service";
+import { getSearchIndex, searchIsConfigured } from "@/lib/search/search-service";
+import { withSearchLock, recordSearchFailure, recordSearchReindex, beginSearchReindex } from "@/lib/search/search-maintenance";
 import { discussionDocId, type SearchDocument } from "@/lib/search/search-types";
 import { pageKey } from "@/lib/slug";
 import { isPageVisible } from "@/lib/page-visibility";
@@ -84,6 +85,7 @@ export async function transactionWithSearchSync<T>(
 export async function syncPages(pageIds: number[]): Promise<void> {
   if (pageIds.length === 0) return;
   try {
+    await withSearchLock(false, async () => {
     // 词条/诠释者的可见性翻转连带其视角与讨论楼层（读路径同口径），同步集合按依赖扩展
     const { pageIds: allIds, termIds } = await expandWithDependencies(pageIds);
     const { docs, removeIds } = await buildSearchDocuments(allIds);
@@ -97,13 +99,12 @@ export async function syncPages(pageIds: number[]): Promise<void> {
           .from(discussionPosts)
           .where(inArray(discussionPosts.termId, termIds))
       ).map((row) => row.id);
-      await syncDiscussionPosts(postIds);
+      await syncDiscussionPostsUnlocked(postIds);
     }
-  } catch (err) {
-    console.error(
-      `搜索索引增量同步失败（pages ${pageIds.join(", ")}），待全量校对修复：`,
-      err,
-    );
+    });
+  } catch {
+    await recordSearchFailure();
+    console.error("SEARCH_INCREMENT_FAILED");
   }
 }
 
@@ -111,16 +112,19 @@ export async function syncPages(pageIds: number[]): Promise<void> {
 export async function syncDiscussionPosts(postIds: number[]): Promise<void> {
   if (postIds.length === 0) return;
   try {
-    const { docs, removeIds } = await buildDiscussionDocuments(postIds);
-    const index = getSearchIndex();
-    if (removeIds.length > 0) await index.remove(removeIds);
-    if (docs.length > 0) await index.upsert(docs);
-  } catch (err) {
-    console.error(
-      `讨论帖索引增量同步失败（posts ${postIds.join(", ")}），待全量校对修复：`,
-      err,
-    );
+    await withSearchLock(false, () => syncDiscussionPostsUnlocked(postIds));
+  } catch {
+    await recordSearchFailure();
+    console.error("SEARCH_DISCUSSION_INCREMENT_FAILED");
   }
+}
+
+async function syncDiscussionPostsUnlocked(postIds: number[]): Promise<void> {
+  if (postIds.length === 0) return;
+  const { docs, removeIds } = await buildDiscussionDocuments(postIds);
+  const index = getSearchIndex();
+  if (removeIds.length > 0) await index.remove(removeIds);
+  if (docs.length > 0) await index.upsert(docs);
 }
 
 /**
@@ -164,9 +168,19 @@ async function expandWithDependencies(pageIds: number[]): Promise<{
 
 /** 全量校对（手动 / 定时兜底）：从 PG 重灌全部文档、清空索引，修复任何漂移。 */
 export async function reindexAll(): Promise<{ indexed: number }> {
-  const docs = [...(await buildAllSearchDocuments()), ...(await buildAllDiscussionDocuments())];
-  await getSearchIndex().replaceAll(docs);
-  return { indexed: docs.length };
+  return withSearchLock(true, async () => {
+    try {
+      if (!searchIsConfigured()) throw new Error("SEARCH_NOT_CONFIGURED");
+      const startedAt = await beginSearchReindex();
+      const docs = [...(await buildAllSearchDocuments()), ...(await buildAllDiscussionDocuments())];
+      await getSearchIndex().replaceAll(docs);
+      await recordSearchReindex(startedAt);
+      return { indexed: docs.length };
+    } catch (error) {
+      await recordSearchFailure(true);
+      throw error;
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

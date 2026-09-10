@@ -11,6 +11,9 @@ export async function POST(req: Request) {
   try {
     return Response.json(await reindexAll());
   } catch (err) {
+    if (err instanceof Error && err.message === "SEARCH_BUSY") {
+      return Response.json({ error: "搜索校对或同步正在进行，请稍后重试" }, { status: 409 });
+    }
     return searchErrorResponse("搜索索引全量校对失败", err);
   }
 }

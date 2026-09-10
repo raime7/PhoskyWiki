@@ -1,0 +1,5 @@
+# Maintenance uses the fixed application image and protected runtime config.
+services:
+  ops:
+    cpus: 0.5
+    mem_limit: 384m

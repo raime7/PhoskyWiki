@@ -7,6 +7,7 @@ After=docker.service network-online.target
 Type=oneshot
 WorkingDirectory=/opt/phoskywiki
 EnvironmentFile=/etc/phoskywiki/deployment.env
-ExecStart=/usr/bin/flock -n /run/lock/phoskywiki-backup.lock /usr/bin/docker compose -f compose.production.yml -f compose.backup.yml --profile backup run --rm -T --interactive=false backup
+ExecStart=/usr/bin/flock -n /run/lock/phoskywiki-backup.lock /usr/bin/python3 /opt/phoskywiki/deploy/phoskywiki-backup-run.py
 TimeoutStartSec=1h
+ExecStopPost=-/usr/bin/docker rm -f phoskywiki-scheduled-backup
 UMask=0077

@@ -24,6 +24,14 @@ import { getHeadRevisionId } from "@/lib/content";
 import { FakeSearchIndex } from "@/lib/search/fake-index";
 import { injectSearchIndex, resetSearchIndex } from "@/lib/search/search-service";
 import { reindexAll } from "@/lib/search/search-sync";
+import { GET as statusRoute } from "@/app/api/admin/search/status/route";
+import { meiliSearchIndex } from "@/lib/search/meili-index";
+import { Meilisearch } from "meilisearch";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { POST as discussionRoute } from "@/app/api/discussion/posts/route";
+import { discussionDocId } from "@/lib/search/search-types";
+import { Pool } from "pg";
 
 interface TestUser {
   id: string;
@@ -351,6 +359,81 @@ describe("全量校对（T10：手动触发，修复漂移）", () => {
     expect(await searchIds(fixture.tag)).toContain(fixture.termId);
   });
 });
+
+it("D06: a rebuild cannot clear a newer increment that timed out after its snapshot", async () => {
+  const fixture = await createIndexedContent("迟到同步");
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const replace = index.replaceAll.bind(index);
+  index.replaceAll = async docs => { entered(); await gate; await replace(docs); };
+  const rebuilding = postJson(reindexRoute, "/api/admin/search/reindex", {}, admin.cookie);
+  try {
+    await started;
+    await directEdit(fixture.perspectiveId, "D06lateincrementunique");
+  } finally { release(); }
+  expect((await rebuilding).status).toBe(200);
+  const status = await statusRoute(new Request("http://localhost/api/admin/search/status", { headers: { cookie: admin.cookie } }));
+  expect(await status.json()).toMatchObject({ ok: false, search: { degraded: true } });
+  expect(await searchIds("D06lateincrementunique")).toEqual([]);
+  index.replaceAll = replace;
+  expect((await postJson(reindexRoute, "/api/admin/search/reindex", {}, admin.cookie)).status).toBe(200);
+  expect(await searchIds("D06lateincrementunique")).toContain(fixture.perspectiveId);
+}, 30000);
+
+it("D06: real search failure preserves published content, exposes degradation and reconciliation repairs it", async () => {
+  const host = process.env.SEARCH_CONTRACT_HOST ?? "http://localhost:7700";
+  const apiKey = process.env.MEILI_MASTER_KEY ?? "dev-meili-master-key";
+  const indexUid = "d06-reconciliation-test";
+  const client = new Meilisearch({ host, apiKey });
+  const real = meiliSearchIndex({ host, apiKey, indexUid });
+  const status = () => statusRoute(new Request("http://localhost/api/admin/search/status", { headers: { cookie: admin.cookie } }));
+  try {
+    await real.replaceAll([]);
+    injectSearchIndex(meiliSearchIndex({ host, apiKey: "deliberately-invalid-test-key", indexUid }));
+    const fixture = await createIndexedContent("故障校对");
+    const discussion = await postJson(discussionRoute, "/api/discussion/posts", { termId: fixture.termId, content: `D06discussion ${fixture.tag}` }, editor.cookie);
+    expect(discussion.status).toBe(201);
+    const pending = await submit({ kind: "new_term", title: "D06pendingprivate" }, editor);
+    expect(pending.status).toBe(201);
+    expect((await status()).status).toBe(503);
+    injectSearchIndex(real);
+    expect(await searchIds(fixture.tag)).toEqual([]);
+    expect(await (await status()).json()).toMatchObject({ ok: false, search: { available: true, degraded: true } });
+    expect((await postJson(reindexRoute, "/api/admin/search/reindex", {}, admin.cookie)).status).toBe(200);
+    expect(await searchIds(fixture.tag)).toEqual(expect.arrayContaining([fixture.termId, fixture.perspectiveId, fixture.interpreterId]));
+    const recovered = await status();
+    expect(recovered.status).toBe(200);
+    expect(await recovered.json()).toMatchObject({ ok: true, search: { degraded: false, lastReindexAt: expect.any(Number) } });
+    expect(await searchIds("D06discussion")).toContain(discussionDocId(Number(discussion.data.id)));
+    expect(await searchIds("D06pendingprivate")).toEqual([]);
+    await pageAction(fixture.termId, { action: "delete" });
+    const dbUrl = new URL(process.env.DATABASE_URL!);
+    const target = `${dbUrl.hostname}:${dbUrl.port || "5432"}/${decodeURIComponent(dbUrl.pathname.slice(1))}/${decodeURIComponent(dbUrl.username)}`;
+    const args = ["--conditions=react-server", "--import=tsx", "scripts/reindex-search.ts", "--target", target, "--search", `${host}/${indexUid}`];
+    const env = { ...process.env, MEILI_HOST: host, MEILI_MASTER_KEY: apiKey, MEILI_INDEX_UID: indexUid };
+    const exec = promisify(execFile);
+    await expect(exec(process.execPath, args.slice(0, -1).concat(`${host}/pages`), { env, timeout: 20000 })).rejects.toMatchObject({ stderr: expect.stringContaining("SEARCH_TARGET_MISMATCH") });
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+    const holder = await pool.connect();
+    try {
+      await holder.query("select pg_advisory_lock(406, hashtext($1))", [indexUid]);
+      await expect(exec(process.execPath, args, { env, timeout: 20000 })).rejects.toMatchObject({ code: 1 });
+    } finally { holder.release(true); await pool.end(); }
+    const rebuilt = await exec(process.execPath, args, { env, timeout: 30000 });
+    expect(JSON.parse(rebuilt.stdout)).toMatchObject({ ok: true, indexed: expect.any(Number), peakRssBytes: expect.any(Number) });
+    const sampled = await exec(process.execPath, ["--conditions=react-server", "--import=tsx", "scripts/production.ts", "search-status", "--target", target, "--search", `${host}/${indexUid}`], { env, timeout: 15000 });
+    expect(JSON.parse(sampled.stdout)).toMatchObject({ ok: true, search: { available: true, degraded: false } });
+    expect(await searchIds(fixture.tag)).toEqual([fixture.interpreterId]);
+    expect(await searchIds("D06discussion")).toEqual([]);
+    expect(await searchIds("D06pendingprivate")).toEqual([]);
+    expect((await statusRoute(new Request("http://localhost/api/admin/search/status"))).status).toBe(401);
+  } finally {
+    resetSearchIndex();
+    await client.index(indexUid).delete().waitTask();
+  }
+}, 60000);
 
 describe("类型分面与联想（T10）", () => {
   it("type 过滤只出该类型命中，分面计数仍统计全部类型", async () => {

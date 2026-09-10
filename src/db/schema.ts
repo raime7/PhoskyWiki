@@ -592,3 +592,12 @@ export const writeLimits = pgTable("write_limits", {
   admitted: bigint("admitted", { mode: "number" }).notNull(),
   denied: bigint("denied", { mode: "number" }).notNull(),
 }, t => [primaryKey({ columns: [t.userId, t.kind] })]);
+
+/** Operational receipt only; PostgreSQL content remains the search source of truth. */
+export const searchMaintenance = pgTable("search_maintenance", {
+  indexUid: text("index_uid").primaryKey(),
+  degraded: boolean("degraded").notNull().default(false),
+  lastFailureAt: timestamp("last_failure_at", { withTimezone: true }),
+  lastReindexAt: timestamp("last_reindex_at", { withTimezone: true }),
+  lastReindexResult: text("last_reindex_result").notNull().default("never"),
+});

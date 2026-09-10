@@ -1,0 +1,45 @@
+name: Production monitor
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+    inputs:
+      drill:
+        description: 'Notification drill (does not stop production)'
+        type: choice
+        options: [none, failure, recovery]
+        default: none
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: production-monitor
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify monitoring thresholds
+        run: node --test scripts/monitor.test.mjs
+      - name: Install restricted monitor identity
+        env:
+          KEY: ${{ secrets.PRODUCTION_MONITOR_KEY }}
+          HOSTS: ${{ secrets.PRODUCTION_MONITOR_HOSTS }}
+        run: |
+          umask 077
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/monitor-key"
+          printf '%s\n' "$HOSTS" > "$RUNNER_TEMP/monitor-hosts"
+      - name: Check site, backup and host; notify only on transitions
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MONITOR_KEY_FILE: ${{ runner.temp }}/monitor-key
+          MONITOR_HOSTS_FILE: ${{ runner.temp }}/monitor-hosts
+          MONITOR_SSH_TARGET: root@141.164.63.81
+          MONITOR_DRILL: ${{ inputs.drill || 'none' }}
+          MONITOR_BACKUP_BYTES_LIMIT: ${{ vars.MONITOR_BACKUP_BYTES_LIMIT || '10737418240' }}
+        run: node scripts/monitor.mjs
+      - name: Remove monitor identity
+        if: always()
+        run: rm -f "$RUNNER_TEMP/monitor-key" "$RUNNER_TEMP/monitor-hosts"

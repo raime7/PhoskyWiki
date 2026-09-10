@@ -21,9 +21,14 @@ export function resetSearchIndex(): void {
 }
 
 /** 搜索实现的故障在路由层统一转 503：如实报错，不拖垮站点其余部分。 */
-export function searchErrorResponse(scope: string, err: unknown): Response {
-  console.error(`${scope}：`, err);
+export function searchErrorResponse(scope: string, _err: unknown): Response {
+  void _err; // Adapter exceptions may contain credentials or document content.
+  console.error(`${scope}：SEARCH_UNAVAILABLE`);
   return Response.json({ error: "搜索服务暂时不可用" }, { status: 503 });
+}
+
+export function searchIsConfigured(): boolean {
+  return !!injected || !!process.env.MEILI_HOST;
 }
 
 export function getSearchIndex(): SearchIndex {
