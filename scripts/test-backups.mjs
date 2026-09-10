@@ -24,12 +24,24 @@ const config = { databaseUrl: "postgres://test:test@pg:5432/wiki_test", appRevis
 writeFileSync(join(directory, "config.json"), JSON.stringify(config), { mode: 0o600 });
 writeFileSync(join(directory, "key"), randomBytes(32), { mode: 0o600 });
 const run = (command, args = []) => {
-  const result = spawnSync("docker", ["run", "--rm", "--network", network, "--user", "0:0", "-v", `${directory}:/config`, image, command, "--config", "/config/config.json", "--key-file", "/config/key", "--target", "pg:5432/wiki_test/test", "--bucket", settings.bucket, ...args], { encoding: "utf8", timeout: 120000 });
+  // Windows bind mounts cannot represent the CLI's required POSIX permissions.
+  // Stage in a disposable Linux volume instead of weakening the permission check.
+  docker("cp", `${directory}/.`, `${network}:/config`);
+  docker("exec", network, "chmod", "-R", "go-rwx", "/config");
+  const commandContainer = `${network}-cli`;
+  let result;
+  try {
+    result = spawnSync("docker", ["run", "--name", commandContainer, "--network", network, "--user", "0:0", "-v", `${network}:/config`, image, command, "--config", "/config/config.json", "--key-file", "/config/key", "--target", "pg:5432/wiki_test/test", "--bucket", settings.bucket, ...args], { encoding: "utf8", timeout: 120000 });
+  } finally {
+    // Killing the Docker client on timeout does not stop its container.
+    docker("rm", "-f", commandContainer);
+  }
+  docker("cp", `${network}:/config/.`, directory);
   return { code: result.status, out: result.stdout, error: result.stderr };
 };
 try {
   docker("network", "create", network);
-  docker("run", "-d", "--name", network, "--network", network, "--network-alias", "pg", "-e", "POSTGRES_USER=test", "-e", "POSTGRES_PASSWORD=test", "-e", "POSTGRES_DB=wiki_test", process.env.BACKUP_CONTRACT_POSTGRES_IMAGE || "postgres:18.3-alpine3.23@sha256:54451ecb8ab38c24c3ec123f2fd501303a3a1856a5c66e98cecf2460d5e1e9d7");
+  docker("run", "-d", "--name", network, "--network", network, "--network-alias", "pg", "-v", `${network}:/config`, "-e", "POSTGRES_USER=test", "-e", "POSTGRES_PASSWORD=test", "-e", "POSTGRES_DB=wiki_test", process.env.BACKUP_CONTRACT_POSTGRES_IMAGE || "postgres:18.3-alpine3.23@sha256:54451ecb8ab38c24c3ec123f2fd501303a3a1856a5c66e98cecf2460d5e1e9d7");
   for (let attempts = 0; ; attempts++) {
     try { sql("select 1"); break; } catch { if (attempts > 30) throw Error("PostgreSQL startup failed"); await new Promise(resolve => setTimeout(resolve, 500)); }
   }
@@ -102,6 +114,7 @@ try {
   // Only this run's UUID namespace and explicitly named test container/network.
   try { docker("rm", "-f", network); } catch { /* creation may have failed */ }
   try { docker("network", "rm", network); } catch { /* creation may have failed */ }
+  try { docker("volume", "rm", network); } catch { /* creation may have failed */ }
   let continuation;
   do {
     const objects = await s3.send(new ListObjectsV2Command({ Bucket: settings.bucket, Prefix: `contract/${id}/`, ContinuationToken: continuation }));
