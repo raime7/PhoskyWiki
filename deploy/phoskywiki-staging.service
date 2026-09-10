@@ -1,0 +1,15 @@
+[Unit]
+Description=PhoskyWiki expired image staging cleanup
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/phoskywiki
+EnvironmentFile=/etc/phoskywiki/deployment.env
+ExecStart=/usr/bin/flock -n /run/lock/phoskywiki-backup.lock /usr/bin/python3 /opt/phoskywiki/deploy/phoskywiki-staging-run.py
+TimeoutStartSec=20min
+ExecStopPost=-/usr/bin/docker rm -f phoskywiki-staging-cleanup
+UMask=0077
+StandardOutput=journal
+StandardError=journal

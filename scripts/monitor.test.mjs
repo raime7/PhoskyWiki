@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { evaluateStatus, evaluateCertificate } from './monitor.mjs';
 const now = 1789016400000;
 const healthy = { timestamp:now, backupVerifiedAt:now-3600000,backupResult:'success',timerActive:true,diskPercent:20,memoryPercent:50,containersHealthy:true,retentionAt:now,
-  search: { available:true,degraded:false,lastReindexAt:now,lastReindexResult:'success' }, searchTimerActive:true,searchResult:'success',restartCount:0,logsRotated:true,backupBytes:1024 };
+  search: { available:true,degraded:false,lastReindexAt:now,lastReindexResult:'success' }, searchTimerActive:true,searchResult:'success',restartCount:0,logsRotated:true,backupBytes:1024,
+  staging:{completedAt:now,timerActive:true,result:'success'} };
 test('healthy site and fresh fully verified backup are quiet',()=>assert.deepEqual(evaluateStatus(healthy,now),[]));
 test('detects stopped scheduler, failure, old recovery point and resource pressure',()=>{
   assert.deepEqual(evaluateStatus({...healthy,backupResult:'failed',timerActive:false,backupVerifiedAt:now-25*3600000,diskPercent:91,memoryPercent:94,containersHealthy:false,retentionAt:0},now),['BACKUP_FAILED','BACKUP_TIMER_STOPPED','BACKUP_RPO_EXCEEDED','DISK_PRESSURE','MEMORY_PRESSURE','CONTAINER_UNHEALTHY','RETENTION_STALE']);
@@ -29,4 +30,8 @@ test('certificate expiry warns at fourteen days; invalid certificates fail close
 test('backup capacity includes retained shared objects and has an explicit adjustable threshold',()=>{
   assert.deepEqual(evaluateStatus({...healthy,backupBytes:2048},now,2048),['BACKUP_CAPACITY']);
   assert.deepEqual(evaluateStatus({...healthy,backupBytes:undefined},now),['STATUS_INVALID']);
+});
+test('staging cleanup failure, missing timer and stale receipt require action',()=>{
+  assert.deepEqual(evaluateStatus({...healthy, staging:{completedAt:now-4*3600000,timerActive:false,result:'exit-code'}},now),
+    ['STAGING_CLEANUP_FAILED','STAGING_TIMER_STOPPED','STAGING_CLEANUP_STALE']);
 });

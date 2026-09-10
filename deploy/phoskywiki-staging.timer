@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly PhoskyWiki image staging cleanup
+
+[Timer]
+OnCalendar=*-*-* *:25:00 UTC
+RandomizedDelaySec=5min
+Persistent=true
+Unit=phoskywiki-staging.service
+
+[Install]
+WantedBy=timers.target
