@@ -258,6 +258,7 @@ async function main() {
   if (values.bucket !== config.backup?.bucket) fail("BUCKET_MISMATCH");
   if (!/^[a-zA-Z0-9/_-]{1,128}\/$/.test(config.backup.prefix || "")) fail("BACKUP_PREFIX_REQUIRED");
   if (config.source.bucket === config.backup.bucket && !config.source.bucket.endsWith("-test")) fail("BUCKET_ISOLATION_REQUIRED");
+  if (positionals[0] === "create" && (!config.runtime || typeof config.runtime !== "object" || Array.isArray(config.runtime) || !Object.keys(config.runtime).length)) fail("RUNTIME_CONFIG_REQUIRED");
   if (!values["key-file"]) fail("KEY_REQUIRED");
   const keyInfo = await stat(values["key-file"]);
   if (!keyInfo.isFile() || keyInfo.size !== 32 || (process.platform !== "win32" && (keyInfo.mode & 0o077))) fail("KEY_PERMISSIONS");

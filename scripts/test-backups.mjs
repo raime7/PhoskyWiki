@@ -35,6 +35,12 @@ try {
   }
   sql(`create table images(object_key text); insert into images values ('${sourceKey}'); create table content(body text); insert into content values ('preserved content and revisions'); create schema drizzle; create table drizzle.__drizzle_migrations(hash text,created_at bigint); insert into drizzle.__drizzle_migrations values ('fixture-migration',1)`);
   await s3.send(new PutObjectCommand({ Bucket: settings.bucket, Key: sourceKey, Body: bytes, ContentType: "image/png" }));
+  const wrongTarget = run("create", ["--target", "wrong:5432/wiki_test/test"]);
+  assert.equal(wrongTarget.code, 1);
+  assert.match(wrongTarget.error, /TARGET_MISMATCH/);
+  const wrongBucket = run("create", ["--bucket", "wrong-test"]);
+  assert.equal(wrongBucket.code, 1);
+  assert.match(wrongBucket.error, /BUCKET_MISMATCH/);
   const created = run("create");
   assert.equal(created.code, 0, created.error);
   const point = JSON.parse(created.out).point;
@@ -79,6 +85,11 @@ try {
   writeFileSync(join(directory, "config.json"), JSON.stringify(config));
   assert.equal(run("restore", ["--point", point]).code, 1, "Existing database must not be overwritten");
   await s3.send(new DeleteObjectCommand({ Bucket: settings.bucket, Key: sourceKey }));
+  const missingSource = run("create");
+  assert.equal(missingSource.code, 1);
+  assert.match(missingSource.error, /RECOVERY_FILE_MISSING/, "Missing source images must prevent a complete recovery point");
+  const afterMissingSource = await s3.send(new ListObjectsV2Command({ Bucket: settings.bucket, Prefix: prefix }));
+  assert.equal(afterMissingSource.Contents.filter(object => object.Key.endsWith("/manifest.enc")).length, 2);
   sql("drop schema public cascade; create schema public; drop schema drizzle cascade");
   const restored = run("restore", ["--point", point]);
   assert.equal(restored.code, 0, restored.error);
