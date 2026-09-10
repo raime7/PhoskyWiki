@@ -12,8 +12,6 @@ phoskywiki.org {
             disable_tlsalpn_challenge
         }
     }
-    # Keep registration closed until the invitation workflow is deployed.
-    @registration path /register /api/auth/sign-up/*
-    respond @registration "Registration is not open." 403
+    # D02 enforces invitations in the application, including direct signup APIs.
     reverse_proxy app:3000
 }
