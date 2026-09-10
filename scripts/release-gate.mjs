@@ -20,16 +20,17 @@ export function qualifyRelease({ repository, sha, runId, run, jobs, receipt }) {
 }
 
 // Fetch evidence from GitHub, never from caller-supplied files or image tags.
-export async function fetchQualifiedRelease(repository, runId, sha) {
+export async function fetchQualifiedRelease(repository, runId, sha, token) {
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository) || !/^[1-9][0-9]*$/.test(String(runId)) || !/^[a-f0-9]{40}$/.test(sha)) throw new Error('RELEASE_INPUT_INVALID');
-  const api = async path => JSON.parse((await exec('gh', ['api', path], { maxBuffer: 4 * 1024 * 1024, timeout: 60_000 })).stdout);
+  const env = { ...process.env, GH_HOST: 'github.com', ...(token ? { GH_TOKEN: token } : {}) };
+  const api = async path => JSON.parse((await exec('gh', ['api', path], { env, maxBuffer: 4 * 1024 * 1024, timeout: 60_000 })).stdout);
   const run = await api(`repos/${repository}/actions/runs/${runId}`);
   // Attempt-specific jobs prevent old successful reruns from qualifying a failure.
   const result = await api(`repos/${repository}/actions/runs/${runId}/attempts/${run.run_attempt}/jobs?per_page=100`);
   if (result.total_count > 100) throw new Error('RELEASE_JOBS_OVERFLOW');
   const directory = await mkdtemp(join(tmpdir(), 'phosky-release-'));
   try {
-    await exec('gh', ['run', 'download', String(runId), '--repo', repository, '--name', `release-${run.run_attempt}`, '--dir', directory], { timeout: 60_000 });
+    await exec('gh', ['run', 'download', String(runId), '--repo', repository, '--name', `release-${run.run_attempt}`, '--dir', directory], { env, timeout: 60_000 });
     const receipt = JSON.parse(await readFile(join(directory, 'release.json'), 'utf8'));
     return qualifyRelease({ repository, runId, sha, run, jobs: result.jobs, receipt });
   } finally {

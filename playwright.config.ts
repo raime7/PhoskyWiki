@@ -21,7 +21,7 @@ export default defineConfig({
   fullyParallel: true,
   // 本地 dev server（按需编译）扛不住多 worker 并发首编译，T11 种子扩容后尤甚；
   // CI 走产物服务器，保持默认并行
-  workers: process.env.CI ? undefined : 2,
+  workers: 2,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
@@ -32,7 +32,16 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testIgnore: '**/access.spec.ts',
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      // This scenario changes the global administrator count. Run it after the
+      // suite whose review fixtures intentionally rely on one administrator.
+      name: 'access-chromium',
+      testMatch: '**/access.spec.ts',
+      dependencies: ['chromium'],
+      use: { ...devices['Desktop Chrome'] },
     },
   ],
   webServer: {

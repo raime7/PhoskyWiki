@@ -7,11 +7,16 @@ if (!/^phosky-e2e-[a-f0-9]{12}$/.test(name || '')) throw new Error('ISOLATED_CON
 const args = ['run', '--rm', '--name', name, ...(process.platform === 'win32' ? ['-p', '127.0.0.1:3000:3000'] : ['--network', 'host']), '--init', '--entrypoint', 'node'];
 // Empty R2 overrides deliberately prevent live credentials. This exercises the
 // production Next build with the same isolated settings as the existing suite.
-for (const key of ['DATABASE_URL', 'BETTER_AUTH_SECRET', 'BETTER_AUTH_URL', 'MEILI_HOST', 'MEILI_INDEX_UID', 'R2_ENDPOINT', 'R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']) {
+for (const key of ['DATABASE_URL', 'BETTER_AUTH_SECRET', 'BETTER_AUTH_URL', 'MEILI_HOST', 'MEILI_MASTER_KEY', 'MEILI_INDEX_UID', 'R2_ENDPOINT', 'R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']) {
   let value = process.env[key] || '';
   if (key === 'DATABASE_URL' && process.platform === 'win32') {
     const url = new URL(value);
     if (!['localhost', '127.0.0.1'].includes(url.hostname)) throw new Error('LOCAL_TEST_DATABASE_REQUIRED');
+    url.hostname = 'host.docker.internal'; value = url.href;
+  }
+  if (key === 'MEILI_HOST' && value && process.platform === 'win32') {
+    const url = new URL(value);
+    if (!['localhost', '127.0.0.1'].includes(url.hostname)) throw new Error('LOCAL_TEST_SEARCH_REQUIRED');
     url.hostname = 'host.docker.internal'; value = url.href;
   }
   args.push('-e', `${key}=${value}`);

@@ -1,9 +1,9 @@
 // Root-owned host entrypoint. SSH supplies only the small JSON request on stdin.
 // Configuration and Compose files are installed by an operator, never over SSH.
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify, isDeepStrictEqual } from 'node:util';
-import { readFile, writeFile, mkdir, open, unlink, rename, stat, statfs, chown, chmod } from 'node:fs/promises';
-import { totalmem } from 'node:os';
+import { readFile, writeFile, mkdir, open, unlink, rename, stat, statfs, chown, chmod, mkdtemp, rm } from 'node:fs/promises';
+import { totalmem, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fetchQualifiedRelease } from './release-gate.mjs';
@@ -26,7 +26,7 @@ async function atomic(path, value) {
   await rename(`${path}.tmp`, path);
 }
 
-export async function deployRelease(config, receipt, request) {
+export async function deployRelease(config, receipt, request, credentials) {
   if (request.environment !== config.environment || !request.notice?.trim() || request.notice.length > 500 || receipt.sha !== request.sha || !immutable(receipt.image) || !immutable(receipt.imageId)) fail('RELEASE_TARGET_OR_INPUT_INVALID');
   await mkdir(config.stateDir, { recursive: true, mode: 0o700 });
   const lockPath = join(config.stateDir, 'release.lock');
@@ -36,6 +36,7 @@ export async function deployRelease(config, receipt, request) {
   const recordPath = join(config.stateDir, `release-${Date.now()}.json`);
   let maintenanceStarted;
   let retainLock = false;
+  let dockerConfig;
   const save = () => atomic(recordPath, JSON.stringify(record, null, 2));
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('COMPOSE_') && !key.startsWith('DOCKER_')));
   const deployment = await readFile(config.envFile, 'utf8').catch(() => '');
@@ -76,6 +77,21 @@ export async function deployRelease(config, receipt, request) {
     const backup = await privateJSON(backupPath);
     if (backup.appRevision !== record.previous.sha || backup.databaseUrl !== runtime.DATABASE_URL || backup.backup?.bucket !== config.bucket || backup.source?.bucket !== runtime.R2_BUCKET || backup.source?.endpoint !== runtime.R2_ENDPOINT || !isDeepStrictEqual(backup.runtime, runtime)) fail('BACKUP_TARGET_OR_REVISION_MISMATCH');
     await stat(join(env.SECRETS_DIR, 'backup-encryption.key'));
+    if (credentials) {
+      if (!credentials.token || !/^[a-zA-Z0-9_[\]-]+$/.test(credentials.user || '')) fail('REGISTRY_CREDENTIALS_REQUIRED');
+      dockerConfig = await mkdtemp(join(tmpdir(), 'phosky-release-auth-'));
+      env.DOCKER_CONFIG = dockerConfig;
+      // A per-run config avoids overwriting persistent host Docker credentials.
+      // The token travels on stdin, never command arguments or release records.
+      await new Promise((resolve, reject) => {
+        const child = spawn('docker', ['login', 'ghcr.io', '--username', credentials.user, '--password-stdin'], { env, stdio: ['pipe', 'ignore', 'ignore'] });
+        const timeout = setTimeout(() => { child.kill(); reject(new Error('REGISTRY_LOGIN_TIMEOUT')); }, 30_000);
+        child.on('error', () => { clearTimeout(timeout); reject(new Error('REGISTRY_LOGIN_FAILED')); });
+        child.on('exit', code => { clearTimeout(timeout); code === 0 ? resolve() : reject(new Error('REGISTRY_LOGIN_FAILED')); });
+        child.stdin.on('error', () => {});
+        child.stdin.end(credentials.token);
+      });
+    }
     // Registry digest is checked against the exact tested configuration ID.
     if (receipt.image.includes('@')) await command('docker', ['pull', receipt.image], 300_000);
     const next = await inspect(receipt.image);
@@ -143,6 +159,7 @@ export async function deployRelease(config, receipt, request) {
       }
     }
   } finally {
+    if (dockerConfig) await rm(dockerConfig, { recursive: true, force: true });
     record.finishedAt = new Date().toISOString();
     if (maintenanceStarted) {
       record.maintenanceSeconds = Math.ceil((Date.now() - maintenanceStarted) / 1000);
@@ -160,9 +177,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const config = await privateJSON(process.argv[2] || '/etc/phoskywiki/release.json');
     let input = '';
     for await (const chunk of process.stdin) { input += chunk; if (input.length > 4096) fail('REQUEST_TOO_LARGE'); }
-    const request = JSON.parse(input);
-    const receipt = await fetchQualifiedRelease(config.repository, request.runId, request.sha);
-    const record = await deployRelease(config, receipt, request);
+    const { githubToken, registryUser, ...request } = JSON.parse(input);
+    if (typeof githubToken !== 'string' || githubToken.length < 20 || githubToken.length > 1024) fail('TEMPORARY_GITHUB_TOKEN_REQUIRED');
+    const receipt = await fetchQualifiedRelease(config.repository, request.runId, request.sha, githubToken);
+    const record = await deployRelease(config, receipt, request, { token: githubToken, user: registryUser });
     console.log(JSON.stringify(record));
     if (record.result !== 'succeeded') process.exitCode = 1;
   } catch { console.error('RELEASE_REFUSED: inspect protected host records and exact CI run'); process.exitCode = 1; }

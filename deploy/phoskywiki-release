@@ -5,6 +5,5 @@ set -eu
 export PATH=/usr/local/bin:/usr/bin:/bin
 export GH_HOST=github.com
 export GH_CONFIG_DIR=/etc/phoskywiki/github
-export GH_TOKEN="$(cat /etc/phoskywiki/release-github-token)"
-unset GITHUB_TOKEN NODE_OPTIONS NODE_PATH
+unset GH_TOKEN GITHUB_TOKEN NODE_OPTIONS NODE_PATH
 exec /usr/bin/node /opt/phoskywiki/scripts/release.mjs /etc/phoskywiki/release.json

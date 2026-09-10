@@ -66,7 +66,22 @@ jobs:
       BETTER_AUTH_SECRET: ci-better-auth-secret-0123456789abcdef0123456789abcdef
       BETTER_AUTH_URL: http://localhost:3000
       SEED_ADMIN_EMAIL: admin@phoskywiki.local
+      E2E_MEILI_HOST: http://localhost:7700
+      MEILI_HOST: http://localhost:7700
+      MEILI_MASTER_KEY: ci-meili-master-key
     services:
+      meilisearch:
+        image: getmeili/meilisearch:v1.15.0@sha256:1bb4bc096c7467ccb5db77bc0bc584c21623ecfc6f8f27e9802f67f809f30333
+        env:
+          MEILI_ENV: development
+          MEILI_MASTER_KEY: ci-meili-master-key
+        ports:
+          - 7700:7700
+        options: >-
+          --health-cmd "curl -fsS http://localhost:7700/health"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
       postgres:
         image: postgres:18.3-alpine3.23@sha256:54451ecb8ab38c24c3ec123f2fd501303a3a1856a5c66e98cecf2460d5e1e9d7
         env:

@@ -10,7 +10,7 @@ CI 构建一次应用镜像，容器验收和完整 Playwright 使用相同镜�
 3. 创建无密码登录的专用 SSH 用户 `phosky-release`，不给 Docker group、不允许写 `/opt/phoskywiki`、配置、脚本或 sudoers。authorized_keys 使用 `restrict,command="sudo -n /usr/local/sbin/phoskywiki-release"`。sudoers 只允许这个 root 拥有且无参数的固定命令；禁止 shell、docker、scp、任意 node 命令和端口转发。运维管理员保留独立恢复入口。
 4. 将 `deploy/phoskywiki-release` 安装到上述路径，root:root 0755。安装 Node 24.14.0、gh CLI、Docker 与支持 `!override` 的 Compose；核实 wrapper 中 Node 路径。将本次审查过的 `scripts/release*.mjs`、Compose 文件及 Caddy 配置部署到 root 拥有的 `/opt/phoskywiki`。发布只替换 app 镜像，Compose/代理/数据库/搜索变更须单独审查安装。
 5. 将 `deploy/release.example.json` 复制为 `/etc/phoskywiki/release.json`（root 0600），填入实际项目、目标、健康 URL 和 Compose 文件。`deployment.env` 为无引号的 `KEY=value` 数据，至少有固定 digest 的 `APP_IMAGE`、`BACKUP_IMAGE`、绝对路径 `SECRETS_DIR`。不得写 shell 展开。程序不会运行该文件里的 shell 代码。D03 的 backup-config 中 appRevision 和 runtime 必须对应实际运行版本；完整成功发布后自动更新 appRevision。
-6. `/etc/phoskywiki/release-github-token`（root 0600）只需该仓库 Actions read 和 Contents read；root 的 Docker 配置只需 GHCR 包读取权限。SSH 持有人不能提交本地收据或任意镜像，主机再次从 GitHub 获取可信证据。生产应用不能访问这些凭据。
+6. 不在服务器保存本机个人 GitHub 令牌。手动 workflow 将仅有 Contents/Actions/Packages read 的短期 `github.token` 随 SSH stdin 请求发送；主机只在 gh 子进程环境中使用它再次查询证据，随后通过 stdin 登录 GHCR。Docker 凭据放入本次发布独立的 0700 临时目录，正常完成或失败均删除；令牌不进入参数、输出、发布记录或应用容器。强制杀死进程可能留下临时目录，检查孤立进程后清理 `/tmp/phosky-release-auth-*`；GitHub 工作结束也会撤销该临时令牌。SSH 持有人不能提交本地收据或任意镜像。
 7. 先完成下述隔离演练，再配置真实站点；缺配置或凭据应失败，不能为获得绿灯绕过校验。D07 复验实际 SSH 限权、公开站点、恢复和 2 GB 资源。
 
 ## 常规发布
@@ -33,7 +33,7 @@ CI 构建一次应用镜像，容器验收和完整 Playwright 使用相同镜�
 | 迁移失败/超时、迁移集合不同或持久配置失败 | 保持停写、保留 release.lock，结果为 manual-recovery-required；禁止盲目重跑或切回 |
 | SSH 断开、进程被杀、主机重启 | 锁文件保留；检查记录、Docker app/ops 状态和数据库迁移表，确认无残留迁移容器仍在运行后人工处理 |
 
-自动切回只比较两个镜像的完整 SQL 和迁移 journal，保守拒绝任何迁移变更。即便维护者认为新增列兼容，也须在恢复副本验证旧应用可用后，通过受控运维入口显式切回；不在普通发布输入里提供“强制兼容”开关。
+发布预检要求迁移历史只能追加，原 SQL 和 journal 条目不能改变，并核对数据库已应用的哈希/时间戳与实际旧镜像一致；倒退、分叉或库外迁移漂移在停写前拒绝。自动切回只允许两个镜像的完整 SQL 和迁移 journal 相同。即便维护者认为新增列兼容，也须在恢复副本验证旧应用可用后，通过受控运维入口显式切回；不在普通发布输入里提供“强制兼容”开关。
 
 有破坏性变更时先安排单独维护：公告并停写，完整备份，克隆到独立空数据库/图片前缀，运行升级与真实浏览器验收，同时测试旧应用兼容性。若不能切回，提前准备修复升级路线及数据恢复方案。实际失败后保存当前数据库/图片证据（包括备份后新写入），使用 D03 恢复到**新的**空目标，核对/迁移增量内容、账号和图片，重建搜索并验证后再切换目标。不得向原库自动导入旧 dump 来“恢复绿灯”。由维护者确认目标和数据处理后清理锁；不删除证据。页面历史修订回滚不是部署或灾难恢复。
 

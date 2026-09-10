@@ -41,6 +41,16 @@ export async function runReleaseScenarios({ directory, project, env, override, o
     assert.equal((await run()).code, 1);
     await writeFile(backupPath, backup, { mode: 0o600 });
     await contentSurvives();
+    // A real container with no backup entrypoint fails create; no migration or
+    // switch is allowed even though configuration and the pinned image exist.
+    const deployment = await readFile(envFile, 'utf8');
+    await writeFile(envFile, deployment.replace(/^BACKUP_IMAGE=.*$/m, `BACKUP_IMAGE=${env.APP_IMAGE}`));
+    const failedBackup = await run();
+    assert.equal(failedBackup.result, 'failed-old-app-restored');
+    assert.equal(failedBackup.migration, 'not-started');
+    assert.equal(failedBackup.recoveryPoint, undefined);
+    await writeFile(envFile, deployment);
+    await contentSurvives();
     // Two real CLI processes; at most one reaches backup/migration.
     const parallel = await Promise.all([run(), run()]);
     assert.equal(parallel.filter(result => result.result === 'succeeded').length, 1, JSON.stringify(parallel));
@@ -58,7 +68,8 @@ export async function runReleaseScenarios({ directory, project, env, override, o
     for (const mode of ['backwards', 'unhealthy', 'migration', 'incompatible']) {
       const fault = join(faultDirectory, 'fault.mjs');
       const partialMigration = `const {readFileSync}=await import('node:fs');const {default:pg}=await import('pg');const p=new pg.Pool({connectionString:JSON.parse(readFileSync('/run/secrets/runtime.json')).DATABASE_URL});await p.query('CREATE TABLE d04_partial (evidence text)');await p.end();process.exit(1);`;
-      await writeFile(fault, `import {spawn} from 'node:child_process';\nconst args=process.argv.slice(2);if(args[0]===${JSON.stringify(mode === 'migration' ? 'migrate' : 'serve')}){${mode === 'migration' ? partialMigration : 'process.exit(1);'}}const c=spawn(process.execPath,['scripts/container-entrypoint.mjs',...args],{stdio:'inherit'});c.on('exit',code=>process.exit(code??1));\n`);
+      const newWrite = mode === 'unhealthy' ? `if(args[0]==='migrate'){const c=spawn(process.execPath,['scripts/container-entrypoint.mjs',...args],{stdio:'inherit'});const code=await new Promise(r=>c.on('exit',r));if(code!==0)process.exit(1);const {readFileSync}=await import('node:fs');const {default:pg}=await import('pg');const p=new pg.Pool({connectionString:JSON.parse(readFileSync('/run/secrets/runtime.json')).DATABASE_URL});await p.query('UPDATE terms SET summary=$1 WHERE page_id=$2',['备份完成后写入的简介',${Number(addedTerm.pageId)}]);await p.end();process.exit(0);}` : '';
+      await writeFile(fault, `import {spawn} from 'node:child_process';\nconst args=process.argv.slice(2);${newWrite}if(args[0]===${JSON.stringify(mode === 'migration' ? 'migrate' : 'serve')}){${mode === 'migration' ? partialMigration : 'process.exit(1);'}}const c=spawn(process.execPath,['scripts/container-entrypoint.mjs',...args],{stdio:'inherit'});c.on('exit',code=>process.exit(code??1));\n`);
       const dockerfile = join(faultDirectory, 'Dockerfile');
       // Build faults on the exact tested image; never rebuild application code.
       const change = mode === 'backwards' ? `USER root\nRUN node -e "const fs=require('fs'),p='drizzle/meta/_journal.json',j=JSON.parse(fs.readFileSync(p));j.entries.pop();fs.writeFileSync(p,JSON.stringify(j))"\nUSER node\n` : mode === 'incompatible' ? 'USER root\nRUN echo "-- changed schema requires manual review" > /app/drizzle/d04-extra.sql\nUSER node\n' : '';
@@ -76,6 +87,7 @@ export async function runReleaseScenarios({ directory, project, env, override, o
       if (mode === 'unhealthy') {
         assert.equal(result.result, 'failed-old-app-restored', JSON.stringify(result));
         assert((await (await page.request.get(`${origin}${addedTerm.href}`)).text()).includes('备份之后的新增内容仍然存在'));
+        assert((await (await page.request.get(`${origin}${addedTerm.href}`)).text()).includes('备份完成后写入的简介'), 'Fallback must not restore even the immediately preceding backup');
       } else {
         assert.equal(result.result, 'manual-recovery-required', JSON.stringify(result));
         assert.equal(result.migration, mode === 'migration' ? 'in-progress' : 'succeeded');

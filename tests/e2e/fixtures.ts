@@ -25,7 +25,7 @@ export const test = base.extend<{ seedBudget: void }>({
   browser: [async ({ browser }, provide) => {
     const isolated = new Proxy(browser, {
       get(target, property) {
-        if (property === 'newContext') return (options: BrowserContextOptions = {}) => target.newContext({ ...options, extraHTTPHeaders: { ...clientHeaders(), ...options.extraHTTPHeaders } });
+        if (property === 'newContext') return (options: BrowserContextOptions = {}) => target.newContext({ ...options, extraHTTPHeaders: options.extraHTTPHeaders ?? clientHeaders() });
         const value = Reflect.get(target, property);
         return typeof value === 'function' ? value.bind(target) : value;
       },
