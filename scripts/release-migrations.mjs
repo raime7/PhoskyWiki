@@ -32,6 +32,10 @@ export function verifyMigrationHistory(before, after) {
 export function verifyMigrationLedger(schema, applied) {
   if (applied.length !== schema.journal.entries.length || schema.journal.entries.some((entry, index) => {
     const file = `${entry.tag}.sql`, row = applied[index];
-    return row.created_at !== String(entry.when) || !matchesForward(file, row.hash, schema.files[file]);
+    // The legacy database was migrated by both Linux and Windows images, so
+    // either exact member of a reviewed pair can already be in its ledger.
+    // This is deliberately independent of the forward-only image transition.
+    return row.created_at !== String(entry.when) ||
+      !(matchesForward(file, row.hash, schema.files[file]) || matchesForward(file, schema.files[file], row.hash));
   })) throw new Error('DATABASE_MIGRATION_DRIFT');
 }
