@@ -1,11 +1,12 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { getDb, type Db } from "@/db";
 import { images } from "@/db/schema";
 import type { Actor } from "./review";
 import { IMAGE_ID, ImageError, imageReferences } from "./image-markdown";
 import { getObjectStore } from "./object-store";
+import { LimitError, limitResponse, limitSetting } from "./write-limits";
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 const TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
@@ -18,9 +19,27 @@ export async function beginImageUpload(input: unknown, actor: Actor) {
   }
   const id = randomUUID();
   const stagingKey = `staging/${id}`;
-  const signed = await getObjectStore().presignUpload(stagingKey, body.contentType);
-  await getDb().insert(images).values({ id, uploadedBy: actor.id, filename: body.filename, contentType: body.contentType, size: body.size, stagingKey });
-  return { id, ...signed, expiresIn: 300 };
+  const { filename, contentType, size } = body;
+  const maximum = limitSetting("UPLOAD_FILE_BYTES", 10 * 1024 * 1024, 10 * 1024 * 1024);
+  if (size > maximum) throw new ImageError(400, `图片超过本站单文件限制（${maximum} 字节）`);
+  return getDb().transaction(async tx => {
+    // Exact account row lock: no hash collisions, shared IPs or client identity fields.
+    await tx.execute(sql`SELECT id FROM "user" WHERE id = ${actor.id} FOR UPDATE`);
+    const usage = await tx.execute<{ bytes: string; pending: string }>(sql`
+      SELECT COALESCE(SUM(size), 0)::text AS bytes,
+        COUNT(*) FILTER (WHERE object_key IS NULL)::text AS pending
+      FROM images WHERE uploaded_by = ${actor.id} AND expired_at IS NULL
+    `);
+    if (Number(usage.rows[0].bytes) + size > limitSetting("UPLOAD_ACCOUNT_BYTES", 1024 * 1024 * 1024, Number.MAX_SAFE_INTEGER)) {
+      throw new LimitError("upload_bytes", "账号图片容量已达上限，请联系管理员");
+    }
+    if (Number(usage.rows[0].pending) >= limitSetting("UPLOAD_PENDING_COUNT", 20)) {
+      throw new LimitError("upload_pending", "待完成上传数量已达上限，请完成上传或等待暂存清理");
+    }
+    const signed = await getObjectStore().presignUpload(stagingKey, contentType);
+    await tx.insert(images).values({ id, uploadedBy: actor.id, filename, contentType, size, stagingKey });
+    return { id, ...signed, expiresIn: 300 };
+  });
 }
 
 export async function completeImageUpload(id: string, actor: Actor) {
@@ -29,6 +48,7 @@ export async function completeImageUpload(id: string, actor: Actor) {
     const [row] = await tx.select().from(images).where(eq(images.id, id)).for("update");
     if (!row || row.uploadedBy !== actor.id) throw new ImageError(404, "图片不存在");
     if (!row.objectKey) {
+      if (row.expiredAt || Date.now() - row.createdAt.getTime() >= stagingMaxAgeSeconds() * 1000) throw new ImageError(410, "暂存上传已过期，请重新上传");
       const store = getObjectStore();
       const metadata = await store.head(row.stagingKey);
       if (!metadata) throw new ImageError(409, "上传尚未完成，请重试");
@@ -67,7 +87,12 @@ export async function publishImageReferences(tx: Tx, content: string) {
 }
 
 export function imageErrorResponse(error: unknown): Response {
+  if (error instanceof LimitError) return limitResponse(error);
   if (error instanceof ImageError) return Response.json({ error: error.message }, { status: error.status });
   // SDK 错误可能包含签名地址；不传给客户端。
   return Response.json({ error: "图片存储暂不可用，请稍后重试" }, { status: 503 });
+}
+
+export function stagingMaxAgeSeconds() {
+  return Math.max(3600, limitSetting("UPLOAD_STAGING_SECONDS", 86400));
 }

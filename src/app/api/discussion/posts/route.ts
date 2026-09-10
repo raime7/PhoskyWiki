@@ -1,3 +1,4 @@
+import { writeLimitResponse } from "@/lib/write-limits";
 // 发表讨论楼层/回复（T13）：编者与管理员都可发言，游客 401（只读）。
 // 语义（一层嵌套、视角锚点、锁定）见 lib/discussion.ts 的 createDiscussionPost。
 
@@ -21,8 +22,11 @@ function parseId(value: unknown, field: string): number | undefined {
 export async function POST(req: Request) {
   const session = await auth.api.getSession({ headers: req.headers });
   if (!session) {
+
     return Response.json({ error: "发言需要登录" }, { status: 401 });
   }
+  const limited = await writeLimitResponse(session.user.id);
+  if (limited) return limited;
 
   let body: unknown;
   try {

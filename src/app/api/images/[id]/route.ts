@@ -1,3 +1,4 @@
+import { writeLimitResponse } from "@/lib/write-limits";
 import { auth } from "@/lib/auth";
 import type { UserRole } from "@/db/schema";
 import { completeImageUpload, imageReadUrl, imageErrorResponse } from "@/lib/images";
@@ -6,6 +7,8 @@ type Context = { params: Promise<{ id: string }> };
 export async function POST(req: Request, context: Context) {
   const session = await auth.api.getSession({ headers: req.headers });
   if (!session) return Response.json({ error: "上传图片需要登录" }, { status: 401 });
+  const limited = await writeLimitResponse(session.user.id, "complete");
+  if (limited) return limited;
   try {
     return Response.json(await completeImageUpload((await context.params).id, { id: session.user.id, role: session.user.role as UserRole }));
   } catch (error) { return imageErrorResponse(error); }

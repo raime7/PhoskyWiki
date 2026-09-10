@@ -16,6 +16,7 @@ import { sql } from "drizzle-orm";
 import type { MetadataSnapshot, RevisionSource } from "@/lib/revision-snapshot";
 import type { KeyText } from "@/lib/key-texts";
 import {
+  bigint,
   boolean,
   check,
   index,
@@ -578,4 +579,16 @@ export const images = pgTable("images", {
   objectKey: text("object_key").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   publishedAt: timestamp("published_at", { withTimezone: true }),
+  expiredAt: timestamp("expired_at", { withTimezone: true }),
+  stagingCleanedAt: timestamp("staging_cleaned_at", { withTimezone: true }),
 }, (t) => [index("images_uploader_idx").on(t.uploadedBy)]);
+
+/** Persistent per-account admission counters; one bounded row per operation. */
+export const writeLimits = pgTable("write_limits", {
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  attempts: integer("attempts").notNull(),
+  admitted: bigint("admitted", { mode: "number" }).notNull(),
+  denied: bigint("denied", { mode: "number" }).notNull(),
+}, t => [primaryKey({ columns: [t.userId, t.kind] })]);

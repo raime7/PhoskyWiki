@@ -9,7 +9,7 @@ it.skipIf(!endpoint || !bucket || !accessKeyId || !secretAccessKey)("ObjectStore
   const config = { endpoint: endpoint!, bucket: bucket!, accessKeyId: accessKeyId!, secretAccessKey: secretAccessKey! };
   const store = r2ObjectStore(config);
   const client = new S3Client({ endpoint, region: "auto", credentials: config });
-  const source = `contract/${randomUUID()}/staging`;
+  const source = `staging/${randomUUID()}`;
   const frozen = `contract/${randomUUID()}/frozen`;
   const bytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aVYQAAAAASUVORK5CYII=", "base64");
   try {
@@ -25,6 +25,11 @@ it.skipIf(!endpoint || !bucket || !accessKeyId || !secretAccessKey)("ObjectStore
     const read = await fetch(await store.presignRead(frozen));
     expect(read.ok).toBe(true);
     expect(Buffer.from(await read.arrayBuffer())).toEqual(bytes);
+    await expect(store.deleteStaging(frozen)).rejects.toThrow("INVALID_STAGING_KEY");
+    await store.deleteStaging(source);
+    await store.deleteStaging(source);
+    expect(await store.head(source)).toBeNull();
+    expect(Buffer.from(await (await fetch(await store.presignRead(frozen))).arrayBuffer())).toEqual(bytes);
   } finally {
     await client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: [{ Key: source }, { Key: frozen }] } }));
     client.destroy();

@@ -1,9 +1,13 @@
+import { writeLimitResponse } from "@/lib/write-limits";
 import { auth } from "@/lib/auth";
 import { markNotificationRead } from "@/lib/notifications";
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await auth.api.getSession({ headers: req.headers });
   if (!session) return Response.json({ error: "查看通知需要登录" }, { status: 401 });
+  const limited = await writeLimitResponse(session.user.id);
+  if (limited) return limited;
+
 
   const id = Number((await ctx.params).id);
   if (!Number.isSafeInteger(id) || id <= 0 || id > 2147483647) {

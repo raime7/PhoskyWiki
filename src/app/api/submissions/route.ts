@@ -1,3 +1,4 @@
+import { writeLimitResponse } from "@/lib/write-limits";
 // 创建提交（T06）：编者把编辑/新建提议送入审核队列；管理员本人提交直接生效。
 // 准入：登录（editor/admin 皆可，游客 401）。语义见 ADR-0004 与 lib/review.ts。
 
@@ -45,8 +46,11 @@ function parseSubmissionInput(body: Record<string, unknown>): SubmissionInput {
 export async function POST(req: Request) {
   const session = await auth.api.getSession({ headers: req.headers });
   if (!session) {
+
     return Response.json({ error: "提交需要登录" }, { status: 401 });
   }
+  const limited = await writeLimitResponse(session.user.id);
+  if (limited) return limited;
 
   let body: unknown;
   try {

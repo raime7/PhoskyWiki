@@ -13,17 +13,22 @@ try {
     if (typeof config[key] !== "string" || !config[key].trim()) throw new Error();
     process.env[key] = config[key];
   }
-  for (const key of ["INVITATION_TTL_SECONDS", "PASSWORD_RESET_TTL_SECONDS", "PHOSKYWIKI_ENV"]) {
+  for (const key of ["INVITATION_TTL_SECONDS", "PASSWORD_RESET_TTL_SECONDS", "PHOSKYWIKI_ENV",
+    "WRITE_LIMIT_COUNT", "WRITE_LIMIT_SECONDS", "UPLOAD_LIMIT_COUNT", "UPLOAD_LIMIT_SECONDS",
+    "COMPLETE_LIMIT_COUNT", "COMPLETE_LIMIT_SECONDS", "UPLOAD_FILE_BYTES", "UPLOAD_ACCOUNT_BYTES",
+    "UPLOAD_PENDING_COUNT", "UPLOAD_STAGING_SECONDS"]) {
     if (config[key] !== undefined) {
       if (typeof config[key] !== "string" || !config[key].trim()) throw new Error();
       process.env[key] = config[key];
     }
   }
   const [command, ...args] = process.argv.slice(2);
-  if (!["serve", "verify", "migrate", "bootstrap", "reindex", "recover-admin"].includes(command)) throw new Error();
+  if (!["serve", "verify", "migrate", "bootstrap", "reindex", "recover-admin", "images"].includes(command)) throw new Error();
   const child = spawn(process.execPath, command === "serve"
     ? ["node_modules/next/dist/bin/next", "start", "--hostname", "0.0.0.0"]
-    : ["--conditions=react-server", "--import=tsx", "scripts/production.ts", command, ...args], { stdio: "inherit" });
+    : command === "images"
+      ? ["--conditions=react-server", "--import=tsx", "scripts/images.ts", ...args]
+      : ["--conditions=react-server", "--import=tsx", "scripts/production.ts", command, ...args], { stdio: "inherit" });
   for (const signal of ["SIGTERM", "SIGINT"]) process.on(signal, () => child.kill(signal));
   child.on("error", () => { console.error("CONTAINER_START_FAILED"); process.exit(1); });
   child.on("exit", code => process.exit(code ?? 1));

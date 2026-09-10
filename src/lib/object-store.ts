@@ -9,6 +9,7 @@ export interface ObjectStore {
   head(key: string): Promise<ObjectMetadata | null>;
   copy(source: string, destination: string, etag: string): Promise<void>;
   presignRead(key: string): Promise<string>;
+  deleteStaging(key: string): Promise<void>;
 }
 let injected: ObjectStore | undefined;
 export function injectObjectStore(store: ObjectStore | undefined) { injected = store; }

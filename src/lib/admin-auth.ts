@@ -1,3 +1,4 @@
+import { writeLimitResponse } from "./write-limits";
 // 管理员操作的准入（T05 会话角色）：请求经 better-auth 解析数据库会话，
 // 未登录 401、已登录但非 admin 403——游客与普通编者都进不了管理员操作。
 
@@ -27,6 +28,10 @@ export async function requireAdminUser(
   const role = session.user.role as UserRole;
   if (role !== "admin") {
     return Response.json({ error: "需要管理员角色" }, { status: 403 });
+  }
+  if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    const limited = await writeLimitResponse(session.user.id);
+    if (limited) return limited;
   }
   return { user: { id: session.user.id, role } };
 }

@@ -8,6 +8,10 @@ export class FakeObjectStore implements ObjectStore {
     this.objects.set(new URL(url).pathname.slice(1), { size, contentType, etag: `${size}-${Math.random()}` });
   }
   async head(key: string) { return this.objects.get(key) ?? null; }
+  async deleteStaging(key: string) {
+    if (!/^staging\/[0-9a-f-]{36}$/.test(key)) throw new Error("INVALID_STAGING_KEY");
+    this.objects.delete(key);
+  }
   async copy(source: string, destination: string, etag: string) {
     const value = this.objects.get(source);
     if (!value || value.etag !== etag) throw new Error("Object changed");
