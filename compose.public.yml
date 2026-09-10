@@ -2,8 +2,14 @@
 # DNS must proxy phoskywiki.org to this host; Cloudflare uses Full (strict).
 services:
   proxy:
+    image: ${CADDY_IMAGE:?set tested immutable Caddy DNS image}
+    entrypoint: ["/bin/sh", "/etc/caddy/entrypoint.sh"]
+    command: ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./deploy/Caddyfile.public:/etc/caddy/Caddyfile:ro
+      - ./deploy/caddy-entrypoint.sh:/etc/caddy/entrypoint.sh:ro
+      - ./deploy/cloudflare-cidrs.txt:/etc/caddy/cloudflare-cidrs.txt:ro
+      - ${SECRETS_DIR}/cloudflare-dns-token:/run/secrets/cloudflare-dns-token:ro

@@ -26,6 +26,12 @@ export function evaluateStatus(s, now=Date.now(), backupBytesLimit=10*1024**3) {
   if (s.restartCount>=3) issues.push('CONTAINER_RESTARTS');
   if (!s.logsRotated) issues.push('LOG_ROTATION_INVALID');
   if (s.backupBytes>=backupBytesLimit) issues.push('BACKUP_CAPACITY');
+  if (!s.staging || !Number.isFinite(s.staging.completedAt) || s.staging.completedAt<0 || s.staging.completedAt>now+300000 || typeof s.staging.timerActive!=='boolean') issues.push('STAGING_STATUS_INVALID');
+  else {
+    if (s.staging.result!=='success') issues.push('STAGING_CLEANUP_FAILED');
+    if (!s.staging.timerActive) issues.push('STAGING_TIMER_STOPPED');
+    if (!s.staging.completedAt || now-s.staging.completedAt>=3*3600000) issues.push('STAGING_CLEANUP_STALE');
+  }
   return issues;
 }
 

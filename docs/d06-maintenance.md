@@ -62,7 +62,7 @@ Register-ScheduledTask -TaskName 'PhoskyWiki Backup Retention' -Action $action -
 Get-ScheduledTaskInfo -TaskName 'PhoskyWiki Backup Retention'
 ```
 
-图片上传/读取使用独立验收（见 write-and-upload-limits.md）；`/healthz` 和搜索检查不能证明 R2 可用。D07 须启用暂存清理调度并接入非零退出/清理落后的信号，目前不能把其生产调度标作完成。
+图片上传/读取使用独立验收（见 write-and-upload-limits.md）；`/healthz` 和搜索检查不能证明 R2 可用。D07 已启用每小时暂存清理，提供失败、停止与三小时回执过期信号；安装、监控发布顺序和实测状态见 [D07 手册](d07-operations.md) 与 [报告](reports/d07-implementation.md)。
 
 ## 外部告警和邮箱
 

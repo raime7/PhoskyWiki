@@ -44,6 +44,11 @@ print(json.dumps({
     'memoryPercent': round((total - available) / total * 100, 1),
     'retentionAt': receipt('retention.json').get('completedAt', 0),
     'backupBytes': receipt('retention.json').get('backupBytes'),
+    'staging': {
+        'completedAt': receipt('staging.json').get('completedAt', 0),
+        'timerActive': command('systemctl', 'is-active', 'phoskywiki-staging.timer') == 'active',
+        'result': command('systemctl', 'show', 'phoskywiki-staging.service', '--property=Result', '--value'),
+    },
     'search': search,
     'searchTimerActive': command('systemctl', 'is-active', 'phoskywiki-search.timer') == 'active',
     'searchResult': command('systemctl', 'show', 'phoskywiki-search.service', '--property=Result', '--value'),

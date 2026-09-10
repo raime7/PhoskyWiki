@@ -1,0 +1,13 @@
+[Unit]
+Description=Cloudflare-only public web origin (IPv4 and IPv6)
+Wants=network-online.target
+After=network-online.target
+Before=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/phoskywiki/deploy/phoskywiki-origin-firewall.py
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

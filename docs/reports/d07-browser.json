@@ -1,0 +1,17 @@
+{
+  "startedAt": "2026-09-10T10:10:53.509Z",
+  "environment": "https://d07-check.phoskywiki.org",
+  "productionDataModified": false,
+  "ok": true,
+  "steps": [
+    "two-browser-admin-logins-refresh-session-isolation",
+    "invited-browser-registration-editor-role-and-replay-rejected",
+    "real-browser-R2-CORS-upload-freeze-private-read",
+    "first-vote-private-second-vote-public-real-image-bytes",
+    "signed-staging-replay-does-not-change-frozen-public-image",
+    "public-browser-navigation-content-and-real-search",
+    "password-reset-old-password-and-session-revoked-token-single-use"
+  ],
+  "imageId": "ea3dc6b2-aed3-47aa-a624-6028564ec8e8",
+  "finishedAt": "2026-09-10T10:11:35.757Z"
+}
