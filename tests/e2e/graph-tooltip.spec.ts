@@ -99,7 +99,7 @@ test("局部图谱：历史特殊名称按文本显示，悬停无注入且点�
   await page.goto(entryUrl);
   await expect(page).toHaveURL(entryUrl);
   const canvas = page.getByTestId("graph-canvas");
-  await expect(canvas.locator("canvas")).toBeVisible();
+  await expect(canvas.locator("svg[data-graph-surface]")).toBeVisible();
   await canvas.scrollIntoViewIfNeeded();
   const box = (await canvas.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
