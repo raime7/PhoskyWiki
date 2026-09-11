@@ -1,48 +1,146 @@
-# dependencies
-/node_modules
-/.agents
-skills-lock.json
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Strict allowlist: new root files/directories are ignored by default.
+# Add a scoped ! rule here when introducing a new project file type.
+# git add -f can bypass these rules; review staged paths before committing.
+*
 
-# testing
-/coverage
-/test-results/
-/artifacts/operations/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
+# Repository, package and build configuration
+!/.gitignore
+!/.gitattributes
+!/.dockerignore
+!/.env.example
+!/AGENTS.md
+!/CONTEXT.md
+!/README.md
+!/REQUIREMENTS.md
+!/package.json
+!/pnpm-lock.yaml
+!/pnpm-workspace.yaml
+!/components.json
+!/tsconfig.json
+!/next.config.ts
+!/postcss.config.mjs
+!/eslint.config.mjs
+!/drizzle.config.ts
+!/vitest.config.ts
+!/playwright.config.ts
+!/playwright.r2.config.ts
+!/Dockerfile
+!/Dockerfile.backup
+!/docker-compose.yml
+!/compose.backup.yml
+!/compose.maintenance.yml
+!/compose.production.yml
+!/compose.public.yml
+!/compose.test.yml
 
-# next.js
-/.next/
-/out/
+# Application source
+!/src/
+!/src/**/
+!/src/**/*.ts
+!/src/**/*.tsx
+!/src/**/*.css
+!/src/**/*.ico
 
-# production
-/build
+# Tests and their fixtures
+!/tests/
+!/tests/**/
+!/tests/**/*.ts
+!/tests/**/*.tsx
+!/tests/**/*.mjs
+!/tests/**/*.json
+
+# Database migrations and migration metadata
+!/drizzle/
+!/drizzle/**/
+!/drizzle/**/*.sql
+!/drizzle/**/*.json
+
+# Maintained scripts
+!/scripts/
+!/scripts/**/
+!/scripts/**/*.ts
+!/scripts/**/*.mjs
+!/scripts/**/*.py
+
+# Public web assets
+!/public/
+!/public/**/
+!/public/**/*.svg
+!/public/**/*.png
+!/public/**/*.jpg
+!/public/**/*.jpeg
+!/public/**/*.webp
+!/public/**/*.avif
+!/public/**/*.gif
+!/public/**/*.ico
+!/public/**/*.woff
+!/public/**/*.woff2
+!/public/robots.txt
+!/public/site.webmanifest
+
+# Formal documentation; generated run reports stay local.
+!/docs/
+!/docs/**/
+!/docs/**/*.md
+# Existing migration regression tests require these two evidence fixtures.
+!/docs/reports/d06-legacy-migration-hashes.json
+!/docs/reports/d06-legacy-migration-ledger.json
+
+# GitHub automation
+!/.github/
+!/.github/dependabot.yml
+!/.github/workflows/
+!/.github/workflows/*.yml
+
+# Deployment configuration and maintained utilities (explicit files only)
+!/deploy/
+!/deploy/Caddyfile
+!/deploy/Caddyfile.public
+!/deploy/Dockerfile.caddy
+!/deploy/admins.example.json
+!/deploy/backup-retention.ps1
+!/deploy/caddy-entrypoint.sh
+!/deploy/cloudflare-cidrs.txt
+!/deploy/create-recovery-vault.py
+!/deploy/phoskywiki-backup-run.py
+!/deploy/phoskywiki-backup.service
+!/deploy/phoskywiki-backup.timer
+!/deploy/phoskywiki-monitor-status.py
+!/deploy/phoskywiki-origin-firewall.py
+!/deploy/phoskywiki-origin-firewall.service
+!/deploy/phoskywiki-release
+!/deploy/phoskywiki-search.service
+!/deploy/phoskywiki-search.timer
+!/deploy/phoskywiki-staging-run.py
+!/deploy/phoskywiki-staging.service
+!/deploy/phoskywiki-staging.timer
+!/deploy/release.example.json
+!/deploy/runtime.example.json
+!/deploy/sshd-phoskywiki.conf
+
+# Local/generated files are excluded even inside allowed directories.
+**/node_modules/
+**/__pycache__/
+**/.cache/
+**/.next/
+**/coverage/
+**/test-results/
+**/playwright-report/
+**/blob-report/
+**/.scratch/
+**/.playwright-mcp/
+**/.DS_Store
+**/Thumbs.db
+**/Desktop.ini
+**/*.log
+**/*.log.*
+**/*.tmp
+**/*.bak
+**/*.swp
+**/*.tsbuildinfo
+**/next-env.d.ts
+**/.env*
+!/.env.example
+**/*.pem
+**/*.key
 /deploy/secrets/
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-*.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-!.env.example
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts

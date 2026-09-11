@@ -33,7 +33,7 @@
 
 前三次发布均在停写前拒绝，完整保留失败记录：旧 runtime 缺少 production 标识；Docker 29 containerd 的 manifest ID 与经典 Docker config ID 语义不同；Windows 旧镜像与 Linux 新镜像历史 SQL 换行不同。分别补齐 runtime 和 backup runtime 一致配置、严格校验固定 manifest 的 config digest、采用逐文件审查过的 13 对哈希别名解决。实际账本为早期 LF 与最后一次 CRLF 混合；未修改数据库旧账本。正确收据/账本通过，错误 config digest/未知迁移哈希拒绝，未来 LF 镜像兼容在内存模拟验证通过。
 
-脱敏主机发布记录、运行状态、备份/保留回执及搜索指标见 [生产部署 JSON](d06-production-deployment.json)，历史文件与账本证据见 [文件哈希](d06-legacy-migration-hashes.json) 和 [迁移账本](d06-legacy-migration-ledger.json)。
+脱敏主机发布记录、运行状态、备份/保留回执及搜索指标见 生产部署 JSON（本机原始证据，不随仓库分发：`d06-production-deployment.json`），历史文件与账本证据见 [文件哈希](d06-legacy-migration-hashes.json) 和 [迁移账本](d06-legacy-migration-ledger.json)。
 
 ## 部署后验证
 

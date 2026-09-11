@@ -43,4 +43,4 @@ docker compose -f compose.production.yml -f compose.backup.yml --profile backup 
 
 目标保留最近 14 天及 4 个周恢复点；当前不自动删除恢复点。清理凭据只在维护者本机保存，服务器没有它。Cloudflare R2 的 Object Read & Write 权限包含删除，因此写入凭据本身仍有删除备份的能力；不同凭据仅实现用途分离，不能宣称不可删除或抵御整账户失陷。不要配置按对象年龄删除图片的生命周期规则。外部失败通知、过期检测、定期保留清理和密码管理器中的独立密钥托管仍需对应运维任务完成。
 
-实测证据见 [d03-backup-evidence.json](reports/d03-backup-evidence.json)。完整站点恢复目标为 24 小时，当前隔离恢复实测不包含采购替代服务器、账号恢复与 DNS 切换时间。
+实测证据见 d03-backup-evidence.json（本机原始证据，不随仓库分发：`reports/d03-backup-evidence.json`）。完整站点恢复目标为 24 小时，当前隔离恢复实测不包含采购替代服务器、账号恢复与 DNS 切换时间。

@@ -1,9 +1,0 @@
-{
-  "checkedAt": "2026-09-10T06:59:17.003Z",
-  "bucket": "phoskywiki-d05-test",
-  "remainingObjects": 0,
-  "truncated": false,
-  "contract": "passed",
-  "browserLifecycle": "passed",
-  "credentialAcl": "current Windows user and SYSTEM only"
-}

@@ -1,6 +1,6 @@
 # D03 备份恢复补充验证
 
-2026-09-10。工单：[#37](https://github.com/raime7/PhoskyWiki/issues/37)。既有备份实现与历史真实恢复证据见 [备份手册](../backups.md) 和 [历史证据](d03-backup-evidence.json)。本文仅记录本轮增量，不将历史证据算作本轮重测。
+2026-09-10。工单：[#37](https://github.com/raime7/PhoskyWiki/issues/37)。既有备份实现与历史真实恢复证据见 [备份手册](../backups.md) 和 历史证据（本机原始证据，不随仓库分发：`d03-backup-evidence.json`）。本文仅记录本轮增量，不将历史证据算作本轮重测。
 
 ## 改动
 

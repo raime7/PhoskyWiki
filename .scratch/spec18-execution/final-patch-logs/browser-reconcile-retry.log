@@ -1,9 +1,0 @@
-
-Running 2 tests using 1 worker
-
-(node:115136) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(Use `node --trace-warnings ...` to show where the warning was created)
-  ok 1 [chromium] › tests\e2e\reconcile-links.spec.ts:32:5 › 存量校对保留真实改名前目标、清除代码假链，公开历史与重复报告稳定 (3.1s)
-  ok 2 [chromium] › tests\e2e\reconcile-links.spec.ts:107:5 › 校对逐页报告锁冲突和不存在的页面，成功项继续处理，故障解除后可按 id 重试 (6.2s)
-
-  2 passed (10.5s)

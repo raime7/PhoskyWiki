@@ -19,7 +19,7 @@
 | 生产模式 Playwright 认证/内容生产回归 | 5 项通过，包括注册/登录/会话、编者提交和管理员发布 |
 | 固定提交的真实容器验收 | 通过；临时干净检出 `ebd4130`，报告 `dirty=false` |
 
-最终容器测试于北京时间 10:45:35–10:48:23 执行。镜像为 `sha256:076515879e949126d35e53d72f38062700da68fef5c77d1e243b46d406b5ca42`；原始脱敏证据见 [d01-container-evidence.json](d01-container-evidence.json)。
+最终容器测试于北京时间 10:45:35–10:48:23 执行。镜像为 `sha256:076515879e949126d35e53d72f38062700da68fef5c77d1e243b46d406b5ca42`；原始脱敏证据见 d01-container-evidence.json（本机原始证据，不随仓库分发：`d01-container-evidence.json`）。
 
 真实 Docker Desktop / WSL2 容器完成了：从无生产配置的构建环境生成镜像；四服务健康检查；不发布应用/PG/搜索宿主端口；错误迁移目标拒绝；迁移与初始化；并发重试；两位管理员浏览器登录；网站 HTTP 创建首条正文词条；新建及管理员直编修订；真实 Meilisearch 重建和检索；应用重启及强制替换后原密码登录、正文、修订和图片元数据保留。
 
@@ -58,9 +58,9 @@
 | SSH | 已安装独立 Ed25519 运维公钥并实测密钥登录；指纹 `SHA256:m6mk5Kfp/DosT/5nKeEz4+S5J7pytzr31S8s0XQiLBU`。这是维护者 root 运维入口，不是受限自动发布账号 |
 | 大陆拨测 | Globalping 六城市、电信/联通/移动节点：健康接口、登录页、CSS 共 18 次请求全部 200，TLS 校验均有效。登录页 0.964–3.468 秒，CSS 0.286–1.928 秒；健康接口 1.407–11.452 秒，跨境链路存在明显波动 |
 
-原始组合负载记录见 [d01-live-load.json](d01-live-load.json)，恢复点与负面契约见 [d03-backup-evidence.json](d03-backup-evidence.json)。宿主采样间隔 200 ms，可能漏掉更短峰值；cgroup 栏是生命周期峰值，不相加充当同时峰值。数据集只有初始编委会和两位管理员，生产库没有永久图片记录；真实图片契约单独运行，不能将小数据集测试推导为大容量承诺。
+原始组合负载记录见 d01-live-load.json（本机原始证据，不随仓库分发：`d01-live-load.json`），恢复点与负面契约见 d03-backup-evidence.json（本机原始证据，不随仓库分发：`d03-backup-evidence.json`）。宿主采样间隔 200 ms，可能漏掉更短峰值；cgroup 栏是生命周期峰值，不相加充当同时峰值。数据集只有初始编委会和两位管理员，生产库没有永久图片记录；真实图片契约单独运行，不能将小数据集测试推导为大容量承诺。
 
-大陆拨测使用 [Globalping 官方 API](https://github.com/jsdelivr/globalping/blob/master/public/v1/spec.yaml)，探针元数据标记 CN/eyeball-network，分别为广州/西安电信 AS4134、武汉/长沙联通 AS4837、北京/上海移动 AS9808。原始记录见 [d01-mainland-http.json](d01-mainland-http.json) 和 [d01-mainland-assets.json](d01-mainland-assets.json)。测量 ID 保存在文件中；这些是一次性 HTTP/TLS 抽样，不是浏览器完整加载或全天可用性承诺。
+大陆拨测使用 [Globalping 官方 API](https://github.com/jsdelivr/globalping/blob/master/public/v1/spec.yaml)，探针元数据标记 CN/eyeball-network，分别为广州/西安电信 AS4134、武汉/长沙联通 AS4837、北京/上海移动 AS9808。原始记录见 d01-mainland-http.json（本机原始证据，不随仓库分发：`d01-mainland-http.json`） 和 d01-mainland-assets.json（本机原始证据，不随仓库分发：`d01-mainland-assets.json`）。测量 ID 保存在文件中；这些是一次性 HTTP/TLS 抽样，不是浏览器完整加载或全天可用性承诺。
 
 **仍未关闭：**真实域名浏览器客户端导航验收及验收测试密钥撤销。浏览器控制通道出现 `nodeRepl.fetch request failed`，重置与重新打开页面后仍超时。每 12 小时备份已运行，但外部失败/过期告警、14 天及 4 周保留清理、密码管理器独立密钥托管和完整故障到恢复的 24 小时演练仍属于部署运维后续验收。此记录不声称整个部署规格完成。
 
