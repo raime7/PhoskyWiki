@@ -351,11 +351,11 @@ export const submissionVotes = pgTable(
  * trusted 为二期「免审编者晋级层」的预留扩展位——枚举先落库，业务语义随该工单再实现。
  * 「游客」不是数据库角色：未登录即游客，无 user 行。
  */
-export const userRoleEnum = pgEnum("user_role", ["editor", "admin", "trusted"] as const);
+export const userRoleEnum = pgEnum("user_role", ["editor", "admin", "trusted", "superadmin"] as const);
 
 export type UserRole = (typeof userRoleEnum.enumValues)[number];
 
-/** 编者/管理员账号。注册即 editor；管理员由种子或既有管理员指定。 */
+/** 注册即 editor；角色调整由超级管理员执行。 */
 export const user = pgTable("user", {
   id: text("id")
     .primaryKey()
@@ -371,6 +371,16 @@ export const user = pgTable("user", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+});
+
+/** 角色变更的审计记录；账号移除后仍保留当时的身份 ID。 */
+export const roleChanges = pgTable("role_changes", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  actorId: text("actor_id").notNull(),
+  targetUserId: text("target_user_id").notNull(),
+  previousRole: userRoleEnum("previous_role").notNull(),
+  newRole: userRoleEnum("new_role").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /** 数据库会话（better-auth）：httpOnly cookie 存 token，服务端查本表。 */
