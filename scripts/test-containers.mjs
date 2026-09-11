@@ -205,7 +205,7 @@ volumes:
     await compose(["up", "-d", "--wait", "app", "proxy"]);
     for (const admin of admins) await login(admin);
     await page.goto(`${origin}${term.href}`);
-    assert((await page.locator("body").innerText()).includes("生产容器中创建的第一篇正文"));
+    assert((await page.locator("body").innerText()).includes("管理员直编后的简介"));
     assert.deepEqual(await (await page.request.get(historyURL)).json(), history);
     assert.equal(await compose(["exec", "-T", "postgres", "psql", "-U", "phosky", "-d", "phoskywiki_test", "-Atc", sql], undefined, true), metadata);
     assert.equal((await page.request.get(`${origin}/healthz`)).status(), 200);

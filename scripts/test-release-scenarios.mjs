@@ -27,7 +27,7 @@ export async function runReleaseScenarios({ directory, project, env, override, o
   }
   async function contentSurvives() {
     assert.equal((await page.request.get(`${origin}${term.href}`)).status(), 200);
-    assert((await (await page.request.get(`${origin}${term.href}`)).text()).includes('生产容器中创建的第一篇正文'));
+    assert((await (await page.request.get(`${origin}${term.href}`)).text()).includes('管理员直编后的简介'));
   }
   const s3 = new S3Client({ endpoint: releaseSettings.endpoint, region: 'auto', credentials: releaseSettings });
   const prefix = `d04/${project}/`;

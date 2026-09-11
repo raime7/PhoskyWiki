@@ -72,7 +72,7 @@ it("两个超级管理员并发互相降级时只允许一方成功", async () =
 it("超级管理员直接发布并可删除恢复词条、查看删除后的历史", async () => {
   await seedDatabase();
   const owner = await actor("superadmin");
-  const result = await submit(request(owner.cookie, { kind: "new_term", title: `超管-${randomUUID()}`, content: "超管直接发布" }));
+  const result = await submit(request(owner.cookie, { kind: "new_term", title: `超管-${randomUUID()}`, summary: "超管直接发布" }));
   expect(result.status).toBe(201);
   const created = await result.json();
   expect(created.outcome).toBe("direct");
@@ -104,7 +104,7 @@ it("一位超级管理员和一位管理员组成两票审核，超级管理员�
     const owner = await actor("superadmin");
     const admin = await actor("admin");
     const editor = await actor("editor");
-    const result = await submit(request(editor.cookie, { kind: "new_term", title: `两票-${randomUUID()}`, content: "需要两位管理员受理" }));
+    const result = await submit(request(editor.cookie, { kind: "new_term", title: `两票-${randomUUID()}`, summary: "需要两位管理员受理" }));
     const created = await result.json();
     expect(created).toMatchObject({ outcome: "pending", quorum: 2 });
     const context = { params: Promise.resolve({ id: String(created.submissionId) }) };

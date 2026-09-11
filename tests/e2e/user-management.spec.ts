@@ -32,9 +32,15 @@ test("超级管理员从个人页面管理用户、删除词条并从回收站�
     await expect(editorPage.getByRole("link", { name: "管理员回收站" })).toBeVisible();
     await expect(editorPage.getByRole("heading", { name: "用户管理", exact: true })).toHaveCount(0);
 
-    const created = await page.request.post("/api/submissions", { data: { kind: "new_term", title, content: "应随词条隐藏的通俗视角" } });
+    const created = await page.request.post("/api/submissions", { data: { kind: "new_term", title, summary: "应随词条隐藏的简介" } });
     expect(created.status()).toBe(201);
     const term = await created.json();
+    const interpreterResponse = await page.request.post("/api/submissions", { data: { kind: "new_interpreter", title: `${title}诠释者` } });
+    expect(interpreterResponse.status()).toBe(201);
+    const interpreter = await interpreterResponse.json();
+    const viewResponse = await page.request.post("/api/submissions", { data: { kind: "new_perspective", termId: term.pageId, interpreterId: interpreter.pageId, content: "应随词条隐藏的具名视角" } });
+    expect(viewResponse.status()).toBe(201);
+    const view = await viewResponse.json();
     await page.goto(term.href);
     await page.getByRole("button", { name: "删除词条", exact: true }).click();
     await expect(page.getByRole("dialog")).toContainText(title);
@@ -45,15 +51,17 @@ test("超级管理员从个人页面管理用户、删除词条并从回收站�
     await page.getByRole("button", { name: "确认删除", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/deleted$/);
     expect((await other.request.get(term.href)).status()).toBe(404);
+    expect((await other.request.get(view.href)).status()).toBe(404);
     await page.goto("/profile");
     await page.getByRole("link", { name: "管理员回收站" }).click();
     const deleted = page.getByRole("listitem").filter({ hasText: title });
     await deleted.getByRole("button", { name: "恢复页面" }).click();
     await expect(deleted).toHaveCount(0);
     expect((await other.request.get(term.href)).status()).toBe(200);
+    expect((await other.request.get(view.href)).status()).toBe(200);
   } finally {
     await other.close();
-    await cleanupTestContent([title], page.request);
+    await cleanupTestContent([title, `${title}诠释者`], page.request);
     if (ids.length) {
       await getDb().delete(pages).where(inArray(pages.createdBy, ids));
       await getDb().delete(submissions).where(inArray(submissions.submittedBy, ids));
