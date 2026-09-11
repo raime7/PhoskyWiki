@@ -1,5 +1,5 @@
 import { hasAdminRole } from "@/lib/roles";
-// 新建词条向导：信息框 + 编委会视角骨架，共用直编/审核管线。
+// 新建词条向导：导航信息框，共用直编/审核管线。
 
 import Link from "next/link";
 
@@ -44,7 +44,7 @@ export default async function NewTermPage() {
 
       <h1 className="text-2xl font-bold tracking-tight">新建词条</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        依次填写信息框、通俗解读、其他视角计划与引用。提交后同时创建词条和编委会视角。
+        填写名称、简介、别名和关键文本。解释正文请在词条创建后另行添加具名诠释者视角。
         {hasAdminRole(sessionUser.role)
           ? "管理员提交不经审核，直接生效。"
           : "提交进入审核队列，需管理员受理后生效。"}

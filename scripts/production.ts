@@ -110,7 +110,7 @@ main().catch((error: unknown) => {
   // Database/JSON/library errors may contain credentials or bound parameters.
   // Only our literal diagnostics are safe to emit.
   const message = error instanceof Error ? error.message : "";
-  const safe = /^(CONFIG_REQUIRED|CREDENTIAL_FILE|RECOVERY_CONFIG|RECOVERY_TARGET|SUPERADMIN_CONFIG|SUPERADMIN_TARGET|SUPERADMIN_EXISTS|ADMIN_CONFIG|ADMIN_CONFLICT|ADMIN_CREDENTIAL_CONFLICT|BOARD_CONFLICT|DATABASE_CONFIG|TARGET_MISMATCH|AUTH_CONFIG|SEARCH_TARGET_MISMATCH|USAGE):/.test(message);
+  const safe = /^(CONFIG_REQUIRED|CREDENTIAL_FILE|RECOVERY_CONFIG|RECOVERY_TARGET|SUPERADMIN_CONFIG|SUPERADMIN_TARGET|SUPERADMIN_EXISTS|ADMIN_CONFIG|ADMIN_CONFLICT|ADMIN_CREDENTIAL_CONFLICT|DATABASE_CONFIG|TARGET_MISMATCH|AUTH_CONFIG|SEARCH_TARGET_MISMATCH|USAGE):/.test(message);
   console.error(safe ? message : "OPERATION_FAILED: check target, protected configuration, database availability and migrations; no credentials logged");
   process.exitCode = 1;
 });

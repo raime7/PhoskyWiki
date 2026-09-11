@@ -56,6 +56,126 @@ test("触屏先选中词条，详情可滚动并通过明确按钮进入词条",
   } finally { await context.close(); }
 });
 
+test("可沿悬停桥自然移入详情并操作", async ({ page }) => {
+  await page.goto("/graph");
+  const graph = page.getByTestId("graph-canvas");
+  await page.getByTestId("graph-search").fill("主体性");
+  await page.getByRole("option", { name: /主体性/ }).first().click();
+  await expect(graph).toHaveAttribute("data-located", /\d+/);
+  const id = await graph.getAttribute("data-located");
+  const node = graph.locator(`[data-node-id="${id}"]`);
+  await graph.locator("[data-graph-surface]").click({ position: { x: 2, y: 620 } });
+
+  await node.hover();
+  const details = graph.getByRole("region", { name: "词条关联详情" });
+  await expect(details).toBeVisible();
+  const from = (await node.boundingBox())!;
+  const to = (await details.boundingBox())!;
+  for (let step = 1; step <= 20; step++) {
+    await page.mouse.move(
+      from.x + from.width / 2 + (to.x + to.width / 2 - from.x - from.width / 2) * step / 20,
+      from.y + from.height / 2 + (to.y + to.height / 2 - from.y - from.height / 2) * step / 20,
+    );
+    await page.waitForTimeout(15);
+    expect(await details.isVisible(), `详情不应在第 ${step} 步消失`).toBe(true);
+  }
+  await details.getByRole("button", { name: "进入词条" }).click();
+  await expect(page).toHaveURL(/\/term\//);
+});
+
+test("从悬停桥直接离开画布会恢复未聚焦状态", async ({ page }) => {
+  await page.goto("/graph");
+  const graph = page.getByTestId("graph-canvas");
+  const node = graph.locator("[data-node-id]").first();
+  await node.hover();
+  const details = graph.getByRole("region", { name: "词条关联详情" });
+  const from = (await node.boundingBox())!;
+  const to = (await details.boundingBox())!;
+  await page.mouse.move((from.x + to.x + to.width / 2) / 2, (from.y + to.y + to.height / 2) / 2);
+  await page.getByRole("heading", { level: 1, name: "全站图谱" }).hover();
+  await expect(details).toBeHidden();
+});
+
+test("悬停离开期间父级搜索重绘仍会按时清除临时聚焦", async ({ page }) => {
+  await page.goto("/graph");
+  const graph = page.getByTestId("graph-canvas");
+  const node = graph.locator("[data-node-id]").first();
+  await node.hover();
+  await expect(graph.getByRole("region", { name: "词条关联详情" })).toBeVisible();
+
+  await node.evaluate(element => {
+    element.dispatchEvent(new PointerEvent("pointerout", { bubbles: true }));
+    const input = document.querySelector<HTMLInputElement>("[data-testid=graph-search]")!;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    setter.call(input, "重绘");
+    input.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: "重绘" }));
+  });
+  await expect(graph.getByRole("region", { name: "词条关联详情" })).toBeHidden();
+});
+
+test("布局完成前重置不会让待定位节点重新获得聚焦", async ({ page }) => {
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    class DelayedWorker extends NativeWorker {
+      set onmessage(listener: ((this: Worker, ev: MessageEvent) => unknown) | null) {
+        super.onmessage = listener
+          ? event => setTimeout(() => listener.call(this, event), 250)
+          : null;
+      }
+    }
+    Object.defineProperty(window, "Worker", { configurable: true, value: DelayedWorker });
+  });
+  await page.goto("/graph");
+  const graph = page.getByTestId("graph-canvas");
+  await page.getByTestId("graph-search").fill("主体性");
+  await page.getByRole("option", { name: /主体性/ }).first().click();
+  await page.keyboard.press("Escape");
+  await expect(graph.getByText("正在排列词条…")).toBeHidden();
+  await expect(graph).not.toHaveAttribute("data-located", /.+/);
+  await expect(graph.getByRole("region", { name: "词条关联详情" })).toBeHidden();
+  await expect(page.getByTestId("graph-located")).toBeHidden();
+});
+
+test("空白、Escape 与适应画布清除聚焦及搜索定位提示", async ({ page }) => {
+  await page.goto("/graph");
+  const graph = page.getByTestId("graph-canvas");
+  const search = page.getByTestId("graph-search");
+
+  async function locateSubjectivity() {
+    await search.fill("主体性");
+    await page.getByRole("option", { name: /主体性/ }).first().click();
+    await expect(graph.getByRole("region", { name: "词条关联详情" })).toContainText("主体性");
+    await expect(page.getByTestId("graph-located")).toContainText("已定位：主体性");
+  }
+
+  await locateSubjectivity();
+  await graph.locator("[data-graph-surface]").click({ position: { x: 2, y: 2 } });
+  await expect(graph.getByRole("region", { name: "词条关联详情" })).toBeHidden();
+  await expect(page.getByTestId("graph-located")).toBeHidden();
+
+  await locateSubjectivity();
+  await page.keyboard.press("Escape");
+  await expect(graph.getByRole("region", { name: "词条关联详情" })).toBeHidden();
+  await expect(page.getByTestId("graph-located")).toBeHidden();
+
+  await locateSubjectivity();
+  await page.getByRole("button", { name: "适应画布" }).click();
+  await expect(graph.getByRole("region", { name: "词条关联详情" })).toBeHidden();
+  await expect(page.getByTestId("graph-located")).toBeHidden();
+});
+
+test("局部图谱也可用 Escape 清除触屏式选择", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "主体性", exact: true }).click();
+  const graph = page.getByTestId("graph-canvas");
+  const node = graph.locator("[data-node-id]").first();
+  await node.focus();
+  await page.keyboard.press(" ");
+  await expect(graph.getByRole("region", { name: "词条关联详情" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(graph.getByRole("region", { name: "词条关联详情" })).toBeHidden();
+});
+
 test("全站和局部圆点在拖拽、缩放、窄屏与跳数切换后均不重叠", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
