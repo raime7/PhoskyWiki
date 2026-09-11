@@ -128,6 +128,49 @@ def read_rows(path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
+def link_concepts(markdown, concepts, current_key, paragraph_id=None, exclusions=()):
+    """Add navigation without changing the source's visible words or formatting."""
+    names = {}
+    for concept in concepts:
+        for name in [concept["title"], *concept["aliases"]]:
+            if name in names and names[name]["key"] != concept["key"]:
+                raise ValueError(f"Ambiguous inline concept: {name}")
+            names[name] = concept
+    # Match longer names even when ineligible, so 自为存在 never links only 存在.
+    protected = {item["phrase"] for item in exclusions if paragraph_id in item["paragraphs"]}
+    separator = r"(?:<!--.*?-->|\*\*)*"
+    alternatives = "|".join(
+        separator.join(re.escape(char) for char in name) if name in protected else re.escape(name)
+        for name in sorted(set(names) | protected, key=lambda n: (-len(n), n)))
+    pattern = re.compile(r"<!--.*?-->|\\.|\*\*|" + alternatives)
+    linked = set()
+
+    def replace(match):
+        word = match[0]
+        if re.sub(r"<!--.*?-->|\*\*", "", word) in protected:
+            return word
+        concept = names.get(word)
+        if not concept or concept["key"] == current_key or concept["key"] in linked:
+            return word
+        if paragraph_id is not None and paragraph_id not in concept["paragraphs"]:
+            return word
+        if len(word) == 1:
+            before, after = markdown[:match.start()], markdown[match.end():]
+            emphasized = before.endswith("**") and after.startswith("**")
+            before = re.sub(r"<!--.*?-->|\*\*", "", before)
+            after = re.sub(r"<!--.*?-->|\*\*", "", after)
+            quoted = before.endswith(("“", "「", "『")) and after.startswith(("”", "」", "』"))
+            pair = word in "有无" and (re.search(r"[有无](?:[与和即或、]|即是)$", before) or
+                                      re.match(r"(?:[与和即或、]|即是)[有无]", after))
+            if not (emphasized or quoted or pair):
+                return word
+        linked.add(concept["key"])
+        target = concept["title"]
+        return f"[[{target}]]" if word == target else f"[[{target}|{word}]]"
+
+    return pattern.sub(replace, markdown)
+
+
 def load_source(output, plan):
     manifest = read_json(output / "source-manifest.json")
     source = (output / "source.xhtml").read_bytes()
@@ -173,11 +216,13 @@ def compose(output, plan):
             if any(p["background"] for p in selected):
                 scope += "另补入标明的 §84—85 总引背景。"
             scope += "本页仅整理这一资料范围，不代表黑格尔对本概念的全部论述。"
+            intro = link_concepts(c["intro"], concepts, c["key"])
             chunks = ["## 资料覆盖范围\n\n" + scope,
-                      "## 导语（编者整理）\n\n" + c["intro"], "## 原文摘录"]
+                      "## 导语（编者整理）\n\n" + intro, "## 原文摘录"]
             for p in selected:
                 background = " · 章外背景" if p["background"] else ""
-                chunks.append(f"### §{p['section']} · {p['layer']} · {p['id']}{background}\n\n> {p['markdown']}")
+                excerpt = link_concepts(p["markdown"], concepts, c["key"], p["id"], plan.get("inlineLinkExclusions", []))
+                chunks.append(f"### §{p['section']} · {p['layer']} · {p['id']}{background}\n\n> {excerpt}")
                 chunks.append(f"出处：《小逻辑》，黑格尔著，贺麟译；§{p['section']}，{p['layer']}，原段 {p['id']}。")
                 for nid in p["notes"]:
                     chunks.append(f"译注（对应本段原书链接，保留原显示注号）：\n\n> {notes[nid]['markdown']}")
@@ -188,7 +233,7 @@ def compose(output, plan):
             chunks.append("## 待补与校勘\n\n" + (pending + "\n\n" if pending else "") +
                           "其他章节论述尚待整理。原文疑似错字及异体字符保留；校勘意见须与引文分开。")
             content = "\n\n".join(chunks) + "\n"
-            board = "## 入门说明（编委会）\n\n" + c["intro"] + "\n\n## 资料范围\n\n" + scope + "\n"
+            board = "## 入门说明（编委会）\n\n" + intro + "\n\n## 资料范围\n\n" + scope + "\n"
         payloads.append({**c, "content": content, "boardContent": board})
     for row in coverage.values():
         if not row["excerptFor"]:

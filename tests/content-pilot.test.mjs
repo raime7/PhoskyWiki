@@ -74,3 +74,42 @@ test("build uses original paragraphs and verification rejects a modified quotati
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("inline concept links preserve source wording, emphasis and alias destinations", () => {
+  const dir = mkdtempSync(join(tmpdir(), "hegel-links-"));
+  try {
+    const epub = join(dir, "source.epub");
+    const original = "变易是有与无的统一。没有一般的说法；规定在这里；纯有不是定在。绝对确定性。";
+    const fixture = '<html><body><p>§ 86</p><p>变易是<span class="point">有</span>与无的统一。没有一般的说法；规定在这里；纯有不是定在。<span class="point">绝对</span>确定性。</p><p>§ 99</p></body></html>';
+    spawnSync(python, ["-c", "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w'); z.writestr('text/part0009_split_002.html',sys.stdin.buffer.read()); z.close()", epub], { input: fixture });
+    const run = (...args) => spawnSync(python, [script, ...args, "--output", dir], { encoding: "utf8" });
+    assert.equal(run("extract", epub).status, 0);
+    const manifest = JSON.parse(readFileSync(join(dir, "source-manifest.json"), "utf8"));
+    const plan = join(dir, "plan.json");
+    writeFileSync(plan, JSON.stringify({ sourceSha256: manifest.epubSha256,
+      inlineLinkExclusions: ["规定在", "绝对确定性"].map(phrase => ({ phrase, paragraphs: ["s86-p01"], reason: "不拆分词语" })), concepts:
+      ["变易", "存在", "无", "一", "纯有", "定在", "绝对"].map((title, i) => ({ key: `c${i}`, title,
+        aliases: title === "存在" ? ["有"] : [], status: i === 0 ? "substantive" : "mention",
+        intro: "变易是有与无的统一。", paragraphs: ["s86-p01"] })) }));
+    assert.equal(run("build", "--plan", plan).status, 0);
+    const content = JSON.parse(readFileSync(join(dir, "payloads.json"), "utf8"))[0].content;
+    const quote = content.split("\n").find(line => line.startsWith("> ")).slice(2);
+    assert.match(quote, /\[\[存在\|有\]\]/);
+    assert.match(quote, /\[\[无\]\]/);
+    assert.match(quote, /没有一般/);
+    assert.match(quote, /规定在这里/);
+    assert.match(quote, /不是\[\[定在\]\]/);
+    assert.match(quote, /\[\[纯有\]\]/);
+    assert.doesNotMatch(quote, /\[\[一\]\]/);
+    assert.doesNotMatch(quote, /\[\[绝对\]\]/);
+    const rendered = spawnSync(process.execPath, ["--import=tsx", "--input-type=module", "-e",
+      'import {renderMarkdown,renderMarkdownText} from "./src/lib/markdown.ts";const resolve=r=>({href:"/term/"+r.term,exists:true});console.log(JSON.stringify({text:renderMarkdownText(process.argv[1],resolve),html:renderMarkdown(process.argv[1],resolve)}))', quote], { encoding: "utf8" });
+    assert.equal(rendered.status, 0, rendered.stderr);
+    const result = JSON.parse(rendered.stdout);
+    assert.equal(result.text, original);
+    assert.match(result.html, /<strong><a[^>]*href="\/term\/存在"[^>]*>有<\/a><\/strong>/);
+    assert.equal(run("verify", "--plan", plan).status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
