@@ -1,3 +1,4 @@
+import { administratorRoles, hasAdminRole } from "@/lib/roles";
 // 审核域写路径（T06）：提交状态机 + 两票受理 + 修订快照 + links 重建。
 // 语义按 ADR-0004：
 //   - submissions 存全量提议内容 + base_revision_id（不存 diff，队列页 diff 现算）；
@@ -322,7 +323,7 @@ export async function createSubmission(
     const validated = await validateSubmissionInput(db, input, actor);
     await validateImageReferences(db, validated.content, actor);
 
-    if (actor.role === "admin") {
+    if (hasAdminRole(actor.role)) {
       const applied = await applySubmission(db, { ...validated, submittedBy: actor.id }, "direct");
       const [page] = await db
         .select({ type: pages.type, slug: pages.slug })
@@ -339,7 +340,7 @@ export async function createSubmission(
     const [adminCountRow] = await db
       .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(user)
-      .where(eq(user.role, "admin"));
+      .where(inArray(user.role, [...administratorRoles]));
     const quorum = Math.min(2, adminCountRow.count);
     const [row] = await db
       .insert(submissions)
@@ -365,7 +366,7 @@ export async function createSubmission(
 
 /** 整批复用管理员直编管线；任何一项失败都不发布，提交后统一同步搜索。 */
 export async function importPages(inputs: SubmissionInput[], actor: Actor) {
-  if (actor.role !== "admin") throw new ReviewError(403, "需要管理员角色");
+  if (!hasAdminRole(actor.role)) throw new ReviewError(403, "需要管理员角色");
   return transactionWithSearchSync(getDb(), async (tx) => {
     const results = [];
     for (const input of inputs) {
@@ -436,7 +437,7 @@ export async function reviewSubmission(
   action: "approve" | "reject",
   reason?: string,
 ): Promise<ReviewOutcome> {
-  if (actor.role !== "admin") throw new ReviewError(403, "需要管理员角色");
+  if (!hasAdminRole(actor.role)) throw new ReviewError(403, "需要管理员角色");
   const db = getDb();
 
   return transactionWithSearchSync(db, async (tx) => {

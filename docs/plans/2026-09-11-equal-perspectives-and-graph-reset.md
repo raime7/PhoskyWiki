@@ -2,14 +2,14 @@
 
 > **For agentic workers:** Use superpowers:subagent-driven-development for independent implementation tasks and final review.
 
-**Goal:** Implement the four user-confirmed decisions in spec 0007.
+**Goal:** Implement the four user-confirmed decisions in spec 0008.
 **Architecture:** Keep graph hover transient and provide a shared reset path. Remove editorial and public-pin semantics from application, then migrate their data while preserving unrelated content.
 **Tech Stack:** Next.js 16.3.4, React 19.2.8, PostgreSQL, Drizzle, Vitest, Playwright.
-**Spec:** docs/specs/0007-equal-perspectives-and-graph-reset.md
+**Spec:** docs/specs/0008-equal-perspectives-and-graph-reset.md
 
 ## Global Constraints
 
-- Follow CONTEXT.md and ADR-0006; read installed Next.js docs before changing framework code.
+- Follow CONTEXT.md and ADR-0007; read installed Next.js docs before changing framework code.
 - Tests use explicit DATABASE_URL ending _test; no live database mutation during implementation.
 - Main and graph-school-communities-pr were integrated in this isolated worktree.
 

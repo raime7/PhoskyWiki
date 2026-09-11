@@ -1,6 +1,6 @@
 {
-  "id": "84a7d725-ccd3-473b-a9c4-f269348dd7da",
-  "prevId": "d12969e4-7a1b-4ef3-abd5-008cc2daba76",
+  "id": "1a623065-ec5a-4efe-ad90-66dd7db3a810",
+  "prevId": "84a7d725-ccd3-473b-a9c4-f269348dd7da",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -828,13 +828,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
-        },
-        "is_editorial_board": {
-          "name": "is_editorial_board",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {},
@@ -1144,12 +1137,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true
-        },
-        "pinned_at": {
-          "name": "pinned_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {

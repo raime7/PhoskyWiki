@@ -21,7 +21,7 @@ beforeAll(async () => {
   oldMigrations = await mkdtemp(join(tmpdir(), "phosky-equal-migration-"));
   await mkdir(join(oldMigrations, "meta"));
   const journal = JSON.parse(await readFile("drizzle/meta/_journal.json", "utf8"));
-  journal.entries = journal.entries.filter((entry: { idx: number }) => entry.idx <= 17);
+  journal.entries = journal.entries.filter((entry: { idx: number }) => entry.idx <= 18);
   await writeFile(join(oldMigrations, "meta/_journal.json"), JSON.stringify(journal));
   for (const entry of journal.entries) await copyFile(`drizzle/${entry.tag}.sql`, join(oldMigrations, `${entry.tag}.sql`));
   await migrate(drizzle(pool), { migrationsFolder: oldMigrations });

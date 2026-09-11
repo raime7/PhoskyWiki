@@ -10,7 +10,7 @@ Date: 2026-09-11. Worktree: `D:/PhoskyWiki-worktrees/equal-perspectives`.
 - New-term wizard creates navigation metadata only, with no Markdown editor or default body template. New ordinary interpreter and explicit perspective creation remain intact.
 - Domain validation rejects nonempty `new_term.content`; apply-time validation also refuses old pending body submissions. JSON import rejects nonempty term bodies before either create or pageId update, preserving transaction atomicity. HTTP input parsing rejects nonstring term bodies rather than discarding them.
 - New term drafts use `phoskywiki:draft:new-term-metadata`. Old browser draft keys are left untouched; legacy bodies are never submitted implicitly or overwritten by the new form.
-- Import examples, edit-page guidance, README, content-production and production operations docs now describe metadata first and separately authored named perspectives. Production docs require search reindex after migration 0018.
+- Import examples, edit-page guidance, README, content-production and production operations docs now describe metadata first and separately authored named perspectives. Production docs require search reindex after migration 0019.
 - Hegel pilot generators/operators now publish only the named Hegel perspective and omit board content from payloads and review indexes.
 
 ## Tests and fixtures

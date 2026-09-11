@@ -4,7 +4,7 @@ Reviewed 2026-09-11 against baseline `228c03796a23ca5e9b2375643fae66ee7bac32e2`,
 
 Scope: non-graph application routes and pages, shared submission/read/discovery modules and components, production/import scripts, current operational documentation, and affected test changes. Graph interaction and database migration/bootstrap/seed correctness have separate reviewers. This report does not certify those areas.
 
-Requirements: `docs/specs/0007-equal-perspectives-and-graph-reset.md`, ADR-0006, current `CONTEXT.md`, and ADR-0004 for ordinary named perspectives and their histories. The review followed the code-review skill's Standards and Spec axes locally, respecting the explicit instruction not to spawn further agents.
+Requirements: `docs/specs/0008-equal-perspectives-and-graph-reset.md`, ADR-0007, current `CONTEXT.md`, and ADR-0004 for ordinary named perspectives and their histories. The review followed the code-review skill's Standards and Spec axes locally, respecting the explicit instruction not to spawn further agents.
 
 ## Standards
 

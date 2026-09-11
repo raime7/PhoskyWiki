@@ -30,7 +30,7 @@ Before implementation, all three new tests failed because the detail region rema
 
 ## Verification
 
-- `pnpm exec playwright test tests/e2e/graph-layout.spec.ts tests/e2e/graph.spec.ts`: 10 passed after migration 0018 was applied to `phosky_graph_reset_test`.
+- `pnpm exec playwright test tests/e2e/graph-layout.spec.ts tests/e2e/graph.spec.ts`: 10 passed after migration 0019 was applied to `phosky_graph_reset_test`.
 - Focused review regressions: parent-rerender departure, delayed-worker reset, and direct corridor exit passed together; the final corrected stepped-corridor test passed separately. Root owns the final production-mode full Playwright run.
 - `pnpm exec vitest run tests/unit/graph-layout.test.ts`: 2 passed.
 - `pnpm exec vitest run tests/integration/graph.test.ts tests/unit/graph-layout.test.ts`: 11 passed after correcting the stale one-hop `价值` expectation to match its documented two-hop relationship.

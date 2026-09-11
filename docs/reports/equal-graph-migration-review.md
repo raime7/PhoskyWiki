@@ -1,6 +1,6 @@
 # Scoped graph and migration review
 
-Reviewed the uncommitted graph, schema, migration/meta, seed, bootstrap and corresponding test changes against `docs/specs/0007-equal-perspectives-and-graph-reset.md`. Other application changes were excluded. This is source inspection; no shared database or integration suite was run. The reported 7 database tests and 10 graph E2E tests were supplied by the implementing agents, not independently rerun here.
+Reviewed the uncommitted graph, schema, migration/meta, seed, bootstrap and corresponding test changes against `docs/specs/0008-equal-perspectives-and-graph-reset.md`. Other application changes were excluded. This is source inspection; no shared database or integration suite was run. The reported 7 database tests and 10 graph E2E tests were supplied by the implementing agents, not independently rerun here.
 
 ## Re-review resolution
 

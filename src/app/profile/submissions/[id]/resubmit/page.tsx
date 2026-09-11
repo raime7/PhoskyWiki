@@ -1,3 +1,4 @@
+import { hasAdminRole } from "@/lib/roles";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { SubmissionForm, type SubmissionFormProps } from "@/components/submission-form";
@@ -18,10 +19,10 @@ export default async function ResubmitPage({ params }: { params: Promise<{ id: s
   const rawId = (await params).id;
   const id = Number(rawId);
   if (!/^[1-9]\d*$/.test(rawId) || !Number.isSafeInteger(id) || id > 2_147_483_647) notFound();
-  const proposal = await getMySubmission(user.id, id, user.role === "admin");
+  const proposal = await getMySubmission(user.id, id, hasAdminRole(user.role));
   if (!proposal || proposal.status !== "rejected") notFound();
   const retry = { id, ownerId: user.id, reason: proposal.rejectionReason ?? "提交已驳回", stale: false, unavailable: undefined as string | undefined, proposal };
-  const common = { isAdmin: user.role === "admin", resubmission: retry };
+  const common = { isAdmin: hasAdminRole(user.role), resubmission: retry };
   let form: SubmissionFormProps;
   let comparison: React.ReactNode = null;
   if (proposal.kind === "edit") {

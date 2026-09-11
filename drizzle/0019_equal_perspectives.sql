@@ -1,4 +1,4 @@
--- ADR-0006: remove the site editorial authority and its history permanently.
+-- ADR-0007: remove the site editorial authority and its history permanently.
 -- Drizzle executes this migration in a transaction; freeze content writes while
 -- collecting the affected identities, including renamed or soft-deleted boards.
 LOCK TABLE "pages", "interpreters", "perspectives", "revisions", "submissions", "links"
