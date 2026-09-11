@@ -5,6 +5,7 @@ import type { Db } from "@/db";
 import { account, interpreters, pages, user } from "@/db/schema";
 import { CREDENTIAL_ISSUER } from "@/lib/credential";
 import { slugify } from "@/lib/slug";
+import { hasAdminRole } from "@/lib/roles";
 
 export interface InitialAdmin { name: string; email: string; password: string }
 
@@ -18,7 +19,7 @@ export async function bootstrapProduction(db: Db, admins: InitialAdmin[]) {
     const existing = [];
     for (const admin of admins) {
       const matches = await tx.select().from(user).where(sql`lower(${user.email}) = ${admin.email}`);
-      if (matches.length > 1 || (matches[0] && (matches[0].role !== "admin" || matches[0].email !== admin.email))) {
+      if (matches.length > 1 || (matches[0] && (!hasAdminRole(matches[0].role) || matches[0].email !== admin.email))) {
         throw new Error("ADMIN_CONFLICT: existing email is not an unambiguous administrator; no changes made");
       }
       const editor = matches[0];

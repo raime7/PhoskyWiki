@@ -1,3 +1,5 @@
+import { hasAdminRole } from "@/lib/roles";
+import { PageAction } from "@/components/page-action";
 import { KeyTexts } from "@/components/key-texts";
 import Link from "next/link";
 import { AgentPanel } from "@/components/agent-panel";
@@ -72,6 +74,7 @@ export default async function TermPage({ params }: Params) {
         <span aria-current="page">{term.title}</span>
       </nav>
       <HistoryLink pageId={page.id} />
+      {hasAdminRole(sessionUser?.role) && <div className="mb-4"><PageAction pageId={page.id} action="delete" deleteTerm={{ title: term.title, perspectiveCount: perspectives.length }} /></div>}
       {sessionUser && <div className="mb-4 flex gap-4 text-sm">
         <Link href={`/edit/${pageKey(page.slug, page.id)}`} className="text-primary hover:underline">编辑词条信息</Link>
         {board && <Link href={`/edit/${pageKey(board.slug, board.pageId)}`} className="text-primary hover:underline">编辑通俗视角</Link>}
@@ -119,7 +122,7 @@ export default async function TermPage({ params }: Params) {
             termId={page.id}
             initial={discovery}
             guest={!sessionUser}
-            isAdmin={sessionUser?.role === "admin"}
+            isAdmin={hasAdminRole(sessionUser?.role)}
           />
 
           <BacklinkPanel items={backlinks} />
