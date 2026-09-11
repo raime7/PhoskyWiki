@@ -211,6 +211,16 @@ volumes:
     assert.equal((await page.request.get(`${origin}/healthz`)).status(), 200);
     await recordMemory();
   }
+  await login(admins[0]);
+  const current = await (await page.request.get(`${origin}/api/auth/get-session`)).json();
+  const promoteArgs = ["promote-first-superadmin", "--environment", releaseSettings ? "test" : "production", "--user-id", current.user.id, "--name", admins[0].name];
+  await ops(...promoteArgs);
+  await ops(...promoteArgs);
+  await ops("bootstrap", "--credentials", "/run/secrets/admins.json");
+  await page.goto(`${origin}/profile`);
+  assert((await page.getByTestId("session-user").innerText()).includes("超级管理员"));
+  assert.equal((await page.request.get(`${origin}/api/admin/users`)).status(), 200);
+  report.superadminBootstrap = true;
   assert.deepEqual(failures, []);
   if (releaseSettings) {
     const { runReleaseScenarios } = await import('./test-release-scenarios.mjs');
