@@ -165,13 +165,13 @@ volumes:
   }
   await login(admins[0]);
   const title = "生产首条词条";
-  const content = "## 通俗解读\n生产容器中创建的第一篇正文。";
-  const created = await page.request.post(`${origin}/api/submissions`, { data: { kind: "new_term", title, content } });
+  const summary = "生产容器中创建的第一个导航词条。";
+  const created = await page.request.post(`${origin}/api/submissions`, { data: { kind: "new_term", title, summary } });
   assert.equal(created.status(), 201);
   const term = await created.json();
   assert.equal(term.outcome, "direct");
   await page.goto(`${origin}${term.href}`);
-  assert((await page.locator("body").innerText()).includes("生产容器中创建的第一篇正文"));
+  assert((await page.locator("body").innerText()).includes(summary));
   const historyURL = `${origin}/api/pages/${term.pageId}/history`;
   const initialHistory = await (await page.request.get(historyURL)).json();
   assert.equal(initialHistory.revisions[0].source, "create");

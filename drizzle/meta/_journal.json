@@ -127,6 +127,13 @@
       "when": 1789024409218,
       "tag": "0017_supreme_nighthawk",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789111642628,
+      "tag": "0018_equal_perspectives",
+      "breakpoints": true
     }
   ]
 }

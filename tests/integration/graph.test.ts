@@ -186,7 +186,7 @@ describe("词条局部图谱（1~2 跳邻居网络）", () => {
       expect(oneIds.has(await termIdByTitle(title))).toBe(true);
     }
     // 价值 只被其他词条引用，不在一跳内
-    expect(oneIds.has(await termIdByTitle("价值"))).toBe(true);
+    expect(oneIds.has(await termIdByTitle("价值"))).toBe(false);
 
     const twoIds = new Set(twoHop.nodes.map((n) => n.id));
     for (const id of oneIds) expect(twoIds.has(id)).toBe(true);

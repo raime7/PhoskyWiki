@@ -50,7 +50,7 @@ export default async function ResubmitPage({ params }: { params: Promise<{ id: s
   } else if (proposal.kind === "new_perspective") {
     const [terms, interpreters, existingPerspectives] = await Promise.all([listTerms(), listInterpreters(), listPerspectivePairs()]);
     const termOptions = terms.map(term => ({ id: term.id, label: term.title }));
-    const interpreterOptions = interpreters.filter(i => !i.isBoard).map(i => ({ id: i.pageId, label: i.name }));
+    const interpreterOptions = interpreters.map(i => ({ id: i.pageId, label: i.name }));
     if (!termOptions.some(t => t.id === proposal.termId)) { retry.unavailable = "原所属词条不可用。"; termOptions.push({ id: proposal.termId!, label: `不可用词条 #${proposal.termId}` }); }
     if (!interpreterOptions.some(i => i.id === proposal.interpreterId)) { retry.unavailable = `${retry.unavailable ?? ""}原诠释者不可用。`; interpreterOptions.push({ id: proposal.interpreterId!, label: `不可用诠释者 #${proposal.interpreterId}` }); }
     form = { ...common, variant: "new_perspective", terms: termOptions, interpreters: interpreterOptions, presetTermId: proposal.termId, existingPerspectives };

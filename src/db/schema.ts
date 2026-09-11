@@ -95,8 +95,6 @@ export const interpreters = pgTable("interpreters", {
   summary: text("summary").notNull().default(""),
   birthYear: integer("birth_year"),
   deathYear: integer("death_year"),
-  // 编委会：以站方名义发布通俗解读的特殊诠释者，其视角固定排第一
-  isEditorialBoard: boolean("is_editorial_board").notNull().default(false),
 });
 
 /** 视角负载表：「诠释者 × 词条」的一次完整诠释，站内的原子知识单位。 */
@@ -112,8 +110,6 @@ export const perspectives = pgTable(
     interpreterId: integer("interpreter_id")
       .notNull()
       .references(() => interpreters.pageId, { onDelete: "cascade" }),
-    // 编者置顶标记：null = 未置顶；置顶时间即标记时间（管理员可置顶/取消，T04）
-    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
   },
   // 同一诠释者对同一词条只有一个视角
   (t) => [uniqueIndex("perspectives_term_interpreter_unique").on(t.termId, t.interpreterId)],
@@ -273,7 +269,7 @@ export const submissions = pgTable(
     // 编辑目标页（kind=edit 必填）；新建类提议为空，建什么由 kind + 各字段决定
     pageId: integer("page_id").references(() => pages.id, { onDelete: "cascade" }),
     kind: submissionKindEnum("kind").notNull(),
-    // 全量提议内容；new_term 可携带编委会视角骨架，new_interpreter 无正文
+    // 全量视角正文；new_term 与 new_interpreter 仅携带元数据，正文为空
     content: text("content").notNull().default(""),
     // 新建页的标题（new_perspective 由「诠释者论词条」派生，提交时留空）
     title: text("title"),
@@ -489,7 +485,6 @@ export const interestTags = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    // 编委会视角固定第一，选它作兴趣无意义：应用层不出现在可选项里
     interpreterId: integer("interpreter_id").references(() => interpreters.pageId, {
       onDelete: "cascade",
     }),

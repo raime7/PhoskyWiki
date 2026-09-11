@@ -224,6 +224,7 @@ async function validateSubmissionInput(
     }
     case "new_term":
     case "new_interpreter": {
+      if (input.kind === "new_term" && input.content?.trim()) throw new ReviewError(400, "新词条只接受导航信息；请另行创建具名诠释者视角来提交正文");
       if (input.aliases !== undefined && (!Array.isArray(input.aliases) || input.aliases.some((alias) => typeof alias !== "string") || input.aliases.length > 50)) {
         throw new ReviewError(400, "别名必须是最多 50 项的字符串数组");
       }
@@ -263,7 +264,7 @@ async function validateSubmissionInput(
         keyTexts,
         kind: input.kind,
         pageId: null,
-        content: input.kind === "new_term" ? (input.content ?? "").trim() : "",
+        content: "",
         aliases: input.kind === "new_term" ? [...new Set((input.aliases ?? []).map((a) => a.trim()).filter(Boolean))] : [],
         title,
         summary,
@@ -369,6 +370,7 @@ export async function importPages(inputs: SubmissionInput[], actor: Actor) {
     const results = [];
     for (const input of inputs) {
       if (input.kind !== "new_term" && input.kind !== "new_interpreter") throw new ReviewError(400, "只能导入词条与诠释者");
+      if (input.kind === "new_term" && input.content?.trim()) throw new ReviewError(400, "词条导入只接受导航信息；请另行创建具名诠释者视角来提交正文");
       let imported = input;
       if (input.pageId !== undefined) {
         const page = await lockLivePage(tx, requiredInt(input.pageId, "pageId 必须是正整数"));
@@ -664,6 +666,7 @@ async function applySubmission(
       return { pageId: sub.pageId! };
     }
     case "new_term": {
+      if (sub.content.trim()) throw new ReviewError(400, "新词条只接受导航信息；请另行提交视角正文");
       const [page] = await tx
         .insert(pages)
         .values({
@@ -675,13 +678,6 @@ async function applySubmission(
         .returning({ id: pages.id });
       await tx.insert(terms).values({ pageId: page.id, summary: sub.summary ?? "", aliases: sub.aliases ?? [], keyTexts: sub.keyTexts ?? undefined });
       await applyTermMetadataChange(tx, page.id, termSnapshot({ title: sub.title!, summary: sub.summary ?? "", aliases: sub.aliases ?? [], keyTexts: sub.keyTexts ?? undefined }), null, { source: "create", createdBy: sub.submittedBy });
-      if (sub.content) {
-        const [board] = await tx.select({ id: interpreters.pageId }).from(interpreters)
-          .innerJoin(pages, eq(pages.id, interpreters.pageId))
-          .where(and(eq(interpreters.isEditorialBoard, true), isNull(pages.deletedAt))).limit(1);
-        if (!board) throw new ReviewError(409, "请先配置编委会诠释者");
-        await applySubmission(tx, { ...sub, kind: "new_perspective", termId: page.id, interpreterId: board.id });
-      }
       return { pageId: page.id };
     }
     case "new_interpreter": {

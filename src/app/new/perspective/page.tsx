@@ -71,7 +71,6 @@ export default async function NewPerspectivePage({ searchParams }: Params) {
           isAdmin={sessionUser.role === "admin"}
           terms={terms.map((term) => ({ id: term.id, label: term.title }))}
           interpreters={interpreters
-            .filter((interpreter) => !interpreter.isBoard)
             .map((interpreter) => ({ id: interpreter.pageId, label: interpreter.name }))}
           presetTermId={presetTermId}
           existingPerspectives={existingPerspectives}

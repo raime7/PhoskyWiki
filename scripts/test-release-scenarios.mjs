@@ -58,7 +58,7 @@ export async function runReleaseScenarios({ directory, project, env, override, o
     assert(parallel.find(result => result.result === 'succeeded').maintenanceTargetMet);
     await contentSurvives();
     // A write after the first recovery point must survive later application fallback.
-    const added = await page.request.post(`${origin}/api/submissions`, { data: { kind: 'new_term', title: `发布后新增-${project}`, content: '备份之后的新增内容仍然存在。' } });
+    const added = await page.request.post(`${origin}/api/submissions`, { data: { kind: 'new_term', title: `发布后新增-${project}`, summary: '备份之后的新增词条仍然存在。' } });
     assert.equal(added.status(), 201);
     const addedTerm = await added.json();
     const faultDirectory = join(directory, 'fault-build');
