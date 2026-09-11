@@ -1,8 +1,0 @@
-
-Running 1 test using 1 worker
-
-(node:8356) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(Use `node --trace-warnings ...` to show where the warning was created)
-  ok 1 [chromium] › tests\e2e\term-history.spec.ts:15:5 › 词条两次编辑、非相邻字段比较、带来源回滚、id链接与撞名失败 (2.1s)
-
-  1 passed (3.4s)

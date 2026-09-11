@@ -1,6 +1,0 @@
-
-> phoskywiki@0.1.0 db:seed D:\PhoskyWiki-worktrees\spec18-final
-> tsx scripts/seed.ts
-
-种子已灌入：词条 111、消歧义页 1、诠释者 26、学派 7、分类 8、视角 305、双链 1755 条已解析 / 4 条红链。
-管理员账号 已更新：admin@phoskywiki.local

@@ -19,7 +19,7 @@ CI 构建一次镜像，容器验收和完整浏览器验收使用该镜像 ID�
 
 ## 实际容器与故障演练
 
-[完整机器记录](d04-container-drill.json) 对应 2026-09-10 08:01–08:05 UTC，使用真实 Docker、PostgreSQL、Meilisearch、D03 备份容器和专用 R2 测试桶。随机项目与 `d04/` 对象前缀已清理。
+完整机器记录（本机原始证据，不随仓库分发：`d04-container-drill.json`） 对应 2026-09-10 08:01–08:05 UTC，使用真实 Docker、PostgreSQL、Meilisearch、D03 备份容器和专用 R2 测试桶。随机项目与 `d04/` 对象前缀已清理。
 
 | 场景 | 观察 |
 | --- | --- |

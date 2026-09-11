@@ -1,8 +1,0 @@
-
-Running 1 test using 1 worker
-
-(node:88980) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(Use `node --trace-warnings ...` to show where the warning was created)
-  ok 1 [chromium] › tests\e2e\resubmission.spec.ts:6:5 › 驳回词条从详情完整预填、网络失败保留独立草稿、重提两票公开 (2.5s)
-
-  1 passed (3.7s)
