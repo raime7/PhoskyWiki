@@ -85,6 +85,7 @@
 # Existing migration regression tests require these two evidence fixtures.
 !/docs/reports/d06-legacy-migration-hashes.json
 !/docs/reports/d06-legacy-migration-ledger.json
+!/docs/reports/hegel-quality-concepts.json
 
 # GitHub automation
 !/.github/
