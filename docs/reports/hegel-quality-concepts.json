@@ -1,0 +1,1692 @@
+{
+  "sourceSha256": "af9e8911d56e96c0b618d7775d333fefbd165e87c50dd97446f48b955d732570",
+  "concepts": [
+    {
+      "key": "c01",
+      "title": "存在",
+      "aliases": [
+        "有"
+      ],
+      "status": "substantive",
+      "intro": "本章从无规定性的存在出发，考察它向无、变易、定在和自为存在的推进。阅读时须区分开端处的纯有与已有规定的存在。",
+      "paragraphs": [
+        "s84-p01",
+        "s85-p02",
+        "s86-p01",
+        "s86-p02",
+        "s86-p03",
+        "s86-p04",
+        "s86-p05",
+        "s86-p06",
+        "s87-p01",
+        "s87-p03",
+        "s87-p04",
+        "s87-p05",
+        "s88-p01",
+        "s88-p02",
+        "s88-p03",
+        "s88-p04",
+        "s88-p05",
+        "s88-p07",
+        "s88-p08",
+        "s88-p09",
+        "s89-p01",
+        "s89-p02",
+        "s90-p01",
+        "s90-p02",
+        "s91-p01",
+        "s91-p02",
+        "s92-p01",
+        "s92-p02",
+        "s92-p03",
+        "s95-p01",
+        "s95-p02",
+        "s95-p04",
+        "s96-p01",
+        "s96-p02",
+        "s96-p03",
+        "s97-p01",
+        "s97-p02",
+        "s98-p01",
+        "s98-p02",
+        "s98-p03",
+        "s98-p04"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c02",
+      "title": "纯有",
+      "aliases": [
+        "纯存在"
+      ],
+      "status": "substantive",
+      "intro": "纯有是作为逻辑学开端的无规定的直接性。黑格尔说明它如何与无相通，并在变易中成为被扬弃的环节。",
+      "paragraphs": [
+        "s86-p01",
+        "s86-p02",
+        "s86-p03",
+        "s86-p04",
+        "s86-p05",
+        "s86-p06",
+        "s87-p01",
+        "s87-p03",
+        "s87-p04",
+        "s87-p05",
+        "s88-p01",
+        "s88-p02",
+        "s88-p03",
+        "s88-p04",
+        "s88-p05",
+        "s88-p07",
+        "s88-p09"
+      ]
+    },
+    {
+      "key": "c03",
+      "title": "无",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章的无首先是与纯有同样空虚的抽象。论述的重点是有无的区别、统一以及它们向变易的过渡。",
+      "paragraphs": [
+        "s86-p06",
+        "s87-p01",
+        "s87-p02",
+        "s87-p03",
+        "s87-p04",
+        "s87-p05",
+        "s88-p01",
+        "s88-p02",
+        "s88-p03",
+        "s88-p04",
+        "s88-p05",
+        "s88-p07",
+        "s88-p09",
+        "s89-p01"
+      ]
+    },
+    {
+      "key": "c04",
+      "title": "变易",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "变易是有与无的统一，同时保留二者的差异和相互消逝。它并不停留于不安息，而产生定在这一结果。",
+      "paragraphs": [
+        "s88-p01",
+        "s88-p02",
+        "s88-p03",
+        "s88-p04",
+        "s88-p05",
+        "s88-p06",
+        "s88-p07",
+        "s88-p09",
+        "s89-p01",
+        "s89-p02",
+        "s89-p03",
+        "s98-p04"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c05",
+      "title": "定在",
+      "aliases": [
+        "限有"
+      ],
+      "status": "substantive",
+      "intro": "定在是具有规定性的存在。它包含质、否定性、限度和异在，因此有限性与变化属于它自身。",
+      "paragraphs": [
+        "s88-p04",
+        "s88-p05",
+        "s89-p01",
+        "s89-p02",
+        "s89-p03",
+        "s90-p01",
+        "s91-p01",
+        "s91-p02",
+        "s92-p01",
+        "s92-p02",
+        "s92-p03",
+        "s94-p02",
+        "s95-p04",
+        "s96-p02",
+        "s96-p03",
+        "s97-p02",
+        "s98-p04"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c06",
+      "title": "质",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "质是与存在直接同一的规定性：某物失去其质，就不再是原来的某物。本章还说明质如何经过自为存在而过渡到量。",
+      "paragraphs": [
+        "s85-p02",
+        "s85-p03",
+        "s90-p01",
+        "s90-p02",
+        "s91-p01",
+        "s92-p02",
+        "s96-p02",
+        "s98-p01",
+        "s98-p04"
+      ]
+    },
+    {
+      "key": "c07",
+      "title": "量",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本次材料主要从质的对照和质到量的过渡说明量：量是对事物存在相对外在的规定性。量的专章尚未整理。",
+      "paragraphs": [
+        "s85-p02",
+        "s85-p03",
+        "s90-p02",
+        "s92-p02",
+        "s98-p01",
+        "s98-p04"
+      ]
+    },
+    {
+      "key": "c08",
+      "title": "规定性",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "规定性使某物成为特定的某物。本章把它与否定联系起来，并区分纯有的无规定性、质的规定性及无限的规定性。",
+      "paragraphs": [
+        "s84-p01",
+        "s85-p02",
+        "s86-p01",
+        "s86-p04",
+        "s87-p02",
+        "s87-p03",
+        "s87-p05",
+        "s88-p02",
+        "s89-p02",
+        "s90-p01",
+        "s90-p02",
+        "s91-p01",
+        "s91-p02",
+        "s92-p01",
+        "s96-p02",
+        "s98-p01",
+        "s98-p04"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c09",
+      "title": "直接性",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "逻辑开端的直接性尚未经中介。材料同时显示，直接性在不同阶段有不同地位，不能一律等同于感性经验。",
+      "paragraphs": [
+        "s84-p01",
+        "s86-p01",
+        "s86-p02",
+        "s86-p04",
+        "s87-p03",
+        "s88-p01",
+        "s88-p02",
+        "s89-p02",
+        "s96-p01",
+        "s97-p01"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c10",
+      "title": "中介性",
+      "aliases": [
+        "间接性"
+      ],
+      "status": "substantive",
+      "intro": "本章在讨论开端时解释中介：从第一到第二、由某物到有差别的他物。纯有与经过中介的本质由此得到区分。",
+      "paragraphs": [
+        "s86-p01",
+        "s86-p02",
+        "s86-p04"
+      ]
+    },
+    {
+      "key": "c11",
+      "title": "思维",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章把纯思维与感觉、直观和表象区分，并讨论思维与存在的同一在何种抽象意义上成立。",
+      "paragraphs": [
+        "s86-p01",
+        "s86-p02",
+        "s86-p04",
+        "s86-p05",
+        "s86-p06",
+        "s87-p04",
+        "s88-p04",
+        "s88-p08",
+        "s94-p02",
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c12",
+      "title": "逻辑学的开端",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "开端必须是单纯、直接且无规定的；本章据此说明为什么从纯有开始，并回应从自我或直观开始的意见。",
+      "paragraphs": [
+        "s86-p01",
+        "s86-p02",
+        "s86-p04",
+        "s86-p05",
+        "s86-p06",
+        "s88-p04"
+      ]
+    },
+    {
+      "key": "c13",
+      "title": "自我",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "我在本章既作为逻辑开端的候选形式接受讨论，也作为自为存在的例子出现；这两处的论证任务不同。",
+      "paragraphs": [
+        "s86-p02",
+        "s95-p01",
+        "s96-p03"
+      ]
+    },
+    {
+      "key": "c14",
+      "title": "绝对",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章讨论以有、无、自为存在等范畴界说绝对，同时指出把有限固定为独立存在的问题。",
+      "paragraphs": [
+        "s85-p01",
+        "s86-p02",
+        "s86-p03",
+        "s86-p05",
+        "s86-p06",
+        "s87-p01",
+        "s87-p02",
+        "s87-p04",
+        "s87-p05",
+        "s88-p02",
+        "s88-p03",
+        "s95-p02",
+        "s98-p02"
+      ]
+    },
+    {
+      "key": "c15",
+      "title": "上帝",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章考察把上帝界说为有、无或最高实在的思想内容及其局限。这里整理的是黑格尔对这些界说的分析。",
+      "paragraphs": [
+        "s86-p03",
+        "s86-p06",
+        "s87-p02",
+        "s87-p05",
+        "s88-p03",
+        "s88-p08"
+      ]
+    },
+    {
+      "key": "c16",
+      "title": "实在性",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "实在性在定在的层次指存在着的规定性。本章又讨论存在符合概念的意义，以及实在性与理想性的关系。",
+      "paragraphs": [
+        "s86-p03",
+        "s91-p01",
+        "s91-p02",
+        "s92-p03",
+        "s95-p04",
+        "s96-p03"
+      ]
+    },
+    {
+      "key": "c17",
+      "title": "本质",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章以本质对照纯有：本质的无规定性经过中介并包含已被扬弃的规定。本质论的进一步展开尚未整理。",
+      "paragraphs": [
+        "s86-p04",
+        "s87-p02"
+      ]
+    },
+    {
+      "key": "c18",
+      "title": "哲学史",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章以哲学体系的相继出现说明逻辑理念的阶段及扬弃的含义，并反对把哲学史看作错误体系的堆积。",
+      "paragraphs": [
+        "s86-p05",
+        "s88-p09"
+      ]
+    },
+    {
+      "key": "c19",
+      "title": "扬弃",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "扬弃同时包含取消与保存。本章通过哲学体系、有无、定在、自然与精神以及质到量的过渡展示这一关系。",
+      "paragraphs": [
+        "s84-p01",
+        "s86-p04",
+        "s86-p05",
+        "s88-p09",
+        "s89-p01",
+        "s89-p02",
+        "s89-p03",
+        "s94-p01",
+        "s94-p03",
+        "s95-p03",
+        "s96-p02",
+        "s96-p03",
+        "s98-p01",
+        "s98-p04"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c20",
+      "title": "理念",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章将哲学体系理解为理念展开的阶段，并借此讨论哲学史、变易及精神。这里只覆盖这些局部论述。",
+      "paragraphs": [
+        "s86-p05",
+        "s88-p03",
+        "s88-p09",
+        "s91-p02",
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c21",
+      "title": "抽象",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章以纯有和无说明空虚的抽象，并批评以最贫乏的范畴直接解释丰富对象的做法。",
+      "paragraphs": [
+        "s85-p03",
+        "s86-p02",
+        "s86-p03",
+        "s86-p05",
+        "s87-p01",
+        "s87-p02",
+        "s87-p04",
+        "s87-p05",
+        "s88-p03",
+        "s88-p04",
+        "s88-p06",
+        "s88-p07",
+        "s88-p08",
+        "s88-p09",
+        "s89-p02",
+        "s89-p03",
+        "s91-p01",
+        "s91-p02",
+        "s92-p01",
+        "s92-p02",
+        "s92-p03",
+        "s94-p02",
+        "s94-p03",
+        "s95-p03",
+        "s96-p03",
+        "s98-p04"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c22",
+      "title": "具体",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章的具体与内在环节及差异的统一有关。变易作为有无的统一被称为第一个具体思想。",
+      "paragraphs": [
+        "s85-p03",
+        "s86-p05",
+        "s87-p03",
+        "s87-p04",
+        "s88-p03",
+        "s88-p04",
+        "s88-p07",
+        "s88-p08",
+        "s88-p09",
+        "s94-p02",
+        "s98-p02",
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c23",
+      "title": "否定",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "否定贯穿纯有到无、定在的规定性以及自为存在。不同阶段的否定不能都当作抽象虚无。",
+      "paragraphs": [
+        "s86-p05",
+        "s87-p01",
+        "s87-p02",
+        "s87-p04",
+        "s88-p09",
+        "s89-p02",
+        "s89-p03",
+        "s91-p01",
+        "s91-p02",
+        "s92-p01",
+        "s92-p02",
+        "s92-p03",
+        "s94-p01",
+        "s94-p02",
+        "s94-p03",
+        "s95-p01",
+        "s95-p03",
+        "s96-p01",
+        "s96-p03",
+        "s97-p01",
+        "s97-p02",
+        "s98-p01"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c24",
+      "title": "物自身",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章在分析绝对即无的界说时，提及把物自身理解为无规定、无形式和无内容的说法；摘录限于这一论证语境。",
+      "paragraphs": [
+        "s87-p02"
+      ]
+    },
+    {
+      "key": "c25",
+      "title": "反思",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章描述反思如何试图给纯有确定界说，又如何推动更具体的逻辑规定。这里不是反思范畴的完整专论。",
+      "paragraphs": [
+        "s86-p03",
+        "s87-p03",
+        "s87-p04",
+        "s88-p08",
+        "s94-p02",
+        "s94-p03",
+        "s95-p03",
+        "s95-p04"
+      ]
+    },
+    {
+      "key": "c26",
+      "title": "自由",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章从否定的肯定意义、摆脱有限目的以及自我联系等方面涉及自由；不能据此视为完整的自由理论。",
+      "paragraphs": [
+        "s87-p04",
+        "s88-p03",
+        "s90-p02",
+        "s91-p02",
+        "s94-p02",
+        "s96-p03"
+      ]
+    },
+    {
+      "key": "c27",
+      "title": "逻辑推演",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "逻辑推演在本章被说明为将概念中蕴涵的道理必然地展开，而不是给抽象概念任意增加规定。",
+      "paragraphs": [
+        "s87-p04",
+        "s88-p02"
+      ]
+    },
+    {
+      "key": "c28",
+      "title": "差异",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章强调统一不能抹去差异，并区分纯有与无尚未确定的差异以及较具体的对立关系。",
+      "paragraphs": [
+        "s87-p05",
+        "s88-p02",
+        "s88-p05",
+        "s95-p03"
+      ]
+    },
+    {
+      "key": "c29",
+      "title": "同一性",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章在有无、思维与存在、有限与无限等关系中辨析同一，并批评不包含差异的抽象同一。",
+      "paragraphs": [
+        "s86-p02",
+        "s88-p01",
+        "s88-p02",
+        "s88-p05",
+        "s88-p06",
+        "s88-p08",
+        "s88-p09",
+        "s92-p03",
+        "s95-p03"
+      ]
+    },
+    {
+      "key": "c30",
+      "title": "矛盾",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "矛盾在本章推动变易、定在和有限事物的变化。黑格尔反对只取否定结果而忽视特定的积极结果。",
+      "paragraphs": [
+        "s88-p02",
+        "s88-p09",
+        "s89-p01",
+        "s89-p02",
+        "s92-p03",
+        "s94-p01"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c31",
+      "title": "表象",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章区分熟悉某种表象与把握其概念，并借变易、一与多等例子说明这种差别。",
+      "paragraphs": [
+        "s86-p04",
+        "s86-p06",
+        "s87-p05",
+        "s88-p02",
+        "s88-p03",
+        "s88-p04",
+        "s92-p03",
+        "s97-p02",
+        "s98-p02",
+        "s98-p04"
+      ]
+    },
+    {
+      "key": "c32",
+      "title": "概念",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章讨论概念的逻辑展开及其与表象的区别，称变易为第一个具体思想和第一个概念。",
+      "paragraphs": [
+        "s88-p02",
+        "s88-p03",
+        "s88-p04",
+        "s88-p07",
+        "s88-p09",
+        "s89-p02",
+        "s89-p03",
+        "s91-p02",
+        "s92-p03",
+        "s94-p02",
+        "s95-p04",
+        "s97-p02",
+        "s98-p02",
+        "s98-p03"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c33",
+      "title": "思辨",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "思辨的统一必须同时把握差异。本章还以扬弃的双重意义说明思辨如何超出抽象的非此即彼。",
+      "paragraphs": [
+        "s88-p04",
+        "s88-p05",
+        "s96-p03"
+      ]
+    },
+    {
+      "key": "c34",
+      "title": "设定",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章用设定说明规定及其关系被明确展开；变易被称为有按其真理性的设定存在。此处仅收录相应论述。",
+      "paragraphs": [
+        "s88-p02",
+        "s88-p05",
+        "s88-p07",
+        "s92-p01",
+        "s95-p03",
+        "s97-p02",
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c35",
+      "title": "泛神论",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章把无不能生有、有不能变无的物质永恒原则与泛神论联系，并以变易的原则加以对照。",
+      "paragraphs": [
+        "s88-p06"
+      ]
+    },
+    {
+      "key": "c36",
+      "title": "生命",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "生命在本章用于说明变易的深化，以及有限事物内在包含变化的道理。生命的完整范畴尚未整理。",
+      "paragraphs": [
+        "s88-p09",
+        "s92-p03"
+      ]
+    },
+    {
+      "key": "c37",
+      "title": "精神",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章讨论精神较单纯变易更丰富，以及精神与自然、实在性与理想性的关系；质在精神中的地位也受到限定。",
+      "paragraphs": [
+        "s87-p05",
+        "s88-p03",
+        "s88-p09",
+        "s90-p02",
+        "s96-p03"
+      ]
+    },
+    {
+      "key": "c38",
+      "title": "知性",
+      "aliases": [
+        "理智"
+      ],
+      "status": "substantive",
+      "intro": "本章批评知性或理智坚持片面规定、固定有限与无限对立的方式，并将其与思辨的理解对照。",
+      "paragraphs": [
+        "s89-p02",
+        "s95-p02",
+        "s95-p03",
+        "s95-p04",
+        "s96-p03",
+        "s98-p03"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c39",
+      "title": "某物",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "某物是具有规定性的定在。它的限度及其与别物的关系不是纯粹外加的，而属于它自身。",
+      "paragraphs": [
+        "s90-p01",
+        "s90-p02",
+        "s91-p01",
+        "s92-p01",
+        "s92-p02",
+        "s92-p03",
+        "s93-p01",
+        "s94-p01",
+        "s94-p02",
+        "s95-p01",
+        "s96-p02",
+        "s96-p03",
+        "s97-p02"
+      ]
+    },
+    {
+      "key": "c40",
+      "title": "异在",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "异在是定在的否定形式，也是定在的固有成分。本章将它与为他存在、限度和变化联系起来。",
+      "paragraphs": [
+        "s91-p01",
+        "s92-p01",
+        "s92-p03"
+      ]
+    },
+    {
+      "key": "c41",
+      "title": "为他存在",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章在质的自身规定和异在的关系中引出为他存在：某物在与他物的关系中得到扩展。",
+      "paragraphs": [
+        "s91-p01"
+      ]
+    },
+    {
+      "key": "c42",
+      "title": "自在存在",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "自在存在在本章通过质与异在的关系引出；脱离规定性而固执它则会成为空洞抽象。",
+      "paragraphs": [
+        "s91-p01",
+        "s92-p01"
+      ]
+    },
+    {
+      "key": "c43",
+      "title": "限度",
+      "aliases": [
+        "界限"
+      ],
+      "status": "substantive",
+      "intro": "限度是定在中与存在同一的否定性。它贯穿某物，而不只是外在边界；须区分质的限度与量的限度。",
+      "paragraphs": [
+        "s87-p04",
+        "s92-p01",
+        "s92-p02",
+        "s92-p03",
+        "s94-p02",
+        "s95-p02"
+      ]
+    },
+    {
+      "key": "c44",
+      "title": "有限性",
+      "aliases": [
+        "有限"
+      ],
+      "status": "substantive",
+      "intro": "有限性与某物自身的质、限度、异在和变化相关。它在坏的无限与真正无限的辨析中进一步展开。",
+      "paragraphs": [
+        "s88-p05",
+        "s90-p02",
+        "s92-p01",
+        "s92-p02",
+        "s92-p03",
+        "s94-p01",
+        "s94-p02",
+        "s95-p02",
+        "s95-p03",
+        "s95-p04",
+        "s96-p02"
+      ]
+    },
+    {
+      "key": "c45",
+      "title": "变化",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "变化不是偶然附加于定在的可能性，而是其内在矛盾的表现。这里与作为有无统一的变易分别整理。",
+      "paragraphs": [
+        "s89-p03",
+        "s92-p01",
+        "s92-p03",
+        "s93-p01",
+        "s94-p01",
+        "s94-p02",
+        "s95-p01",
+        "s95-p03",
+        "s98-p04"
+      ]
+    },
+    {
+      "key": "c46",
+      "title": "别物",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "别物自身也是某物，而某物潜在地就是它自己的别物。这一关系是变化及无限论证的关键。",
+      "paragraphs": [
+        "s92-p03",
+        "s93-p01",
+        "s94-p01",
+        "s94-p02",
+        "s95-p01",
+        "s96-p01",
+        "s96-p02",
+        "s96-p03",
+        "s97-p02",
+        "s98-p04"
+      ]
+    },
+    {
+      "key": "c47",
+      "title": "无限",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章区分无穷递进的坏的无限与在别物中返回自身的真正无限，并反对固定有限与无限的二元对立。",
+      "paragraphs": [
+        "s87-p03",
+        "s88-p08",
+        "s93-p01",
+        "s94-p01",
+        "s94-p02",
+        "s94-p03",
+        "s95-p01",
+        "s95-p02",
+        "s95-p03",
+        "s95-p04",
+        "s96-p02",
+        "s96-p03",
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c48",
+      "title": "坏的无限",
+      "aliases": [
+        "否定的无限",
+        "无穷进展"
+      ],
+      "status": "substantive",
+      "intro": "坏的无限不断否定有限却又重复有限，形成同一过程的无穷进展。本章以时空延展和应该的立场说明它。",
+      "paragraphs": [
+        "s93-p01",
+        "s94-p01",
+        "s94-p02",
+        "s94-p03",
+        "s95-p02",
+        "s95-p04"
+      ]
+    },
+    {
+      "key": "c49",
+      "title": "真正的无限",
+      "aliases": [
+        "真无限"
+      ],
+      "status": "substantive",
+      "intro": "真正的无限是在别物中返回自身，并通过否定之否定恢复肯定性；它不是与有限并列的另一个有限。",
+      "paragraphs": [
+        "s94-p02",
+        "s94-p03",
+        "s95-p01",
+        "s95-p02",
+        "s95-p03",
+        "s95-p04"
+      ]
+    },
+    {
+      "key": "c50",
+      "title": "应该",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章批评只说有限应该被扬弃、却不能实现这一要求的立场，并以此讨论康德和费希特的伦理思想。",
+      "paragraphs": [
+        "s94-p01",
+        "s94-p03"
+      ]
+    },
+    {
+      "key": "c51",
+      "title": "否定之否定",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章在真正无限的论证中把否定之否定说明为恢复肯定性的关系，而不是中性地取消双方。",
+      "paragraphs": [
+        "s94-p02",
+        "s95-p01",
+        "s95-p03"
+      ]
+    },
+    {
+      "key": "c52",
+      "title": "自为存在",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "自为存在是经否定之否定而达到的自身联系，也是完成了的质。其展开涉及一、多、斥力与引力。",
+      "paragraphs": [
+        "s91-p02",
+        "s95-p01",
+        "s95-p04",
+        "s96-p01",
+        "s96-p02",
+        "s96-p03",
+        "s97-p01",
+        "s97-p02",
+        "s98-p01",
+        "s98-p02",
+        "s98-p03",
+        "s98-p04"
+      ]
+    },
+    {
+      "key": "c53",
+      "title": "二元论",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "这里主要讨论把有限与无限固定为不可逾越两界的二元论，并说明它如何使所谓无限也成为有限。",
+      "paragraphs": [
+        "s95-p02"
+      ]
+    },
+    {
+      "key": "c54",
+      "title": "形而上学",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章通过有限与无限的固定对立以及原子论批评片面的知性形而上学，而不把一切思想规定一概排除。",
+      "paragraphs": [
+        "s95-p02",
+        "s98-p02",
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c55",
+      "title": "理想性",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "理想性在本章表现为有限事物的真理，与自为存在相联系；它不是在实在性之外另加的空名。",
+      "paragraphs": [
+        "s91-p02",
+        "s95-p04",
+        "s96-p02",
+        "s96-p03"
+      ]
+    },
+    {
+      "key": "c56",
+      "title": "理想主义",
+      "aliases": [
+        "唯心论"
+      ],
+      "status": "substantive",
+      "intro": "本章把承认有限事物理想性的立场称为理想主义，译注说明此处也译唯心论；不与日常愿望意义的理想混同。",
+      "paragraphs": [
+        "s95-p04"
+      ]
+    },
+    {
+      "key": "c57",
+      "title": "一",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "一是自为存在着的东西。它的否定的自身联系不是静止孤立，而是设定多并展开斥力与引力。",
+      "paragraphs": [
+        "s96-p01",
+        "s97-p01",
+        "s97-p02",
+        "s98-p01",
+        "s98-p02",
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c58",
+      "title": "多",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "多在本章由一的自身排斥而展开。多中的每一个仍是一，这又成为理解引力的环节。",
+      "paragraphs": [
+        "s97-p01",
+        "s97-p02",
+        "s98-p01",
+        "s98-p02",
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c59",
+      "title": "斥力",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "斥力在本章首先表示一自身排斥并设定多的过程；许多一的相互排斥同时包含相互联系。",
+      "paragraphs": [
+        "s96-p01",
+        "s97-p01",
+        "s97-p02",
+        "s98-p01",
+        "s98-p02",
+        "s98-p03",
+        "s98-p04"
+      ]
+    },
+    {
+      "key": "c60",
+      "title": "引力",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章从斥力中说明引力：相互排斥的一同时发生联系。两者的统一不应只是外在并列的假定。",
+      "paragraphs": [
+        "s97-p02",
+        "s98-p01",
+        "s98-p02",
+        "s98-p03",
+        "s98-p04"
+      ]
+    },
+    {
+      "key": "c61",
+      "title": "物质",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章以原子论和康德的物质理论讨论物质与斥力、引力的关系；不将这些论述当作当代物理结论。",
+      "paragraphs": [
+        "s88-p06",
+        "s97-p02",
+        "s98-p02",
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c62",
+      "title": "原子论",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章将原子论理解为以多的形式规定自为存在的哲学，并讨论其物理学及政治学形态。",
+      "paragraphs": [
+        "s98-p02",
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c63",
+      "title": "虚空",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章把原子论的虚空解释为被表象为原子间虚无的斥力。摘录限于对原子论的这一分析。",
+      "paragraphs": [
+        "s98-p02"
+      ]
+    },
+    {
+      "key": "c64",
+      "title": "偶然",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章批评把原子聚集只归于偶然的解释，并强调原子间联系应从其概念中理解。",
+      "paragraphs": [
+        "s98-p02",
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c65",
+      "title": "国家",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章在批评政治原子论时提及以个人意志、需要和契约构成国家的看法；不构成完整的国家理论。",
+      "paragraphs": [
+        "s98-p02"
+      ]
+    },
+    {
+      "key": "c66",
+      "title": "契约",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章在政治原子论语境中批评把共同体或国家理解为外在契约关系。这里只保存这一局部论述。",
+      "paragraphs": [
+        "s98-p02"
+      ]
+    },
+    {
+      "key": "c67",
+      "title": "范畴",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章把存在的规定作为逻辑范畴，并用范畴的推进和界说绝对的关系说明其作用。",
+      "paragraphs": [
+        "s85-p01",
+        "s86-p06",
+        "s87-p04",
+        "s88-p03",
+        "s88-p09",
+        "s89-p02",
+        "s90-p01",
+        "s90-p02",
+        "s95-p04",
+        "s96-p03",
+        "s98-p03",
+        "s98-p04"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c68",
+      "title": "哲学",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s86-p05"
+      ]
+    },
+    {
+      "key": "c69",
+      "title": "逻辑学",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s86-p01"
+      ]
+    },
+    {
+      "key": "c70",
+      "title": "感性意识",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s85-p03",
+        "s86-p04"
+      ]
+    },
+    {
+      "key": "c71",
+      "title": "自我确定性",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s86-p02"
+      ]
+    },
+    {
+      "key": "c72",
+      "title": "绝对无差别性",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s86-p02",
+        "s86-p06"
+      ]
+    },
+    {
+      "key": "c73",
+      "title": "理智的直观",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s86-p02"
+      ]
+    },
+    {
+      "key": "c74",
+      "title": "直观",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s86-p02",
+        "s86-p04"
+      ]
+    },
+    {
+      "key": "c75",
+      "title": "感觉",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s86-p04",
+        "s88-p04"
+      ]
+    },
+    {
+      "key": "c76",
+      "title": "主客统一",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s88-p05"
+      ]
+    },
+    {
+      "key": "c77",
+      "title": "质料",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s87-p03"
+      ]
+    },
+    {
+      "key": "c78",
+      "title": "非有",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s88-p03",
+        "s88-p09"
+      ]
+    },
+    {
+      "key": "c79",
+      "title": "运动",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s89-p02"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c80",
+      "title": "太一",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s89-p02"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c81",
+      "title": "生",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s89-p02"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c82",
+      "title": "灭",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s89-p02"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    },
+    {
+      "key": "c83",
+      "title": "现实",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s92-p02"
+      ]
+    },
+    {
+      "key": "c84",
+      "title": "可能性",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s92-p03"
+      ]
+    },
+    {
+      "key": "c85",
+      "title": "空间",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s94-p02"
+      ]
+    },
+    {
+      "key": "c86",
+      "title": "时间",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s94-p02"
+      ]
+    },
+    {
+      "key": "c87",
+      "title": "彼岸世界",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s94-p02"
+      ]
+    },
+    {
+      "key": "c88",
+      "title": "理性律令",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s94-p03"
+      ]
+    },
+    {
+      "key": "c89",
+      "title": "灵魂不灭",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s94-p03"
+      ]
+    },
+    {
+      "key": "c90",
+      "title": "主观精神",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s90-p02"
+      ]
+    },
+    {
+      "key": "c91",
+      "title": "品格",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s90-p02"
+      ]
+    },
+    {
+      "key": "c92",
+      "title": "灵魂",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s90-p02",
+        "s91-p02"
+      ]
+    },
+    {
+      "key": "c93",
+      "title": "法权",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s91-p02"
+      ]
+    },
+    {
+      "key": "c94",
+      "title": "目的",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s88-p03",
+        "s91-p02"
+      ]
+    },
+    {
+      "key": "c95",
+      "title": "形式",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s87-p02"
+      ]
+    },
+    {
+      "key": "c96",
+      "title": "内容",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s87-p02",
+        "s88-p03"
+      ]
+    },
+    {
+      "key": "c97",
+      "title": "真理",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s88-p03",
+        "s95-p03"
+      ]
+    },
+    {
+      "key": "c98",
+      "title": "必然性",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s87-p04",
+        "s88-p02"
+      ]
+    },
+    {
+      "key": "c99",
+      "title": "主观",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s91-p02"
+      ]
+    },
+    {
+      "key": "c100",
+      "title": "客观",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s86-p06"
+      ]
+    },
+    {
+      "key": "c101",
+      "title": "理性",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s94-p03"
+      ]
+    },
+    {
+      "key": "c102",
+      "title": "意志",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s98-p02"
+      ]
+    },
+    {
+      "key": "c103",
+      "title": "需要",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s98-p02"
+      ]
+    },
+    {
+      "key": "c104",
+      "title": "共体",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s98-p02"
+      ]
+    },
+    {
+      "key": "c105",
+      "title": "原子",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章把原子看作思想规定，讨论原子间的联系，并批评将其理解为独立微粒、再由外加的力偶然联结的观点。",
+      "paragraphs": [
+        "s98-p02",
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c106",
+      "title": "分子",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s98-p02"
+      ]
+    },
+    {
+      "key": "c107",
+      "title": "动力学",
+      "aliases": [],
+      "status": "mention",
+      "intro": "",
+      "paragraphs": [
+        "s98-p03"
+      ]
+    },
+    {
+      "key": "c108",
+      "title": "自然",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章以自然对照精神，讨论质的适用地位，并说明自然与精神的关系不是两种互不相干的存在。",
+      "paragraphs": [
+        "s90-p02",
+        "s96-p03"
+      ]
+    },
+    {
+      "key": "c109",
+      "title": "辩证法",
+      "aliases": [],
+      "status": "substantive",
+      "intro": "本章以有无、定在、有限与无限以及质到量的过渡展开辩证运动；关键是把握矛盾的特定结果，而不只取抽象的否定。",
+      "paragraphs": [
+        "s84-p01",
+        "s86-p05",
+        "s86-p06",
+        "s87-p04",
+        "s88-p05",
+        "s88-p09",
+        "s89-p01",
+        "s89-p02",
+        "s89-p03",
+        "s92-p03",
+        "s94-p01",
+        "s94-p02",
+        "s95-p01",
+        "s95-p02",
+        "s95-p03",
+        "s96-p03",
+        "s97-p01",
+        "s97-p02",
+        "s98-p01",
+        "s98-p04"
+      ],
+      "pendingReferences": [
+        "《小逻辑》§82及说明：§89说明明确提示参照；本轮只记录，不扩摘。"
+      ]
+    }
+  ],
+  "lexicalAuditExclusions": [
+    {
+      "concept": "物自身",
+      "paragraph": "s93-p01",
+      "reason": "子串位于“别物自身”，并非“物自身”范畴"
+    },
+    {
+      "concept": "物自身",
+      "paragraph": "s94-p02",
+      "reason": "子串位于“别物自身”，并非“物自身”范畴"
+    },
+    {
+      "concept": "自由",
+      "paragraph": "s88-p06",
+      "reason": "此处为一般词义或例子的修饰语，非该范畴的直接论述"
+    },
+    {
+      "concept": "应该",
+      "paragraph": "s86-p06",
+      "reason": "此处为一般词义或例子的修饰语，非该范畴的直接论述"
+    },
+    {
+      "concept": "应该",
+      "paragraph": "s87-p05",
+      "reason": "此处为一般词义或例子的修饰语，非该范畴的直接论述"
+    },
+    {
+      "concept": "本质",
+      "paragraph": "s96-p03",
+      "reason": "此处为一般词义或例子的修饰语，非该范畴的直接论述"
+    },
+    {
+      "concept": "本质",
+      "paragraph": "s98-p01",
+      "reason": "此处为一般词义或例子的修饰语，非该范畴的直接论述"
+    },
+    {
+      "concept": "偶然",
+      "paragraph": "s87-p03",
+      "reason": "此处为一般词义或例子的修饰语，非该范畴的直接论述"
+    },
+    {
+      "concept": "偶然",
+      "paragraph": "s87-p04",
+      "reason": "此处为一般词义或例子的修饰语，非该范畴的直接论述"
+    },
+    {
+      "concept": "偶然",
+      "paragraph": "s96-p03",
+      "reason": "此处为一般词义或例子的修饰语，非该范畴的直接论述"
+    }
+  ]
+}
