@@ -47,6 +47,8 @@ export function GraphCanvas({ data, height, rootId, onNodeClick, ariaLabel, ref 
   const layout = result?.source === data ? result.layout : EMPTY;
   const activeId = hovered ?? selected;
   const active = data.nodes.find(n => n.id === activeId);
+  const activePosition = layout.nodes.find(n => n.id === activeId);
+  const detailAtTop = activePosition ? (activePosition.y - camera.y) * camera.scale > 0 : true;
   const schools = useMemo(() => new Map(data.schools.map(s => [s.id, s])), [data]);
   const neighbors = useMemo(() => {
     const ids = new Set<number>();
@@ -144,7 +146,7 @@ export function GraphCanvas({ data, height, rootId, onNodeClick, ariaLabel, ref 
           gesture.current = null;
           // Pointer capture retargets click to the SVG; use the original gesture
           // target, and never navigate after a drag.
-          if (!g.moved) {
+          if (!g.moved && event.pointerType !== "touch") {
             const node = data.nodes.find(n => n.id === g.nodeId);
             if (node) onNodeClick?.(node);
           }
@@ -152,17 +154,18 @@ export function GraphCanvas({ data, height, rootId, onNodeClick, ariaLabel, ref 
         onPointerCancel={() => { gesture.current = null; }}
       >
         <GraphScene data={data} layout={layout} camera={camera} width={width} height={height} gradientId={gradientId} activeId={activeId} neighbors={neighbors}
-          onHover={setHovered} onSelect={setSelected} onOpen={node => onNodeClick?.(node)} />
+          onHover={id => { setHovered(id); if (id !== null) setSelected(id); }} onSelect={setSelected} onOpen={node => onNodeClick?.(node)} />
       </svg>
       {result?.source !== data && !failed && <span role="status" className="absolute inset-0 grid place-content-center text-sm text-muted-foreground">正在排列词条…</span>}
       {failed && <div role="status" className="absolute inset-0 grid place-content-center gap-2 bg-card text-sm"><p>图谱布局载入失败。</p><button onClick={() => { setFailed(false); setRetry(n => n + 1); }} className="rounded border px-3 py-1">重试布局</button></div>}
-      {active && <div className="pointer-events-none absolute left-3 top-3 max-h-[55%] max-w-[calc(100%-1.5rem)] overflow-hidden rounded-md border border-border bg-popover/95 p-3 text-xs text-popover-foreground shadow-sm">
+      {active && <div role="region" aria-label="词条关联详情" tabIndex={0} style={{ top: detailAtTop ? 12 : undefined, bottom: detailAtTop ? undefined : 48, maxHeight: height / 2 - 64 }} className="absolute left-3 max-w-[calc(100%-1.5rem)] overflow-y-auto rounded-md border border-border bg-popover/95 p-3 text-xs text-popover-foreground shadow-sm">
         <strong className="block max-w-md break-words text-sm">{active.title}</strong>
         <div className="mt-1 flex max-w-lg flex-wrap gap-x-3 gap-y-1">
           {active.schoolAffinities.length ? active.schoolAffinities.map(a => <span key={a.schoolId}><span className="mr-1 inline-block size-2 rounded-full" style={{ backgroundColor: schools.get(a.schoolId)?.color ?? UNSCHOOLED_COLOR }} />{schools.get(a.schoolId)?.title} · {a.count} 个视角</span>) : <span>{UNSCHOOLED_LABEL}</span>}
         </div>
         <p className="mt-1">双链热度 {active.heat} · {active.perspectiveCount} 个视角</p>
         {active.schoolAffinities.length > 1 && <p className="mt-1 text-muted-foreground">学派成员视角可交叉计数，不表示概念归属比例。</p>}
+        <button type="button" onClick={() => onNodeClick?.(active)} className="mt-2 underline underline-offset-2">进入词条</button>
       </div>}
       <div className="absolute bottom-3 right-3 flex gap-1" role="group" aria-label="图谱视口">
         <button type="button" onClick={() => zoom(1.3)} aria-label="放大图谱" className="rounded border bg-background px-2.5 py-1.5 text-sm">＋</button>

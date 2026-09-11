@@ -36,6 +36,26 @@ test("实心饼图保留多个学派，搜索和键盘聚焦显示完整关联",
   await expect(page).toHaveURL(/\/term\//);
 });
 
+test("触屏先选中词条，详情可滚动并通过明确按钮进入词条", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await page.goto("/graph");
+    await page.getByTestId("graph-search").fill("主体性");
+    await page.getByRole("option", { name: /主体性/ }).first().click();
+    const graph = page.getByTestId("graph-canvas");
+    await expect(graph).toHaveAttribute("data-located", /\d+/);
+    const id = await graph.getAttribute("data-located");
+    await graph.locator(`[data-node-id="${id}"]`).tap();
+    await expect(page).toHaveURL(/\/graph$/);
+    const details = graph.getByRole("region", { name: "词条关联详情" });
+    await expect(details).toContainText("主体性");
+    await expect(details).toHaveCSS("overflow-y", "auto");
+    await details.getByRole("button", { name: "进入词条" }).click();
+    await expect(page).toHaveURL(/\/term\//);
+  } finally { await context.close(); }
+});
+
 test("全站和局部圆点在拖拽、缩放、窄屏与跳数切换后均不重叠", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));

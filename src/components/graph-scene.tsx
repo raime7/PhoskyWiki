@@ -60,7 +60,7 @@ export const GraphScene = memo(function GraphScene({ data, layout, camera, width
         if (!p) return null;
         return <g key={node.id} data-node-id={node.id} transform={`translate(${p.x},${p.y})`} role="link" tabIndex={0} aria-label={`${node.title}，${node.schoolAffinities.length} 个学派，进入词条`} className="cursor-pointer outline-none"
           opacity={activeId === null || neighbors.has(node.id) ? 1 : .2}
-          onPointerEnter={() => onHover(node.id)} onPointerLeave={() => onHover(null)} onFocus={() => onSelect(node.id)}
+          onPointerEnter={() => onHover(node.id)} onPointerLeave={() => onHover(null)} onFocus={() => { onHover(null); onSelect(node.id); }}
           onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); onOpen(node); } if (e.key === " ") { e.preventDefault(); onSelect(node.id); } }}>
           <circle data-node-boundary="true" r={p.radius} fill={node.schoolAffinities.length === 1 ? schools.get(node.schoolAffinities[0].schoolId)?.color : UNSCHOOLED_COLOR} stroke={node.id === activeId ? "var(--foreground)" : "var(--card)"} strokeWidth={node.id === activeId ? 2.5 : 1.5} />
           {node.schoolAffinities.length > 1 && sectors(node, p.radius - 1.5).map(sector => <path key={sector.schoolId} data-school-sector={sector.schoolId} d={sector.path} fill={schools.get(sector.schoolId)?.color ?? UNSCHOOLED_COLOR} />)}
