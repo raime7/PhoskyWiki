@@ -298,6 +298,8 @@ for (const [style, label] of [["highlight", "马克笔划线"], ["underline", "�
     await page.goto(sample.source.href);
     const before = await page.locator(".wiki-content").innerText();
     await bodyLink(page).evaluate(el => {
+      // 读者只选看得见的字：先滚入视野，浮条才贴得到选区旁
+      el.scrollIntoView({ block: "center" });
       const range = document.createRange(); range.selectNodeContents(el);
       const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
     });
@@ -306,6 +308,7 @@ for (const [style, label] of [["highlight", "马克笔划线"], ["underline", "�
     await page.reload();
     await expect(bodyLink(page).locator(`.pw-mark--${style}`)).toHaveText("普通双链");
     await bodyLink(page).evaluate(el => {
+      el.scrollIntoView({ block: "center" });
       const range = document.createRange(); range.selectNodeContents(el);
       const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
     });

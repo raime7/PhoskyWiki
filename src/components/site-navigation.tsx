@@ -211,7 +211,7 @@ export function SiteNavigation({ user, unreadCount }: { user: NavigationUser | n
   return (
     <header className={`${styles.header} sticky top-0 z-40 bg-background/95 backdrop-blur`}>
       <div className="mx-auto flex min-h-16 w-full max-w-[88rem] items-center gap-2 px-4 sm:gap-4 sm:px-6 xl:gap-5">
-        <Link id="site-home-link" href="/" className={`${styles.wordmark} mr-auto shrink-0 xl:mr-0`}><span>Phosky</span><span>Wiki</span></Link>
+        <Link id="site-home-link" href="/" className={`${styles.wordmark} mr-auto shrink-0 xl:mr-0`} aria-label="PhoskyWiki"><span>Phosky</span><span>Wiki</span></Link>
         <nav aria-label="主导航" className={`${styles.primaryNav} hidden shrink-0 items-center xl:flex`}>
           <NavigationLinks items={primaryItems} />
           <NavigationPopover key={pathname} label="更多导航" items={discoveryItems} trigger={<Button variant="ghost" aria-label="更多导航" className="min-h-11 text-muted-foreground">更多<ChevronDown aria-hidden="true" /></Button>} />

@@ -56,6 +56,8 @@ async function selectText(page: Page, needle: string) {
       if (anchor && focus) break;
     }
     if (!anchor || !focus) return false;
+    // 真实读者只会选中看得见的字：先把选段滚入视野，浮条才贴得到选区旁
+    anchor.node.parentElement?.scrollIntoView({ block: "center" });
     window.getSelection()?.setBaseAndExtent(anchor.node, anchor.offset, focus.node, focus.offset);
     return true;
   }, needle);

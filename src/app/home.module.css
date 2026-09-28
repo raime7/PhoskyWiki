@@ -270,6 +270,11 @@
   overflow-wrap: anywhere;
 }
 
+.recommendation {
+  display: grid;
+  gap: 0.25rem;
+}
+
 .cardTitle {
   font-size: 1.875rem;
   font-weight: 900;

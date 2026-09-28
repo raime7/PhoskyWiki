@@ -185,9 +185,14 @@ test("按需面板默认收起：宽屏留白展示不重排正文，Esc 关焦�
     await expect(thoughts).toBeHidden();
     await expect(agent).toBeHidden();
 
-    // 滚到正文中部再开面板：正文列的宽度/位置与阅读位置都不得变化
+    // 滚进正文再开面板：正文列的宽度/位置与阅读位置都不得变化。
+    // 入口不吸顶，读者滚到入口刚好贴在页头下方为止（页头高度随视觉系统变化，不写死段落序号）
     const body = page.locator(".wiki-content");
-    await body.locator("p").nth(6).scrollIntoViewIfNeeded();
+    await page.evaluate(() => {
+      const entry = document.querySelector('[aria-label="阅读面板入口"]')!.getBoundingClientRect().top;
+      const header = document.querySelector("header")!.getBoundingClientRect().bottom;
+      window.scrollBy(0, entry - header - 8);
+    });
     const before = await body.boundingBox();
     const scrollBefore = await page.evaluate(() => window.scrollY);
 

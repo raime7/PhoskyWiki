@@ -78,8 +78,11 @@ export default async function Home() {
               <ul className={`${styles.cards} mt-6`}>
                 {recommendations.map(term => (
                   <li key={term.id}>
-                    <Link href={pagePath("term", term.slug, term.id)} className={styles.cardTitle}>{term.title}</Link>
-                    <span className={styles.meta}>{term.interestMatchCount} 项兴趣匹配</span>
+                    {/* 匹配数放在链接里：与"探索概念"里同名词条的链接各有其名 */}
+                    <Link href={pagePath("term", term.slug, term.id)} className={styles.recommendation}>
+                      <span className={styles.cardTitle}>{term.title}</span>{" "}
+                      <span className={styles.meta}>{term.interestMatchCount} 项兴趣匹配</span>
+                    </Link>
                   </li>
                 ))}
               </ul>
