@@ -1,0 +1,4 @@
+interface:
+  display_name: "原典概念词条整理"
+  short_description: "按章节忠实整理哲学原典，保留完整论述、行文双链与全量校验记录"
+  default_prompt: "使用 $source-to-concepts，按我指定的原典和章节整理概念词条，保留完整原文，建立行文双链，并生成覆盖记录和评阅材料。"

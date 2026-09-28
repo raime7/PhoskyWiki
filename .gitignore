@@ -9,6 +9,7 @@
 !/.dockerignore
 !/.env.example
 !/AGENTS.md
+!/CLAUDE.md
 !/CONTEXT.md
 !/README.md
 !/REQUIREMENTS.md
@@ -34,6 +35,11 @@
 !/compose.production.yml
 !/compose.public.yml
 !/compose.test.yml
+
+# Claude Code project skills (local settings stay untracked)
+!/.claude/
+!/.claude/skills/
+!/.claude/skills/**
 
 # Application source
 !/src/
@@ -146,3 +152,4 @@
 **/*.pem
 **/*.key
 /deploy/secrets/
+/.claude/settings.local.json
