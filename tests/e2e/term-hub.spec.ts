@@ -9,17 +9,22 @@ async function openTerm(page: Page) {
   await expect(page.getByRole("heading", { level: 1, name: "主体性" })).toBeVisible();
 }
 
-test("词条资料、反链与邻居保留真实导航，视角目录支持键盘展开与收起", async ({ page }) => {
+test("词条资料、反链与邻居保留真实导航，视角并置列可用键盘横向到达每一列", async ({ page }) => {
   test.setTimeout(90_000);
   await openTerm(page);
   const directory = page.getByRole("region", { name: /^诠释者视角/ });
-  await expect(directory.getByRole("listitem")).toHaveCount(5);
-  const expand = directory.getByRole("button", { name: /展开全部/ });
-  await expand.focus();
-  await page.keyboard.press("Enter");
-  await expect(directory.getByRole("link", { name: "德勒兹论主体性", exact: true })).toBeVisible();
-  await page.keyboard.press("Enter");
-  await expect(directory.getByRole("listitem")).toHaveCount(5);
+  const columns = directory.getByRole("list", { name: "视角目录" }).getByRole("listitem");
+  await expect(columns).toHaveCount(8);
+  // 各列同形：诠释者、标题、摘录与读全文入口俱全
+  for (const column of await columns.all()) {
+    await expect(column.getByRole("link", { name: "读全文", exact: true })).toHaveCount(1);
+    await expect(column.locator("p")).not.toBeEmpty();
+  }
+  // 宽屏放不下的列在横向滚动区里，键盘聚焦最后一列会把它滚入视野
+  const scroller = directory.locator('[aria-label="视角目录"]').locator("..");
+  await columns.last().getByRole("link", { name: "读全文", exact: true }).focus();
+  await expect.poll(() => scroller.evaluate(el => el.scrollLeft)).toBeGreaterThan(0);
+  await expect(columns.last()).toBeInViewport();
 
   const resources = page.getByRole("region", { name: "词条资料", exact: true });
   await expect(resources).toContainText("主体、subject");

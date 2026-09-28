@@ -66,7 +66,7 @@ export const GraphScene = memo(function GraphScene({ data, layout, camera, width
         const touches = edge.source === activeId || edge.target === activeId;
         // 关系层级（#97）：当前节点触边用前景色粗线，其余边退为底纹。
         return <line key={`${edge.source}-${edge.target}`} x1={source.x} y1={source.y} x2={target.x} y2={target.y}
-          stroke={touches ? "var(--foreground)" : "var(--muted-foreground)"} strokeWidth={touches ? 1.8 : 1} opacity={activeId === null ? .13 : touches ? .55 : .02} />;
+          stroke={touches ? "var(--vermilion)" : "var(--muted-foreground)"} strokeWidth={touches ? 1.8 : 1} opacity={activeId === null ? .13 : touches ? .55 : .02} />;
       })}</g>
       {data.nodes.map(node => {
         const p = positions.get(node.id);
@@ -75,10 +75,10 @@ export const GraphScene = memo(function GraphScene({ data, layout, camera, width
           opacity={activeId === null || neighbors.has(node.id) ? 1 : .2}
           onPointerEnter={() => onHover(node.id)} onPointerLeave={() => onHover(null)} onFocus={() => { onHover(null); onSelect(node.id); }}
           onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); onOpen(node); } if (e.key === " ") { e.preventDefault(); onSelect(node.id); } }}>
-          <circle data-node-boundary="true" r={p.radius} fill={node.schoolAffinities.length === 1 ? schools.get(node.schoolAffinities[0].schoolId)?.color : UNSCHOOLED_COLOR} stroke={node.id === activeId ? "var(--foreground)" : "var(--card)"} strokeWidth={node.id === activeId ? 2.5 : 1.5} />
+          <circle data-node-boundary="true" r={p.radius} fill={node.schoolAffinities.length === 1 ? schools.get(node.schoolAffinities[0].schoolId)?.color : UNSCHOOLED_COLOR} stroke={node.id === activeId ? "var(--vermilion)" : "var(--card)"} strokeWidth={node.id === activeId ? 2.5 : 1.5} />
           {node.schoolAffinities.length > 1 && sectors(node, p.radius - 1.5).map(sector => <path key={sector.schoolId} data-school-sector={sector.schoolId} d={sector.path} fill={schools.get(sector.schoolId)?.color ?? UNSCHOOLED_COLOR} />)}
           {/* 轮廓层级（#97）：选中节点加外圈虚线环，保留扇区可辨认的学派身份色。 */}
-          {node.id === activeId && <circle aria-hidden="true" r={p.radius + 6} fill="none" stroke="var(--foreground)" strokeWidth={1.25} strokeDasharray="3 3" opacity={.7} pointerEvents="none" />}
+          {node.id === activeId && <circle aria-hidden="true" r={p.radius + 6} fill="none" stroke="var(--vermilion)" strokeWidth={1.25} strokeDasharray="3 3" opacity={.7} pointerEvents="none" />}
         </g>;
       })}
     </g>

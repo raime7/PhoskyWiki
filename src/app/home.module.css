@@ -1,24 +1,395 @@
-.hero { display: grid; gap: 28px; padding-block: 28px; border-bottom: 1px solid var(--border); }
-.title { font-size: clamp(40px, 11.7vw, 56px); line-height: 1.15; font-weight: 800; letter-spacing: -0.055em; margin-block: 18px 16px; }
-.title span { display: block; }
-.entrances { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 24px; border-top: 1px solid var(--border); }
-.entrances a { min-width: 0; padding: 14px 8px 0; color: var(--foreground); }
-.entrances a:first-child { padding-left: 0; }
-.entrances a + a { border-left: 1px solid var(--border); }
-.entrances strong { display: block; margin-top: 7px; font-size: 14px; font-weight: 600; }
-.entrances small { display: block; min-height: 2.8em; line-height: 1.4; font-size: 10px; color: var(--muted-foreground); }
-.sectionHeading { display: flex; align-items: center; gap: 16px; }
-.sectionNumber { display: flex; flex: 0 0 56px; height: 64px; align-items: center; justify-content: center; overflow: hidden; background: var(--accent); color: var(--primary); font-family: var(--font-code); font-size: 52px; letter-spacing: -0.12em; padding-right: 6px; clip-path: polygon(0 0, 100% 0, 100% 80%, 78% 100%, 0 100%); }
-.concept { position: relative; isolation: isolate; border-top: 1px solid var(--foreground); background: var(--card); padding: 22px; }
-.concept::after { content: ""; position: absolute; z-index: -1; top: 0; right: 0; width: 36px; height: 36px; background: linear-gradient(45deg, var(--muted) 50%, var(--background) 50%); }
-@media (min-width: 640px) {
-  .hero { padding-block: 40px; }
-  .title { font-size: 72px; }
-  .entrances strong { font-size: 18px; }
-  .entrances small { min-height: 0; font-size: 12px; }
-  .entrances a { padding: 18px 16px 0; }
+/* 首页（ADR-0008）：入口像海报。斜置标语与朱红楔形只在首屏出现，下方栏目回到书页般的秩序。 */
+
+/* 窄屏单列：标语 → 检索带 → 今日词条；宽屏两列：标语与今日词条并排，检索带通栏压底。
+   装饰层与标语同占第一行，楔形与墨杠都压在字下。 */
+.poster {
+  --gutter: max(1rem, calc((100% - 1360px) / 2));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  isolation: isolate;
+  overflow: hidden;
 }
-@media (min-width: 1280px) {
-  .hero { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 40px; }
-  .title { font-size: clamp(88px, 7.2vw, 104px); }
+
+.decor {
+  position: relative;
+  z-index: -1;
+  grid-row: 1;
+  grid-column: 1 / -1;
+}
+
+.poster > .title {
+  grid-row: 1;
+  grid-column: 1 / -1;
+  margin-block: 3rem 3.5rem;
+}
+
+/* 斜插的朱红楔形：从左下角刺向今日词条。 */
+.wedge {
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  bottom: 0;
+  width: 70%;
+  height: 46%;
+  background: var(--vermilion);
+  clip-path: polygon(0 58%, 100% 0, 0 100%);
+}
+
+.bar {
+  position: absolute;
+  z-index: -1;
+  left: -5%;
+  top: 58%;
+  width: 72%;
+  height: 22px;
+  background: var(--foreground);
+  transform: rotate(-7deg);
+  transform-origin: left center;
+}
+
+.title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-left: calc(var(--gutter) + clamp(0rem, 3vw, 2.5rem));
+  font-size: clamp(3rem, 7.4vw, 7rem);
+  font-weight: 900;
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+  transform: rotate(-7deg);
+  transform-origin: left center;
+}
+
+.kicker {
+  margin-bottom: 0.1em;
+  color: var(--vermilion);
+  font-size: 0.42em;
+  letter-spacing: 0;
+}
+
+.band {
+  margin-block: 0.06em;
+  margin-left: 0.4em;
+  padding: 0.02em 0.14em 0.08em;
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.title > span:last-child {
+  margin-left: 0.9em;
+}
+
+.daily {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.25rem;
+  min-width: 0;
+  padding: 3rem var(--gutter) 0;
+}
+
+.disc {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  width: 12rem;
+  height: 12rem;
+  padding: 1.25rem;
+  border-radius: 50%;
+  background: var(--foreground);
+  color: var(--background);
+  text-align: center;
+}
+
+.dailyLabel {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.disc a {
+  color: var(--background);
+}
+
+.dailyTerm {
+  font-size: 1.75rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.dailyMore {
+  font-size: 0.75rem;
+  text-decoration: underline;
+}
+
+.rays {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+/* 各视角色带同形同色，悬停才转朱红：并列不分主次（ADR-0007）。 */
+.rays a {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  min-width: 0;
+  padding: 0.5rem 1rem 0.5rem 1.6rem;
+  background: var(--foreground);
+  color: var(--background);
+  clip-path: polygon(0 50%, 1rem 0, 100% 0, 100% 100%, 1rem 100%);
+}
+
+.rays a:hover,
+.rays a:focus-visible {
+  background: var(--vermilion);
+  color: #fff;
+  text-decoration: none;
+}
+
+.rays strong {
+  flex-shrink: 0;
+  font-weight: 900;
+}
+
+.rays span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9375rem;
+  opacity: 0.85;
+}
+
+.searchBand {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem var(--gutter);
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.searchBandText {
+  flex-shrink: 0;
+  font-size: clamp(1.5rem, 2.6vw, 2.25rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.searchBand input {
+  border-color: var(--background);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.searchBand button[type="submit"] {
+  background: var(--vermilion);
+  color: #fff;
+}
+
+.entrances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  flex-shrink: 0;
+}
+
+.entrances a {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  color: var(--background);
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.entrances a:hover {
+  text-decoration-color: var(--vermilion);
+  text-decoration-thickness: 0.18em;
+}
+
+.section {
+  margin-top: 5rem;
+}
+
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  margin-bottom: 1.5rem;
+  padding-top: 0.75rem;
+  border-top: var(--bar) solid var(--foreground);
+}
+
+.sectionHead h2 {
+  font-size: clamp(2.25rem, 4.5vw, 3.5rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.sectionHead > a {
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 0.12em;
+}
+
+.meta {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.cards {
+  display: grid;
+  gap: 2.5rem;
+}
+
+.cards li {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  min-width: 0;
+  padding-top: 0.75rem;
+  border-top: var(--rule) solid var(--foreground);
+}
+
+.cardTitle {
+  font-size: 1.875rem;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.cards p {
+  margin-top: 0.25rem;
+  font-family: var(--font-reading);
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  color: var(--muted-foreground);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.recent {
+  display: grid;
+  column-gap: 2.5rem;
+}
+
+.recent li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  min-width: 0;
+  padding-block: 0.6rem;
+}
+
+.recent strong {
+  flex-shrink: 0;
+  padding: 0.15rem 0.5rem;
+  background: var(--foreground);
+  color: var(--background);
+  font-weight: 900;
+}
+
+.recent a {
+  font-family: var(--font-reading);
+  font-size: 1.125rem;
+}
+
+@media (max-width: 639px) {
+  .entrances a { font-size: 1.0625rem; }
+}
+
+@media (min-width: 640px) {
+  .poster { --gutter: max(1.5rem, calc((100% - 1360px) / 2)); }
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .recent { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* 桌面：以圆心为原点，把视角沿扇区放射出去；细线接圆，色带在外。
+   第一行高度扣掉页头与检索带，保证 900px 高的屏幕里检索带仍在首屏。 */
+@media (min-width: 1024px) {
+  .poster {
+    grid-template-columns: var(--gutter) minmax(0, 1fr) minmax(0, 1fr) var(--gutter);
+    grid-template-rows: minmax(max(32rem, min(calc(100svh - 14rem), 700px)), auto) auto;
+  }
+  .poster > .title {
+    grid-column: 2;
+    align-self: center;
+    margin: 0 0 0 clamp(0rem, 3vw, 2.5rem);
+  }
+  .searchBand {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+  }
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .daily {
+    grid-row: 1;
+    grid-column: 3;
+    align-self: center;
+    flex-direction: row;
+    align-items: center;
+    min-height: 32rem;
+    padding: 0;
+  }
+  .rays {
+    position: absolute;
+    left: 6rem;
+    top: 50%;
+    display: block;
+    width: 0;
+    height: 0;
+  }
+  .rays li {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 28rem;
+    transform: rotate(var(--a));
+    transform-origin: 0 0;
+  }
+  .rays li::before {
+    content: "";
+    position: absolute;
+    left: 6rem;
+    top: -1px;
+    width: 4.5rem;
+    height: 2px;
+    background: var(--foreground);
+  }
+  .rays a {
+    position: absolute;
+    left: 10.5rem;
+    top: 0;
+    max-width: 17.5rem;
+    transform: translateY(-50%);
+  }
+}
+
+/* 入场：一次编排好的动效——墨杠先划出、楔形切入，标语与色带随后落位。 */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes bar-in { from { transform: rotate(-7deg) scaleX(0); } }
+  @keyframes wedge-in { from { clip-path: polygon(0 58%, 0 58%, 0 100%); } }
+  @keyframes rise { from { opacity: 0; transform: translateY(0.4em); } }
+  @keyframes fade { from { opacity: 0; } }
+
+  .bar { animation: bar-in 640ms cubic-bezier(0.7, 0, 0.2, 1) both; }
+  .wedge { animation: wedge-in 700ms 220ms cubic-bezier(0.7, 0, 0.2, 1) both; }
+  .title > span { animation: rise 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .title > span:nth-child(2) { animation-delay: 60ms; }
+  .title > span:nth-child(3) { animation-delay: 120ms; }
+  .title > span:nth-child(4) { animation-delay: 180ms; }
+  .disc { animation: fade 360ms 420ms both; }
+  .rays li { animation: fade 320ms calc(620ms + var(--i) * 80ms) both; }
 }

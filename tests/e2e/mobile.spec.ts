@@ -30,7 +30,7 @@ test("375px：搜索提交、词条阅读、图谱定位可用，评论区保持
   await page.getByRole("link", { name: "主体性", exact: true }).tap();
   await expect(page.getByRole("heading", { level: 1, name: "主体性" })).toBeVisible();
   await expectFits(page);
-  await page.getByRole("button", { name: /展开全部/ }).tap();
+  // 窄屏视角并置列退回纵向列表：全部视角直接可达，不横向溢出
   await expect(page.getByRole("link", { name: "德勒兹论主体性", exact: true })).toBeVisible();
   // 讨论区退役后词条页自带总评论区：移动端一期只读（写入口留给桌面端）
   await expect(page.getByRole("heading", { level: 2, name: "词条总评论" })).toBeVisible();

@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { hasAdminRole, roleLabels } from "@/lib/roles";
 import type { SessionUser } from "@/lib/session";
 
+import styles from "./site-navigation.module.css";
+
 type NavigationUser = Pick<SessionUser, "id" | "name" | "role">;
 type NavigationItem = { href: string; label: string };
 
@@ -50,7 +52,7 @@ const guestItems = [
   { href: "/register", label: "注册" },
 ];
 
-// PROTOTYPE：页头红楔标出"当前所在栏目"，详情页归入对应索引栏目。
+// 页头红楔标出"当前所在栏目"：详情页归入对应索引栏目（ADR-0008）。
 function sectionOf(pathname: string) {
   if (pathname.startsWith("/term") || pathname.startsWith("/perspective")) return "/terms";
   if (pathname.startsWith("/interpreter")) return "/interpreters";
@@ -72,7 +74,7 @@ function NavigationLinks({ items, onNavigate }: {
       onNavigate={onNavigate}
       aria-current={pathname === href ? "page" : undefined}
       data-section-active={section === href ? "" : undefined}
-      className="flex min-h-11 min-w-0 items-center rounded px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-primary"
+      className="flex min-h-11 min-w-0 items-center rounded px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-primary data-[section-active]:shadow-[inset_4px_0_var(--vermilion)]"
     >
       {label}
     </Link>
@@ -207,10 +209,10 @@ export function SiteNavigation({ user, unreadCount }: { user: NavigationUser | n
   const menuKey = `${pathname}:${user?.id ?? "guest"}:${user?.role ?? ""}`;
 
   return (
-    <header className="pw-site-header sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+    <header className={`${styles.header} sticky top-0 z-40 bg-background/95 backdrop-blur`}>
       <div className="mx-auto flex min-h-16 w-full max-w-[88rem] items-center gap-2 px-4 sm:gap-4 sm:px-6 xl:gap-5">
-        <Link id="site-home-link" href="/" className="pw-wordmark mr-auto shrink-0 text-lg font-bold tracking-tight text-primary xl:mr-0"><span>Phosky</span><span>Wiki</span></Link>
-        <nav aria-label="主导航" className="hidden shrink-0 items-center xl:flex">
+        <Link id="site-home-link" href="/" className={`${styles.wordmark} mr-auto shrink-0 xl:mr-0`}><span>Phosky</span><span>Wiki</span></Link>
+        <nav aria-label="主导航" className={`${styles.primaryNav} hidden shrink-0 items-center xl:flex`}>
           <NavigationLinks items={primaryItems} />
           <NavigationPopover key={pathname} label="更多导航" items={discoveryItems} trigger={<Button variant="ghost" aria-label="更多导航" className="min-h-11 text-muted-foreground">更多<ChevronDown aria-hidden="true" /></Button>} />
         </nav>

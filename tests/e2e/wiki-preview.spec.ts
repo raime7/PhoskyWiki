@@ -88,25 +88,17 @@ test("同一双链只挂载一张预览，点击入口不被另一张浮卡遮�
   await expect(page).toHaveURL(new RegExp(`${sample.term.pageId}$`));
 });
 
-test("蓝色正文链接保留强调，小浮卡显示词条简介与两个视角 @cross-browser", async ({ page, sample }) => {
+test("墨色正文链接常驻下划线、悬停反白，小浮卡显示词条简介与两个视角 @cross-browser", async ({ page, sample }) => {
   await page.goto(sample.source.href);
   const link = bodyLink(page);
-  await expect(link).toHaveCSS("text-decoration-line", "none");
+  // ADR-0008：链接与正文同为墨色，以常驻下划线区分；不额外加粗
+  await expect(link).toHaveCSS("text-decoration-line", "underline");
   expect(Number(await link.evaluate(el => getComputedStyle(el).fontWeight))).toBeLessThan(600);
   expect(Number(await bodyLink(page, "加粗双链").evaluate(el => getComputedStyle(el).fontWeight))).toBeGreaterThanOrEqual(600);
-  const assertBlue = async () => {
-    const rgb = await link.evaluate(el => {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d")!;
-      ctx.fillStyle = getComputedStyle(el).color;
-      ctx.fillRect(0, 0, 1, 1);
-      return [...ctx.getImageData(0, 0, 1, 1).data];
-    });
-    expect(rgb[2]).toBeGreaterThan(rgb[0]);
-  };
-  await assertBlue();
+  const restingBackground = await link.evaluate(el => getComputedStyle(el).backgroundColor);
   await link.hover();
   await expect(link).toHaveCSS("text-decoration-line", "underline");
+  await expect(link).not.toHaveCSS("background-color", restingBackground);
   await expect(card(page)).toBeHidden();
   await page.mouse.move(0, 0);
   await page.waitForTimeout(750);
@@ -124,7 +116,9 @@ test("蓝色正文链接保留强调，小浮卡显示词条简介与两个视�
   await page.keyboard.press("Escape");
   await expect(card(page)).toBeHidden();
   await page.locator("html").evaluate(el => el.classList.add("dark"));
-  await assertBlue();
+  // 深色下链接随正文反为浅墨，仍靠下划线区分
+  await expect(link).toHaveCSS("text-decoration-line", "underline");
+  expect(await link.evaluate(el => getComputedStyle(el).color)).toBe(await link.evaluate(el => getComputedStyle(el.closest(".wiki-content")!).color));
   await page.setViewportSize({ width: 375, height: 450 });
   // Establish keyboard modality; Safari may skip anchors in its native Tab order.
   await page.keyboard.press("Tab");

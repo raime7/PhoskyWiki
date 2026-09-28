@@ -2,10 +2,10 @@ import Link from "next/link";
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-border">
+    <footer className="border-t-(length:--bar) border-foreground">
       <div className="mx-auto flex w-full max-w-[88rem] flex-col gap-5 px-4 py-8 sm:flex-row sm:items-end sm:justify-between sm:px-6">
         <div>
-          <p className="text-lg font-bold tracking-tight">PhoskyWiki</p>
+          <p className="text-lg font-black tracking-tight">PhoskyWiki</p>
           <p className="mt-2 text-sm text-muted-foreground">词条 × 视角的原子笔记 WIKI</p>
           <p className="mt-1 text-xs text-muted-foreground">哲学 / 政治经济学 / 历史</p>
         </div>

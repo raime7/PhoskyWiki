@@ -9,6 +9,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-vermilion: var(--vermilion);
   --font-sans: var(--font-ui);
   --font-serif: var(--font-reading);
   --font-mono: var(--font-code);
@@ -58,33 +59,43 @@
   --font-reading: "Noto Serif SC Variable", "Noto Serif CJK SC", "Source Han Serif SC",
     "Songti SC", "STSong", "SimSun", serif;
   --font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  --background: #f2f0e9;
-  --foreground: #191919;
-  --card: #f8f6ef;
+  /* 构成主义视觉系统（ADR-0008）：新闻纸 / 纯墨 / 朱红三色。
+     朱红只给签名元素、hr 短条、选区、焦点环与破坏性操作；对纸面仅 4.1:1，
+     因此只用于大字与非文字元素，需要红色文字的地方（错误提示）用更深的 --destructive。 */
+  --paper: #e9e7e1;
+  --ink: #000;
+  --vermilion: #d5261c;
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: #efede8;
   --card-foreground: var(--foreground);
-  --popover: #f8f6ef;
+  --popover: #efede8;
   --popover-foreground: var(--foreground);
-  --primary: #2548e5;
-  --primary-foreground: #ffffff;
-  --secondary: #e5e1d7;
+  --primary: var(--ink);
+  --primary-foreground: var(--paper);
+  --secondary: #dedbd3;
   --secondary-foreground: var(--foreground);
-  --muted: #e9e6de;
-  --muted-foreground: #65615a;
-  --accent: #e1e6fc;
-  --accent-foreground: #1936b3;
-  --destructive: #b4232e;
-  --border: #c9c5bc;
+  --muted: #dedbd3;
+  --muted-foreground: #55524b;
+  --accent: #dcd9d0;
+  --accent-foreground: var(--ink);
+  --destructive: #b81d15;
+  --border: #c4c0b6;
   /* Input boundaries need more contrast than decorative rules. */
-  --input: #8b877e;
-  --ring: var(--primary);
-  --selection: #d5ddff;
-  --selection-foreground: #191919;
-  --chart-1: #2548e5;
-  --chart-2: #65615a;
-  --chart-3: #7461a9;
-  --chart-4: #8a541c;
-  --chart-5: #28736a;
-  --radius: 0.25rem;
+  --input: #807b71;
+  --ring: var(--vermilion);
+  --selection: #f3c2bc;
+  --selection-foreground: #000;
+  --chart-1: #3f5a78;
+  --chart-2: #55524b;
+  --chart-3: #6f5a86;
+  --chart-4: #8a6a3a;
+  --chart-5: #3f7466;
+  --radius: 0;
+  /* 构成的尺度：通栏墨杠、分区线、正文小标题墨条。 */
+  --bar: 14px;
+  --rule: 4px;
+  --head-bar: 9px;
   --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
@@ -97,27 +108,26 @@
 
 .dark {
   color-scheme: dark;
-  --background: #191b1d;
-  --foreground: #eeece4;
-  --card: #222629;
-  --popover: #24282c;
-  --primary: #9badff;
-  --primary-foreground: #191b1d;
-  --secondary: #2b3035;
-  --muted: #292d31;
-  --muted-foreground: #b7b4ac;
-  --accent: #303953;
-  --accent-foreground: #c7d2ff;
-  --destructive: #ff959d;
-  --border: #484b4d;
-  --input: #777a7b;
-  --selection: #3a4a83;
-  --selection-foreground: #ffffff;
-  --chart-1: #9badff;
-  --chart-2: #b7b4ac;
-  --chart-3: #c5afea;
-  --chart-4: #e6b779;
-  --chart-5: #83c5b4;
+  /* 深色 = 黑纸红印：偏纸感的深灰而非纯黑，朱红提亮以保对比。 */
+  --paper: #1d1c1a;
+  --ink: #ece9e1;
+  --vermilion: #ff5a47;
+  --card: #252421;
+  --popover: #262522;
+  --secondary: #2c2b28;
+  --muted: #2c2b28;
+  --muted-foreground: #aaa598;
+  --accent: #34322e;
+  --destructive: #ff5a47;
+  --border: #45433e;
+  --input: #858074;
+  --selection: #7a2a22;
+  --selection-foreground: #fff;
+  --chart-1: #9fb4cf;
+  --chart-2: #aaa598;
+  --chart-3: #bba6d0;
+  --chart-4: #d2b27f;
+  --chart-5: #8fc0b0;
 }
 
 @layer base {
@@ -144,6 +154,7 @@
   }
   a:hover {
     text-decoration-line: underline;
+    text-decoration-thickness: 0.12em;
   }
   button, input, textarea, select {
     font: inherit;
@@ -193,9 +204,9 @@
   --tw-prose-bold: var(--foreground);
   --tw-prose-counters: var(--muted-foreground);
   --tw-prose-bullets: var(--muted-foreground);
-  --tw-prose-hr: var(--border);
+  --tw-prose-hr: var(--vermilion);
   --tw-prose-quotes: var(--foreground);
-  --tw-prose-quote-borders: var(--input);
+  --tw-prose-quote-borders: var(--foreground);
   --tw-prose-captions: var(--muted-foreground);
   --tw-prose-code: var(--foreground);
   --tw-prose-pre-code: var(--foreground);
@@ -221,23 +232,60 @@
   font-style: normal;
 }
 
+/* 构成的阅读区（ADR-0008）：小标题粗黑带墨条，引文与原典摘录压一道粗墨条，
+   hr 是正文里唯一的朱红——一截短条。 */
+.wiki-content :where(h2, h3, h4) {
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.wiki-content h2 {
+  padding-left: 0.55em;
+  border-left: var(--head-bar) solid var(--foreground);
+}
+
+.wiki-content h3 {
+  padding-left: 0.6em;
+  border-left: 3px solid var(--foreground);
+}
+
+.wiki-content blockquote {
+  padding-left: 1.1em;
+  border-left: var(--head-bar) solid var(--foreground);
+  color: var(--foreground);
+}
+
+.wiki-content hr {
+  width: 4em;
+  height: 6px;
+  margin-block: 2.5em;
+  border: 0;
+  background: var(--vermilion);
+}
+
 .wiki-content blockquote p:first-of-type::before,
 .wiki-content blockquote p:last-of-type::after {
   content: none;
 }
 
 .wiki-content a.wiki-link {
-  color: var(--primary);
+  color: var(--foreground);
   font-weight: inherit;
-  text-decoration: none;
 }
 
-.wiki-content a.wiki-link:hover,
-.wiki-content a.wiki-link:focus-visible {
-  text-decoration-line: underline;
-  /* 上面 text-decoration 简写会把粗细重置回 auto，这里在出下划线时重新给全：
-     悬停下划线加粗到 0.09em 并贴字（0.1em），与个人划线（0.2em+）错开纵距（#96） */
+/* 链接是墨色常驻粗下划线（ADR-0008，取代 #85 的蓝色悬停下划线）。下划线仍贴字 0.1em、
+   粗 0.09em，守住 #96 的纵向阶梯；悬停／聚焦改为反白，不再加粗以免压到个人划线。 */
+.wiki-content a:not(.wiki-link) {
+  color: var(--foreground);
+  font-weight: inherit;
+  text-underline-offset: 0.1em;
   text-decoration-thickness: 0.09em;
+}
+
+.wiki-content a:hover,
+.wiki-content a:focus-visible {
+  background: var(--foreground);
+  color: var(--background);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -250,11 +298,11 @@
 }
 
 /* Markdown 渲染器输出的 wiki-link（src/lib/markdown.ts）。
-   蓝色双链不额外加粗，悬停／键盘聚焦时显示下划线（#85）；红链保留缺口标记。
+   双链不额外加粗，墨色常驻下划线；红链保留缺口标记。
    下划线纵向阶梯（#96）：可跳转链接的悬停下划线最贴文字，个人划线在其下方，
    红链／暂不可用缺口线保持内容盒底边，公共感想虚线在最外——多层同现时各行错开。 */
 .wiki-content .wiki-link {
-  @apply text-primary;
+  text-decoration-line: underline;
   text-underline-offset: 0.1em;
   text-decoration-thickness: 0.09em;
   text-decoration-skip-ink: none;
@@ -265,9 +313,23 @@
   outline-offset: 3px;
 }
 
+/* 红链：概念名不变，视觉上是墨色虚线 +"未建"小角标（伪元素不进入正文文本索引）。 */
 .wiki-content .wiki-link--red {
-  @apply cursor-help text-red-700 no-underline dark:text-red-400;
+  @apply cursor-help no-underline;
+  color: var(--foreground);
   border-bottom: 1px dashed currentColor;
+}
+
+.wiki-content .wiki-link--red::after {
+  content: "未建";
+  margin-left: 0.2em;
+  padding: 0 0.25em;
+  border: 1px solid currentColor;
+  font-family: var(--font-ui);
+  font-size: 0.6em;
+  font-weight: 700;
+  line-height: 1.4;
+  vertical-align: 0.35em;
 }
 
 .wiki-content .wiki-link--unavailable {
