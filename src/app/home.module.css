@@ -20,6 +20,8 @@
 .poster > .title {
   grid-row: 1;
   grid-column: 1 / -1;
+  /* 收到内容宽度再旋转，旋转后的外框才不会越出视口 */
+  justify-self: start;
   margin-block: 3rem 3.5rem;
 }
 
@@ -126,10 +128,16 @@
   text-decoration: underline;
 }
 
+/* 色带按容器宽度截断标题，绝不按内容撑宽：移动端浏览器会因溢出放大布局视口。 */
 .rays {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   width: 100%;
+}
+
+.rays li {
+  min-width: 0;
 }
 
 /* 各视角色带同形同色，悬停才转朱红：并列不分主次（ADR-0007）。 */
@@ -259,6 +267,7 @@
   min-width: 0;
   padding-top: 0.75rem;
   border-top: var(--rule) solid var(--foreground);
+  overflow-wrap: anywhere;
 }
 
 .cardTitle {
@@ -291,10 +300,12 @@
   gap: 0.25rem 1rem;
   min-width: 0;
   padding-block: 0.6rem;
+  /* 名称与标题可能是无空格长串（如带 UUID 的测试数据），必须能断行 */
+  overflow-wrap: anywhere;
 }
 
 .recent strong {
-  flex-shrink: 0;
+  min-width: 0;
   padding: 0.15rem 0.5rem;
   background: var(--foreground);
   color: var(--background);
