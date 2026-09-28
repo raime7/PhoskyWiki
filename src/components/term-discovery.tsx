@@ -7,8 +7,10 @@ import { RelatedTermsPanel } from "@/components/related-terms";
 import { useGuestInterests } from "@/lib/guest-interest-store";
 import { hasAnyInterest, serializeInterestSet } from "@/lib/interest-tags";
 import type { TermDiscovery } from "@/lib/term-discovery";
+import { PerspectiveColumns } from "@/components/prototype/perspective-columns";
+import type { ProtoVariant } from "@/components/prototype/variants";
 
-export function TermDiscoveryPanel({ termId, initial, guest, resources, exploreNav, children }: {
+export function TermDiscoveryPanel({ termId, initial, guest, resources, exploreNav, children, protoVariant = "current", protoExcerpts = {} }: {
   termId: number;
   initial: TermDiscovery;
   guest: boolean;
@@ -16,6 +18,9 @@ export function TermDiscoveryPanel({ termId, initial, guest, resources, exploreN
   /** 继续探索区的索引导航（#97：词条页按真实存在的区块生成锚点）。 */
   exploreNav?: ReactNode;
   children: ReactNode;
+  /** PROTOTYPE：构成主义原型的并置列（一次性代码）。 */
+  protoVariant?: ProtoVariant;
+  protoExcerpts?: Record<number, string>;
 }) {
   const selected = useGuestInterests();
   const requestKey = guest && selected && hasAnyInterest(selected)
@@ -43,7 +48,7 @@ export function TermDiscoveryPanel({ termId, initial, guest, resources, exploreN
   const others = data.perspectives;
   return (
     <>
-      <section aria-labelledby="perspectives-heading" className="mt-12">
+      <section aria-labelledby="perspectives-heading" className="pw-perspectives mt-12">
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="perspectives-heading" className="text-2xl font-semibold">
             诠释者视角（{others.length}）
@@ -60,7 +65,9 @@ export function TermDiscoveryPanel({ termId, initial, guest, resources, exploreN
         <p className="mb-5 text-sm leading-relaxed text-muted-foreground">
           各视角平等并列，排序不代表权威。未设置相关兴趣时，按站内引用排序。
         </p>
-        {others.length > 0 ? (
+        {others.length > 0 && protoVariant !== "current" ? (
+          <PerspectiveColumns items={others} excerpts={protoExcerpts} variant={protoVariant} />
+        ) : others.length > 0 ? (
           <PerspectiveList items={others} interestInterpreterIds={data.interestInterpreterIds} />
         ) : (
           <p className="text-sm text-muted-foreground">该词条暂无诠释者的视角。</p>

@@ -27,10 +27,14 @@ import { getTermDiscovery } from "@/lib/term-discovery";
 import { pageIdFromKey, pageKey } from "@/lib/slug";
 import { resolveLivePage } from "@/lib/resolve-page";
 import { getSessionUser } from "@/lib/session";
+import { ConstructivistTermHeader } from "@/components/prototype/constructivist-term-header";
+import { excerptsFor } from "@/lib/prototype-constructivist-data";
+import { getProtoVariant } from "@/lib/prototype-variant";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ pageKey: string }> };
+type PageProps = Params & { searchParams: Promise<{ variant?: string | string[] }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const id = pageIdFromKey((await params).pageKey);
@@ -39,7 +43,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return term ? { title: term.title, description: term.summary } : {};
 }
 
-export default async function TermPage({ params }: Params) {
+export default async function TermPage({ params, searchParams }: PageProps) {
   const page = await resolveLivePage("term", (await params).pageKey);
   const term = await getTermDetail(page.id);
   if (!term) notFound();
@@ -56,9 +60,27 @@ export default async function TermPage({ params }: Params) {
   const interests = sessionUser ? await getInterestTags(sessionUser.id) : null;
   const discovery = await getTermDiscovery(page.id, interests);
   if (!discovery) notFound();
+  // PROTOTYPE：构成主义原型——页头与视角并置列按变体切换，去掉装饰性编号。
+  const variant = await getProtoVariant((await searchParams).variant);
+  const protoExcerpts = variant === "current" ? {} : Object.fromEntries(await excerptsFor(discovery.perspectives.map(p => p.pageId)));
+  const actions = (
+    <>
+      <HistoryLink pageId={page.id} />
+      {sessionUser && <Link href={`/edit/${pageKey(page.slug, page.id)}`}>编辑词条信息</Link>}
+      {hasAdminRole(sessionUser?.role) && (
+        <PageAction pageId={page.id} action="delete" deleteTerm={{ title: term.title, perspectiveCount: perspectives.length }} />
+      )}
+    </>
+  );
 
   // 继续探索索引（#97）：只链接真实存在的区块，编号为装饰性等宽索引。
-  const exploreNav = (
+  const exploreNav = variant !== "current" ? (
+    <nav aria-label="继续探索索引" className="flex flex-wrap gap-x-5 gap-y-1 pb-1 text-sm">
+      {discovery.relatedTerms.length > 0 && <a href="#related-terms-heading" className="py-1">相关词条</a>}
+      <a href="#backlinks-heading" className="py-1">反链</a>
+      {localGraph && <a href="#local-graph-heading" className="py-1">局部图谱</a>}
+    </nav>
+  ) : (
     <nav aria-label="继续探索索引" className="flex flex-wrap gap-x-5 gap-y-1 pb-1 text-sm">
       {discovery.relatedTerms.length > 0 && (
         <a href="#related-terms-heading" className="py-1"><span aria-hidden="true" className="mr-1.5 font-mono text-xs text-muted-foreground">01</span>相关词条</a>
@@ -71,7 +93,10 @@ export default async function TermPage({ params }: Params) {
   );
 
   return (
-    <PageContainer className="max-w-6xl [overflow-wrap:anywhere]">
+    <PageContainer className={`${variant === "current" ? "max-w-6xl" : "pw-term-page max-w-[1408px]"} [overflow-wrap:anywhere]`}>
+      {variant !== "current" ? (
+        <ConstructivistTermHeader variant={variant} title={term.title} summary={term.summary} perspectiveCount={discovery.perspectives.length} actions={actions} />
+      ) : (
       <header className="border-b border-border pb-8">
         <nav aria-label="面包屑" className="flex flex-wrap gap-x-2 gap-y-1 text-sm text-muted-foreground">
           <Link href="/" className="py-1">首页</Link>
@@ -103,8 +128,11 @@ export default async function TermPage({ params }: Params) {
           <a href="#comments" className="py-2">词条总评论</a>
         </nav>
       </header>
+      )}
 
       <TermDiscoveryPanel
+        protoVariant={variant}
+        protoExcerpts={protoExcerpts}
         termId={page.id}
         initial={discovery}
         guest={!sessionUser}

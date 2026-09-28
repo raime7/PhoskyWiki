@@ -11,6 +11,9 @@ import { getInterestTags } from "@/lib/interests";
 import { hasAnyInterest } from "@/lib/interest-tags";
 import { listHomeRecommendations } from "@/lib/recommend";
 import { pagePath } from "@/lib/slug";
+import { BookHome, MiddleHome, PosterHome } from "@/components/prototype/constructivist-home";
+import { getDailyTerm } from "@/lib/prototype-constructivist-data";
+import { getProtoVariant } from "@/lib/prototype-variant";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +23,18 @@ const entrances = [
   { href: "/schools", title: "学派入口", description: "在思想谱系中漫游" },
 ];
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ variant?: string | string[] }> }) {
   const [terms, recent, schools, user] = await Promise.all([
     listTerms(), listRecentPerspectives(), listSchools(), getSessionUser(),
   ]);
+  // PROTOTYPE：构成主义三档首页（"为你发现"在原型中省略）。
+  const variant = await getProtoVariant((await searchParams).variant);
+  if (variant !== "current") {
+    const data = { terms, recent, schools, daily: await getDailyTerm() };
+    if (variant === "book") return <BookHome {...data} />;
+    if (variant === "middle") return <MiddleHome {...data} />;
+    return <PosterHome {...data} />;
+  }
   const interests = user ? await getInterestTags(user.id) : null;
   const recommendations = interests ? await listHomeRecommendations(interests) : [];
 
