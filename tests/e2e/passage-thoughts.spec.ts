@@ -151,6 +151,8 @@ async function selectText(page: Page, quote: string) {
     const from = pointAt(start, false);
     const to = pointAt(end, true);
     if (!from || !to) return false;
+    // 真实读者只会选中看得见的字：先把选段滚入视野，浮条才贴得到选区旁
+    from.node.parentElement?.scrollIntoView({ block: "center" });
     const range = document.createRange();
     range.setStart(from.node, from.offset);
     range.setEnd(to.node, to.offset);
@@ -299,6 +301,8 @@ test("句子虚线与双链叠加：点双链优先导航，虚线非链接区�
         const text = node.nodeValue ?? "";
         const index = text.indexOf(needle);
         if (index >= 0) {
+          // 坐标点击只落在视口内：先把该句滚入视野再量位置
+          node.parentElement?.scrollIntoView({ block: "center" });
           const range = document.createRange();
           range.setStart(node, index);
           range.setEnd(node, index + needle.length);
