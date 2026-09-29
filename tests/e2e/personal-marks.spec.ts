@@ -56,6 +56,8 @@ async function selectText(page: Page, needle: string) {
       if (anchor && focus) break;
     }
     if (!anchor || !focus) return false;
+    // 真实读者只会选中看得见的字：先把选段滚入视野，浮条才贴得到选区旁
+    anchor.node.parentElement?.scrollIntoView({ block: "center" });
     window.getSelection()?.setBaseAndExtent(anchor.node, anchor.offset, focus.node, focus.offset);
     return true;
   }, needle);
@@ -362,11 +364,11 @@ test("双链、红链与三种划线、感想虚线叠加分层可辨：明暗�
           link: read(".wiki-content a.wiki-link", "color"),
           underline: read("a.wiki-link .pw-mark--underline", "textDecorationColor"),
           marker: read("a.wiki-link .pw-thought-marker", "textDecorationColor"),
-          redText: read(".wiki-link--red", "color"),
         };
       });
       expect(new Set([colors.link, colors.underline, colors.marker]).size, `${theme} 三层线色应互不相同`).toBe(3);
-      expect(colors.link, `${theme} 链接应保持主题蓝`).not.toBe(colors.redText);
+      // ADR-0008：红链与链接同为墨色，靠虚线与"未建"角标区分
+      expect(await redLink.evaluate(el => getComputedStyle(el, "::after").content), `${theme} 红链应带"未建"角标`).toBe('"未建"');
       await expect(publicMarker).toHaveCSS("text-decoration-style", "dashed");
       await expect(redLink).toHaveCSS("border-bottom-style", "dashed");
 

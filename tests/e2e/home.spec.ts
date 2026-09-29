@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 test("首页以搜索为中心，提供真实发现栏目和可用的三轴入口", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { level: 1, name: /思想，\s*在分歧中展开。/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /只有\s*改变过去，\s*才能创造\s*新的未来/ })).toBeVisible();
   await expect(page.getByRole("banner")).toContainText("词条");
   await expect(page.getByRole("contentinfo")).toContainText("原子笔记");
   const main = page.getByRole("main");

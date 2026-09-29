@@ -1,6 +1,8 @@
 import { expect, test, type Locator } from "./fixtures";
 import { toggleTheme } from "./navigation-fixture";
 
+const SLOGAN = "只有改变过去，才能创造新的未来";
+
 async function expectInsideFirstScreen(locator: Locator, height: number) {
   await expect(locator).toBeVisible();
   const bounds = await locator.boundingBox();
@@ -10,19 +12,19 @@ async function expectInsideFirstScreen(locator: Locator, height: number) {
 }
 
 for (const width of [1440, 375]) {
-  test(`首页 ${width}px 明暗首屏保留检索、三轴与有来源的拼贴`, async ({ page }, testInfo) => {
+  test(`首页 ${width}px 明暗首屏保留标语、检索、三轴与今日词条构成`, async ({ page }, testInfo) => {
     const height = width === 375 ? 812 : 900;
     await page.setViewportSize({ width, height });
     await page.goto("/");
     await page.evaluate(() => document.fonts.ready);
     const main = page.getByRole("main");
-    const collage = main.getByRole("figure", { name: "黑格尔、马克思、拉康与文献拼贴" });
+    const daily = main.getByRole("region", { name: "今日词条" });
 
     for (const theme of ["light", "dark"] as const) {
       if (theme === "dark") await toggleTheme(page);
       await page.evaluate(() => scrollTo(0, 0));
       await expect(page.locator("html")).toHaveCSS("color-scheme", theme);
-      await expect(main.getByRole("heading", { level: 1 })).toHaveText("思想，在分歧中展开。");
+      await expect(main.getByRole("heading", { level: 1 })).toHaveText(SLOGAN);
       await expect(main.getByText("一个概念，多种视角。", { exact: true })).toBeVisible();
       await expectInsideFirstScreen(main.getByRole("textbox", { name: "全站搜索" }), height);
       const axes = main.getByRole("navigation", { name: "三轴入口" });
@@ -31,27 +33,30 @@ for (const width of [1440, 375]) {
       const headingSize = await main.getByRole("heading", { level: 1 }).evaluate(el => parseFloat(getComputedStyle(el).fontSize));
       expect(headingSize).toBeGreaterThanOrEqual(width === 375 ? 40 : 88);
       expect(headingSize).toBeLessThanOrEqual(width === 375 ? 56 : 120);
-      for (const name of ["黑格尔肖像", "马克思肖像", "拉康肖像", "《资本论》第一卷 1867 年扉页"]) {
-        const asset = collage.getByRole("img", { name, exact: true });
-        await expect(asset).toBeVisible();
-        await expect.poll(() => asset.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
-      }
+      // 今日词条：一个词条连向它的多个视角，每个视角都是可达的链接
+      await expect(daily.getByRole("heading", { name: "今日词条", exact: true })).toBeVisible();
+      await expect(daily.getByRole("link").first()).toHaveAttribute("href", /^\/term\//);
+      expect(await daily.getByRole("list").getByRole("link").count()).toBeGreaterThanOrEqual(2);
       await expect(main.getByRole("heading", { name: "探索概念", exact: true })).toBeVisible();
-      await expect(main.getByText("本周概念", { exact: false })).toHaveCount(0);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       await page.screenshot({ path: testInfo.outputPath(`home-${width}-${theme}.png`), fullPage: true });
       await page.screenshot({ path: testInfo.outputPath(`home-${width}-${theme}-first-screen.png`) });
     }
-    await collage.getByText("拼贴素材与来源", { exact: true }).click();
-    for (const name of ["黑格尔肖像来源", "马克思肖像来源", "拉康肖像来源", "《资本论》扉页来源"]) {
-      await expect(collage.getByRole("link", { name, exact: true })).toHaveAttribute("href", /^https:\/\/commons\.wikimedia\.org\/wiki\/File:/);
-    }
-    await expect(collage).toContainText("Foto Moisio");
-    await expect(collage).toContainText("PD-Italy / PD-1996");
-    await expect(collage).toContainText("裁去座椅及手部");
-    await page.screenshot({ path: testInfo.outputPath(`home-${width}-sources.png`), fullPage: true });
   });
 }
+
+test("今日词条同一天稳定，视角入口进入对应视角页", async ({ page }) => {
+  await page.goto("/");
+  const daily = page.getByRole("main").getByRole("region", { name: "今日词条" });
+  const term = await daily.getByRole("link").first().innerText();
+  await page.reload();
+  await expect(daily.getByRole("link").first()).toHaveText(term);
+  const ray = daily.getByRole("list").getByRole("link").first();
+  const interpreter = await ray.locator("strong").innerText();
+  await ray.click();
+  await expect(page).toHaveURL(/\/perspective\//);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(interpreter);
+});
 
 test("首页三轴进入真实索引，概念计数与索引一致", async ({ page }) => {
   await page.goto("/");
@@ -90,8 +95,7 @@ test("首页真实搜索提交到词条，联想可用键盘直达视角", async
   await expect(page.locator(".wiki-content")).toBeVisible();
 });
 
-test("窄屏和图片加载失败仍可搜索与进入三轴", async ({ page }) => {
-  await page.route("**/_next/image?**", route => route.abort());
+test("窄屏与中等宽度仍可在首屏搜索与进入三轴", async ({ page }) => {
   for (const width of [320, 768, 1024]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");

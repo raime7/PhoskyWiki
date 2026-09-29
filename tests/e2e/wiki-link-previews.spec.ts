@@ -128,7 +128,7 @@ test("普通词条双链：短暂划过不弹卡，停留后出简介与视角�
   const link = page.locator(".wiki-content").getByRole("link", { name: "意识形态", exact: true });
   const card = page.getByRole("dialog", { name: "双链预览" });
 
-  // F01 回归（未悬停）：蓝色、默认无下划线、不加粗
+  // 未悬停（ADR-0008 取代 F01 的蓝色）：与正文同墨、常驻下划线、不加粗
   const styles = await link.evaluate(el => ({
     color: getComputedStyle(el).color,
     body: getComputedStyle(el.parentElement!).color,
@@ -136,9 +136,9 @@ test("普通词条双链：短暂划过不弹卡，停留后出简介与视角�
     parentWeight: getComputedStyle(el.parentElement!).fontWeight,
     decoration: getComputedStyle(el).textDecorationLine,
   }));
-  expect(styles.color).not.toBe(styles.body);
+  expect(styles.color).toBe(styles.body);
   expect(styles.weight).toBe(styles.parentWeight);
-  expect(styles.decoration).not.toContain("underline");
+  expect(styles.decoration).toContain("underline");
 
   // 短暂停留（<650ms）不弹卡；停留到延迟后弹卡
   await link.hover();
