@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures";
 
 // 游客读路径全流程（依赖 pnpm db:seed 灌入的演示内容，见 CI 与 README）
 
-test("词条页：视角列表折叠展开 + 信息框", async ({ page }) => {
+test("词条页：视角并置列 + 信息框", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "主体性", exact: true }).click();
 
@@ -19,10 +19,12 @@ test("词条页：视角列表折叠展开 + 信息框", async ({ page }) => {
   // 信息框
   await expect(page.getByText("词条（聚合枢纽）")).toBeVisible();
   await expect(page.getByText("主体、subject")).toBeVisible();
-  // 折叠列表：默认露 5 条，德勒兹论主体性 藏在「展开全部」之后
-  await expect(page.getByRole("link", { name: "德勒兹论主体性" })).toBeHidden();
-  await page.getByRole("button", { name: /展开全部/ }).click();
-  await expect(page.getByRole("link", { name: "德勒兹论主体性" })).toBeVisible();
+  // 并置列：8 个视角全部同宽排开（放不下时横向滚动），每列有首段摘录与读全文入口
+  const columns = page.getByRole("list", { name: "视角目录" }).getByRole("listitem");
+  await expect(columns).toHaveCount(8);
+  await expect(page.getByRole("link", { name: "德勒兹论主体性", exact: true })).toBeVisible();
+  await expect(columns.filter({ hasText: "德勒兹论主体性" }).getByRole("link", { name: "读全文", exact: true }))
+    .toHaveAccessibleDescription("德勒兹论主体性");
 });
 
 test("全流程：词条 → 视角 → 双链落词条枢纽；红链可见", async ({ page }) => {

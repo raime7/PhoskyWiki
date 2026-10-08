@@ -1,0 +1,180 @@
+/* 词条枢纽页（ADR-0008）：签名位之一。页头是海报式构成，视角并置成同宽的列。 */
+
+.header {
+  position: relative;
+  isolation: isolate;
+}
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.crumbs a {
+  padding-block: 0.25rem;
+  color: var(--muted-foreground);
+}
+
+.crumbs [aria-current="page"] {
+  padding-block: 0.25rem;
+}
+
+/* 朱红楔形压在标题下层；黑字压朱红为 4.1:1，只允许巨字标题叠上去。 */
+.wedge {
+  position: absolute;
+  z-index: -1;
+  right: 0;
+  top: 0;
+  width: min(42%, 34rem);
+  height: 78%;
+  background: var(--vermilion);
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1.5rem;
+  margin-top: 2rem;
+}
+
+.title {
+  min-width: 0;
+  font-size: clamp(3.5rem, 11vw, 9rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+
+.count {
+  margin-bottom: 0.5em;
+  padding: 0.3rem 0.6rem;
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.summary {
+  margin-top: 1.25rem;
+  max-width: 40em;
+  font-family: var(--font-reading);
+  font-size: 1.125rem;
+  line-height: 1.8;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  margin-top: 1.25rem;
+  font-size: 0.875rem;
+}
+
+.pageNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.5rem;
+  margin-top: 1.5rem;
+  padding-inline: 1rem;
+  background: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.pageNav a {
+  padding-block: 0.6rem;
+  color: var(--background);
+}
+
+.columns {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  border-block: var(--rule) solid var(--foreground);
+}
+
+.track {
+  display: grid;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 1.25rem 0;
+  scroll-snap-align: start;
+}
+
+.column + .column {
+  border-top: 1px solid var(--foreground);
+}
+
+.interpreter {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  background: var(--foreground);
+  color: var(--background);
+  font-weight: 900;
+}
+
+.columnTitle {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+.excerpt {
+  flex: 1;
+  margin-top: 0.75rem;
+  font-family: var(--font-reading);
+  font-size: 1rem;
+  line-height: 1.8;
+}
+
+.columnFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  align-self: stretch;
+  gap: 0.25rem 1rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.columnFoot a {
+  color: var(--foreground);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 0.12em;
+}
+
+@media (max-width: 767px) {
+  .wedge { width: 42%; height: 11rem; }
+}
+
+@media (min-width: 768px) {
+  /* 同宽并列：列数少时平分整行；多于四列时每列收窄到露出下一列一角，提示可横向滚动。 */
+  .track {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(16rem, 1fr);
+  }
+  .track:has(> li:nth-child(5)) {
+    grid-auto-columns: max(16rem, calc(100% / 4.4));
+  }
+  .column { padding: 1.25rem 1.5rem 1.5rem; }
+  .column:first-child { padding-left: 0; }
+  .column + .column { border-top: 0; border-left: var(--rule) solid var(--foreground); }
+}

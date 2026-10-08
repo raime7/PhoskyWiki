@@ -83,7 +83,8 @@ test("词条草稿、独立编辑、两票逐字段审核、旧 URL 与普通及
     await expect(visitor.getByRole("heading", { level: 1 })).toHaveText(renamedTitle);
     await expect(visitor.getByText("新简介", { exact: true }).first()).toBeVisible();
     await expect(visitor.getByText("新别名、另一个别名", { exact: true })).toBeVisible();
-    await visitor.locator(`a[href="${targetPerspective.href}"]`).click();
+    // 视角列里标题与"读全文"同指一处，点标题
+    await visitor.locator(`a[href="${targetPerspective.href}"]`).first().click();
     await expect(visitor.locator(".wiki-content")).toContainText("通俗视角保持独立。");
     await expect(visitor).toHaveURL(targetPerspective.href);
     const current = await (await page.request.get(historyUrl)).json();

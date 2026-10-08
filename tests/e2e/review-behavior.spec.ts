@@ -51,9 +51,9 @@ async function history(request: APIRequestContext, pageId: number) {
   return response.json() as Promise<{ revisions: { id: number; content: string }[] }>;
 }
 
-async function edit(request: APIRequestContext, pageId: number, content: string) {
+async function edit(request: APIRequestContext, pageId: number, content: string, note?: string) {
   const base = (await history(request, pageId)).revisions[0].id;
-  return submit(request, { kind: "edit", pageId, content, baseRevisionId: base });
+  return submit(request, { kind: "edit", pageId, content, baseRevisionId: base, note });
 }
 
 async function fixture(request: APIRequestContext) {
@@ -100,7 +100,8 @@ test("队列显示票数、批准者、过期基准与两侧 diff；提交详情
   await getDb().update(submissions).set({ quorum: 2 }).where(eq(submissions.id, created.submissionId));
   expect(await review(request, created.submissionId, "approve")).toEqual({ outcome: "pending", approveCount: 1, quorum: 2 });
   await edit(request, source.perspective.pageId, "直编推进 head。");
-  const fresh = await edit(page.request, source.perspective.pageId, "第二条待审提交。");
+  const note = "审稿说明 <img src=x onerror=\"window.__noteXss=1\"> **不渲染**";
+  const fresh = await edit(page.request, source.perspective.pageId, "第二条待审提交。", note);
   const staleProposal = await edit(page.request, source.perspective.pageId, "等待旧基准受理的提案。");
 
   await loginAdmin(page.request);
@@ -116,6 +117,10 @@ test("队列显示票数、批准者、过期基准与两侧 diff；提交详情
   const freshItem = page.locator(`[data-submission-id="${fresh.submissionId}"]`);
   await expect(freshItem.getByTestId("stale-badge")).toHaveCount(0);
   await expect(freshItem).toContainText("批准 0/");
+  // 提交说明按纯文本显示：HTML 与 Markdown 标记原样可见，不执行
+  await expect(freshItem.getByTestId("submission-note")).toContainText(note);
+  await expect(freshItem.getByTestId("submission-note").locator("img")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __noteXss?: number }).__noteXss)).toBeUndefined();
   const queueIds = await page.locator("[data-submission-id]").filter({ hasText: source.perspectiveTitle }).evaluateAll((items) => items.map((entry) => entry.getAttribute("data-submission-id")));
   await edit(request, source.perspective.pageId, "再次直编，不进入审核队列。");
   await page.reload();

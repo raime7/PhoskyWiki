@@ -114,6 +114,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
   const duplicatePerspective = variant === "new_perspective" && props.existingPerspectives.some(
     (pair) => pair.termId === Number(termId) && pair.interpreterId === Number(interpreterId),
   );
+  const [note, setNote] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<FieldError | null>(null);
@@ -249,7 +250,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
     const res = await fetch("/api/submissions", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...payload, ...(retry ? { supersedes: retry.id, confirmedBaseRevisionId: confirmed ? draftBase : undefined } : {}) }),
+      body: JSON.stringify({ ...payload, ...(!isAdmin && note.trim() ? { note } : {}), ...(retry ? { supersedes: retry.id, confirmedBaseRevisionId: confirmed ? draftBase : undefined } : {}) }),
     });
     const data = (await res.json().catch(() => null)) as
       | (CreateSubmissionResult & { error?: string; href?: string })
@@ -452,6 +453,20 @@ export function SubmissionForm(props: SubmissionFormProps) {
       )}
 
       <section aria-label="提交" className="flex flex-col gap-4 border-t border-border pt-6">
+        {!isAdmin && (
+          <label className="flex flex-col gap-2 text-sm font-medium">
+            提交说明（可选）
+            <textarea
+              name="note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              maxLength={20000}
+              rows={3}
+              placeholder="写给审核者的修改理由或补充材料，按纯文本显示"
+              className="min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-normal"
+            />
+          </label>
+        )}
         {error && (
           <Callout tone="danger" data-testid="form-error" role="alert">
             <span className="[overflow-wrap:anywhere]">{error}</span>

@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import { PerspectiveList } from "@/components/perspective-list";
+import { PerspectiveColumns } from "@/components/perspective-columns";
 import { RelatedTermsPanel } from "@/components/related-terms";
 import { useGuestInterests } from "@/lib/guest-interest-store";
 import { hasAnyInterest, serializeInterestSet } from "@/lib/interest-tags";
 import type { TermDiscovery } from "@/lib/term-discovery";
 
-export function TermDiscoveryPanel({ termId, initial, guest, resources, exploreNav, children }: {
+export function TermDiscoveryPanel({ termId, initial, guest, excerpts, resources, exploreNav, children }: {
   termId: number;
   initial: TermDiscovery;
   guest: boolean;
+  /** 各视角首段摘录（按页 id），并置列用；与排序无关，兴趣重排后仍按 id 取。 */
+  excerpts: Record<number, string>;
   resources: ReactNode;
   /** 继续探索区的索引导航（#97：词条页按真实存在的区块生成锚点）。 */
   exploreNav?: ReactNode;
@@ -45,7 +47,7 @@ export function TermDiscoveryPanel({ termId, initial, guest, resources, exploreN
     <>
       <section aria-labelledby="perspectives-heading" className="mt-12">
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="perspectives-heading" className="text-2xl font-semibold">
+          <h2 id="perspectives-heading" className="text-3xl font-black tracking-tight sm:text-5xl">
             诠释者视角（{others.length}）
           </h2>
           {!guest && (
@@ -61,16 +63,16 @@ export function TermDiscoveryPanel({ termId, initial, guest, resources, exploreN
           各视角平等并列，排序不代表权威。未设置相关兴趣时，按站内引用排序。
         </p>
         {others.length > 0 ? (
-          <PerspectiveList items={others} interestInterpreterIds={data.interestInterpreterIds} />
+          <PerspectiveColumns items={others} excerpts={excerpts} interestInterpreterIds={data.interestInterpreterIds} />
         ) : (
           <p className="text-sm text-muted-foreground">该词条暂无诠释者的视角。</p>
         )}
       </section>
       {resources}
-      <section aria-labelledby="term-explore-heading" className="mt-12 border-t border-border pt-8">
+      <section aria-labelledby="term-explore-heading" className="mt-12 border-t-(length:--rule) border-foreground pt-8">
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
           <div className="min-w-0">
-            <h2 id="term-explore-heading" className="text-2xl font-semibold">继续探索</h2>
+            <h2 id="term-explore-heading" className="text-2xl font-black">继续探索</h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">从相关词条、引用本页的视角与双链邻居，找到下一步阅读入口。</p>
           </div>
           {exploreNav}

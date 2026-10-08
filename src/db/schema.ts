@@ -285,6 +285,8 @@ export const submissions = pgTable(
     // 编辑起点的页面 head 修订（ADR-0004 #2 并发防护）；
     // 受理时页面 head ≠ base → 该票无法通过，自动驳回并提示基于新版重新提交
     baseRevisionId: integer("base_revision_id").references(() => revisions.id),
+    // 提交说明：提交者附给审核者的可选纯文本（修改理由、机器审稿报告等）；不继承给重提
+    note: text("note"),
     status: submissionStatusEnum("status").notNull().default("pending"),
     // 受理所需批准票数：提交创建时快照的 min(2, 管理员数)（ADR-0004 #4）
     quorum: integer("quorum").notNull(),

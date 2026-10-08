@@ -11,7 +11,8 @@ import { expect, test, type Page } from "./fixtures";
 const SECTION = '[aria-labelledby="perspectives-heading"]';
 
 async function perspectiveTitles(page: Page): Promise<string[]> {
-  return page.locator(`${SECTION} li > div > a.font-medium`).allTextContents();
+  // 每列的视角标题链接（诠释者名链到 /interpreter/，读全文在列脚）
+  return page.locator(`${SECTION} [aria-label="视角目录"] > li > a[href^="/perspective/"]`).allTextContents();
 }
 
 async function gotoSubjectivity(page: Page) {
@@ -19,11 +20,6 @@ async function gotoSubjectivity(page: Page) {
   await page.getByRole("link", { name: "主体性", exact: true }).click();
   // 等词条页真正渲染（click 不等导航完成）
   await expect(page.getByRole("heading", { level: 1, name: "主体性" })).toBeVisible();
-  // 视角列表默认折叠 5 条：先展开，取完整序（8 条视角都在断言范围内）
-  const expand = page.getByRole("button", { name: /展开全部/ });
-  if ((await expand.count()) > 0) {
-    await expand.click();
-  }
 }
 
 test("游客单选学派使成员视角与相关词条即时参与发现，刷新保留", async ({ page }) => {
@@ -57,7 +53,6 @@ test("游客主题、三类组合、跨标签页修改保持同步，与账号�
   const separateVisitor = await browser.newContext();
   const separatePage = await separateVisitor.newPage();
   await separatePage.goto(page.url());
-  await separatePage.getByRole("button", { name: /展开全部/ }).click();
   expect(await perspectiveTitles(separatePage)).toEqual(defaultTitles);
   await expect(separatePage.getByTestId("related-terms").locator("li").first()).toContainText("异化");
   await separateVisitor.close();
@@ -101,7 +96,6 @@ test("游客同页通知、清空、坏数据、失效 id 与请求失败均回�
   await expect.poll(() => perspectiveTitles(page)).toEqual(defaultTitles);
   await page.reload();
   await expect(page.getByRole("heading", { name: "主体性", level: 1 })).toBeVisible();
-  await page.getByRole("button", { name: /展开全部/ }).click();
   const invalid = { v: 1, interpreters: [999999], schools: [999999], categories: [999999] };
   const invalidResponse = page.waitForResponse((response) => response.url().includes("/discovery?"));
   await page.evaluate((value) => {

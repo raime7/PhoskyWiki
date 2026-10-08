@@ -112,7 +112,11 @@ export interface SubmissionInput {
   supersedes?: number;
   /** 编者已对照此修订人工整理过期提案。 */
   confirmedBaseRevisionId?: number;
+  /** 提交说明（可选，纯文本；空白视为未填，上限 SUBMISSION_NOTE_MAX_LENGTH） */
+  note?: string;
 }
+
+export const SUBMISSION_NOTE_MAX_LENGTH = 20000;
 
 interface ValidatedSubmission {
   keyTexts?: KeyText[] | null;
@@ -126,6 +130,7 @@ interface ValidatedSubmission {
   interpreterId: number | null;
   baseRevisionId: number | null;
   supersedes: number | null;
+  note: string | null;
 }
 
 function requiredInt(value: unknown, error: string): number {
@@ -142,6 +147,13 @@ async function validateSubmissionInput(
   let keyTexts: KeyText[] | undefined;
   try { keyTexts = parseKeyTexts(input.keyTexts); } catch (error) { throw new ReviewError(400, (error as Error).message); }
   const summary = input.summary?.trim() || null;
+  if (input.note !== undefined && input.note !== null && typeof input.note !== "string") {
+    throw new ReviewError(400, "note 必须是字符串");
+  }
+  const note = input.note?.trim() || null;
+  if (note !== null && note.length > SUBMISSION_NOTE_MAX_LENGTH) {
+    throw new ReviewError(400, `提交说明不能超过 ${SUBMISSION_NOTE_MAX_LENGTH} 字符`);
+  }
   const supersedes =
     input.supersedes === undefined || input.supersedes === null
       ? null
@@ -222,6 +234,7 @@ async function validateSubmissionInput(
         interpreterId: null,
         baseRevisionId,
         supersedes,
+        note,
       };
     }
     case "new_term":
@@ -274,6 +287,7 @@ async function validateSubmissionInput(
         interpreterId: null,
         baseRevisionId: null,
         supersedes,
+        note,
       };
     }
     case "new_perspective": {
@@ -305,6 +319,7 @@ async function validateSubmissionInput(
         interpreterId,
         baseRevisionId: null,
         supersedes,
+        note,
       };
     }
     default:
@@ -359,6 +374,7 @@ export async function createSubmission(
         quorum,
         submittedBy: actor.id,
         supersedesId: validated.supersedes,
+        note: validated.note,
       })
       .returning({ id: submissions.id });
     return { outcome: "pending", submissionId: row.id, quorum };
@@ -754,6 +770,7 @@ export interface QueueItem {
   content: string;
   title: string | null;
   summary: string | null;
+  note: string | null;
   /** kind=new_perspective：挂载描述 */
   termTitle: string | null;
   interpreterName: string | null;
@@ -775,6 +792,7 @@ export async function listQueue(): Promise<QueueItem[]> {
       content: submissions.content,
       title: submissions.title,
       summary: submissions.summary,
+      note: submissions.note,
       aliases: submissions.aliases,
       keyTexts: submissions.keyTexts,
       termId: submissions.termId,
@@ -899,6 +917,7 @@ export async function listQueue(): Promise<QueueItem[]> {
       linkTargets: [...(linkTargets.get(row.id) ?? new Map<string, WikiLinkTarget>())],
       title: row.title,
       summary: row.summary,
+      note: row.note,
       aliases: row.aliases,
       keyTexts: row.keyTexts,
       termTitle: row.termId !== null ? titleById.get(row.termId) ?? null : null,

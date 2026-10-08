@@ -57,21 +57,22 @@ export interface LocalGraphData extends SiteGraphData {
   hopsById: Record<number, 1 | 2>;
 }
 
-/** 学派配色盘（顺序分配）；未归属学派的词条用灰。 */
+/** 学派配色盘（顺序分配）；未归属学派的词条用灰。
+ *  低饱和的分类色，刻意不含红／粉：朱红只留给选中与路径高亮（ADR-0008）。 */
 export const SCHOOL_PALETTE = [
-  "#e11d48", // rose
-  "#2563eb", // blue
-  "#16a34a", // green
-  "#d97706", // amber
-  "#7c3aed", // violet
-  "#0d9488", // teal
-  "#db2777", // pink
-  "#ca8a04", // yellow
-  "#4f46e5", // indigo
-  "#dc2626", // red
+  "#3f5a78", // slate
+  "#4f7a5a", // moss
+  "#a07a3c", // ochre
+  "#6f5a86", // violet
+  "#3f7474", // teal
+  "#7d7a3e", // olive
+  "#5f7fa8", // steel
+  "#8a6f5a", // clay
+  "#5e8a7a", // sage
+  "#86739a", // lavender
 ] as const;
 
-export const UNSCHOOLED_COLOR = "#94a3b8";
+export const UNSCHOOLED_COLOR = "#9a968c";
 
 /** 缺少学派成员视角的词条图例名，词条页与全站页共用。 */
 export const UNSCHOOLED_LABEL = "暂无学派成员视角";

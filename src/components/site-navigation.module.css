@@ -1,0 +1,61 @@
+/* 页头（ADR-0008）：斜置的红印字标、通栏墨杠，当前所在栏目由立在墨杠上的朱红楔标出。 */
+.header {
+  border-bottom: var(--bar) solid var(--foreground);
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: stretch;
+  font-family: var(--font-ui);
+  /* 最窄手机上登录态页头还要放搜索、通知与菜单三个 44px 按钮，字标随宽度收小 */
+  font-size: clamp(1.0625rem, 5.6vw, 1.375rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  transform: rotate(-5deg);
+}
+
+.wordmark:hover {
+  text-decoration: none;
+}
+
+.wordmark span {
+  padding: 0.3rem 0.35rem 0.25rem;
+}
+
+.wordmark span:first-child {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+/* 大字（22px 粗体）白字压朱红，明暗两套都 ≥3:1。 */
+.wordmark span:last-child {
+  background: var(--vermilion);
+  color: #fff;
+}
+
+.primaryNav {
+  align-self: stretch;
+}
+
+.primaryNav > a {
+  position: relative;
+  align-self: stretch;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.primaryNav > a[aria-current="page"] {
+  background: transparent;
+  color: var(--foreground);
+}
+
+.primaryNav > a[data-section-active]::after {
+  content: "";
+  position: absolute;
+  inset-inline: -0.25rem;
+  bottom: 0;
+  height: 16px;
+  background: var(--vermilion);
+  clip-path: polygon(0 100%, 100% 0, 100% 100%);
+}

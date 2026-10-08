@@ -14,6 +14,22 @@
   margin-inline: auto;
 }
 
+/* 阅读页是书页（ADR-0008）：标题粗黑，顶上一道通栏墨杠，其余克制。 */
+.title {
+  font-size: clamp(2.25rem, 6vw, 4rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.title::before {
+  content: "";
+  display: block;
+  height: var(--bar);
+  margin-bottom: 1rem;
+  background: var(--foreground);
+}
+
 .layout {
   margin-top: 2rem;
 }
