@@ -5,31 +5,36 @@
 //
 // 发现项的严重度：limit = 硬上限，可经 overrides.json 放行；error = 不可放行。
 // ok = 放行之后没有剩余发现项。放行过的项不在 findings 中，而在 overridden 里显式列出。
+// hints（validation@2）是不阻断的提示（中文 AI 腔，style-patterns.ts），不计入 ok。
 
 import { existsSync, readFileSync } from "node:fs";
 
 import { markdownParser, visitWikiLinks } from "@/lib/markdown-ast";
 import { renderMarkdownText, renderMarkdownTree } from "@/lib/markdown";
-import { parseWikiLink, type WikiLinkRef } from "@/lib/wiki-links";
+import { parseWikiLink, parseWikiLinks, type WikiLinkRef } from "@/lib/wiki-links";
 
 import { citationFor, citedLabel, rangeLabel, sourceLoader, translationLabel } from "./assemble";
 import { topLevelBlocks } from "./blocks";
+import { aiPatternHits } from "./style-patterns";
 import { nameKey, requireConfirmed } from "./candidates";
 import { expectedVisibleEmphasis, expectedVisibleQuote, parsePerspectiveMarkdown, renderedExcerpts, renderExcerpt, TEMPLATE } from "./template";
 import {
   isPseudoInterpreter,
   SCHEMAS,
+  STYLE_PROFILE_SECTIONS,
   type AssembledPerspective,
   type CandidateList,
   type ClaimId,
   type ClaimMap,
   type ConceptKey,
   type FrozenParagraph,
+  type IncrementalBase,
   type LimitOverride,
   type LockInfo,
   type ReviewReport,
   type SiteExport,
   type ValidationFinding,
+  type ValidationHint,
   type ValidationReport,
   type ValidationRule,
   type WorkdirManifest,
@@ -46,6 +51,13 @@ export const LIMITS = {
   /** 一句话核心加全部论点解读的可见文字（不含引用块、标题、资料说明） */
   expositionChars: 1500,
 } as const;
+
+/**
+ * 照录原文（exposition.verbatim-source）：解读与一句话核心（引用块之外）去掉全部空白后，
+ * 与某个冻结段落（含范围外注释段落）去掉全部空白后的文字有连续 ≥ 这么多个字（Unicode 码点，标点计入）相同即报错。
+ * 只在单个段落之内比较；双链按可见文字比较。短于阈值的引语（术语、短句）不受限。
+ */
+export const VERBATIM_RUN_CHARS = 20;
 
 const charCount = (text: string): number => Array.from(text.replace(/\s/g, "")).length;
 const preview = (text: string): string => (Array.from(text).length > 24 ? Array.from(text).slice(0, 24).join("") + "…" : text);
@@ -116,6 +128,102 @@ function buildContext(workdirPath: string, confirmed: ConceptKey[]): Context {
   return { workdir, siteTerms, siteInterpreters, sitePerspectives, batchTerms };
 }
 
+/** 引用块之外的解读块：一句话核心（claimId 为 null）与各论点的段落、列表，止于分隔线。 */
+interface ProseBlock {
+  claimId: ClaimId | null;
+  source: string;
+}
+
+/**
+ * 解读文字中与冻结段落逐字相同的连续片段（去空白后 ≥ VERBATIM_RUN_CHARS 个码点）。
+ * 先把解读的全部定长窗口建索引，再扫描各段落的窗口，耗时与来源总长成正比。
+ */
+function verbatimRuns(text: string, paragraphs: readonly { id: string; chars: string[] }[]): { text: string; length: number; paragraph: string }[] {
+  const chars = Array.from(text.replace(/\s/g, ""));
+  const n = VERBATIM_RUN_CHARS;
+  if (chars.length < n) return [];
+  const windows = new Map<string, number[]>();
+  for (let i = 0; i + n <= chars.length; i++) {
+    const key = chars.slice(i, i + n).join("");
+    windows.set(key, [...(windows.get(key) ?? []), i]);
+  }
+  /** 每个被覆盖的位置记下首个命中的段落 */
+  const covered: (string | undefined)[] = new Array(chars.length);
+  for (const paragraph of paragraphs) {
+    for (let i = 0; i + n <= paragraph.chars.length; i++) {
+      const starts = windows.get(paragraph.chars.slice(i, i + n).join(""));
+      if (!starts) continue;
+      for (const start of starts) for (let k = start; k < start + n; k++) covered[k] ??= paragraph.id;
+    }
+  }
+  const runs: { text: string; length: number; paragraph: string }[] = [];
+  for (let i = 0; i < chars.length; ) {
+    if (covered[i] === undefined) {
+      i++;
+      continue;
+    }
+    let end = i;
+    while (end < chars.length && covered[end] !== undefined) end++;
+    runs.push({ text: chars.slice(i, end).join(""), length: end - i, paragraph: covered[i]! });
+    i = end;
+  }
+  return runs;
+}
+
+/** style/profile.md 缺失或缺少 STYLE_PROFILE_SECTIONS 中的小节（`## 标题`）时的说明；完整则为 null。 */
+function styleProfileProblem(path: string): string | null {
+  if (!existsSync(path)) return "style/profile.md 不存在：写论点映射前先整理文风档案";
+  const headings = new Set(
+    readFileSync(path, "utf8")
+      .split("\n")
+      .flatMap((line) => /^##\s+(.+?)\s*$/.exec(line)?.[1] ?? []),
+  );
+  const missing = STYLE_PROFILE_SECTIONS.filter((section) => !headings.has(section));
+  return missing.length ? `style/profile.md 缺少小节：${missing.map((m) => `「${m}」`).join("、")}` : null;
+}
+
+/** 一段 Markdown 里的双链目标（词条名，显式视角另带 @诠释者），排序后的列表。 */
+function linkTargets(markdown: string): string[] {
+  return [...new Set(parseWikiLinks(markdown).map((l) => (l.interpreter === null ? l.term : `${l.term}@${l.interpreter}`)))].sort();
+}
+
+/**
+ * 润色只许改 core 与各论点 exposition 的文字（polish.structure-changed）：比较润色前副本与 claim-map.json，
+ * 其余字段、论点的 ID 与顺序、标题、revision、摘录引用须完全一致，每段（核心、各论点解读）的双链目标集合不变。
+ * 增量论点映射（有非 new 的论点）的 core 照抄 head，kept 论点整体不得改动。
+ */
+function polishProblems(before: ClaimMap, after: ClaimMap): { message: string; claimId: ClaimId | null }[] {
+  const problems: { message: string; claimId: ClaimId | null }[] = [];
+  for (const field of ["schema", "conceptKey", "term", "interpreter"] as const) {
+    if (before[field] !== after[field]) problems.push({ message: `润色改动了 ${field}：「${before[field]}」→「${after[field]}」`, claimId: null });
+  }
+  const ids = (map: ClaimMap) => (map.claims ?? []).map((c) => c.id).join(", ");
+  if (ids(before) !== ids(after)) {
+    problems.push({ message: `润色改动了论点的 ID 或顺序：[${ids(before)}] → [${ids(after)}]`, claimId: null });
+    return problems;
+  }
+  if (!Array.isArray(before.claims) || !Array.isArray(after.claims)) return problems;
+  const incremental = before.claims.some((c) => c.revision !== "new");
+  if (incremental && before.core !== after.core) problems.push({ message: "增量论点映射的一句话核心须照抄 head，润色不得改动", claimId: null });
+  if (linkTargets(before.core).join("\n") !== linkTargets(after.core).join("\n")) {
+    problems.push({ message: `润色改变了一句话核心的双链目标：[${linkTargets(before.core).join("、")}] → [${linkTargets(after.core).join("、")}]`, claimId: null });
+  }
+  before.claims.forEach((was, i) => {
+    const now = after.claims[i];
+    if (was.revision === "kept" && JSON.stringify(was) !== JSON.stringify(now)) {
+      problems.push({ message: "保留（kept）的论点润色时不得改动", claimId: was.id });
+      return;
+    }
+    for (const field of ["heading", "revision"] as const) {
+      if (was[field] !== now[field]) problems.push({ message: `润色改动了 ${field}：「${was[field]}」→「${now[field]}」`, claimId: was.id });
+    }
+    if (JSON.stringify(was.excerpts) !== JSON.stringify(now.excerpts)) problems.push({ message: "润色改动了摘录引用", claimId: was.id });
+    const [from, to] = [linkTargets(was.exposition), linkTargets(now.exposition)];
+    if (from.join("\n") !== to.join("\n")) problems.push({ message: `润色改变了解读的双链目标：[${from.join("、")}] → [${to.join("、")}]`, claimId: was.id });
+  });
+  return problems;
+}
+
 /** 双链能否落到已有词条或本批确认候选；显式视角语法还要求该视角存在或属于本批。 */
 function linkProblem(ctx: Context, ref: WikiLinkRef): string | null {
   const term = nameKey(ref.term);
@@ -154,6 +262,14 @@ export function validatePerspective(workdirPath: string, key: ConceptKey): Valid
   const assembledRaw = readOptional<AssembledPerspective>(paths.assembled);
   // assembled.json 仅在与当前 perspective.md 一致时用作回查的依据
   const assembled = assembledRaw && assembledRaw.markdownSha256 === sha256(markdown) ? assembledRaw : null;
+
+  // --- 文风档案与润色（ADR-0009：每篇都经过文风档案与润色） ----------------
+  const profileProblem = styleProfileProblem(layout.style.profile);
+  if (profileProblem) found.add("style.profile-missing", profileProblem);
+  const prePolish = readOptional<ClaimMap>(paths.claimMapPrePolish);
+  if (!prePolish) found.add("polish.missing", `perspectives/${key}/claim-map.pre-polish.json 不存在：论点映射须经润色子代理润色后再组装`);
+  else if (!claimMap) found.add("polish.structure-changed", `perspectives/${key}/claim-map.json 不存在，无法与润色前副本比对`);
+  else for (const problem of polishProblems(prePolish, claimMap)) found.add("polish.structure-changed", problem.message, problem.claimId);
 
   // --- 模板 ---------------------------------------------------------------
   const parsed = parsePerspectiveMarkdown(markdown);
@@ -307,6 +423,40 @@ export function validatePerspective(workdirPath: string, key: ConceptKey): Valid
     new Map(citedSources.map(({ source }) => [source.manifest.work.title, translationLabel(source.manifest)])),
   );
 
+  // --- 解读的文字：照录原文（error）与中文 AI 腔（提示） ---------------------
+  // 只看引用块之外的解读与一句话核心。增量与改写稿中与 base.json 的 head 逐字相同的块已经发表、
+  // 本次也不许改动（保留的论点、锁定段落），不再检查。
+  const base = readOptional<IncrementalBase>(paths.base);
+  const headBlocks = new Set(base ? topLevelBlocks(base.head.content) : []);
+  const prose: ProseBlock[] = [];
+  for (const node of tree.children ?? []) {
+    if (node.type === "thematicBreak") break;
+    if (node.type !== "paragraph" && node.type !== "list") continue;
+    const source = markdown.slice(node.position!.start.offset!, node.position!.end.offset!).trim();
+    if (!headBlocks.has(source)) prose.push({ claimId: claimAt(node.position!.start.offset!), source });
+  }
+  const sourceChars = sources.flatMap(({ source }) =>
+    [...source.paragraphs.values()].map((p) => ({ id: p.id, chars: Array.from(p.text.replace(/\s/g, "")) })),
+  );
+  const hints: ValidationHint[] = [];
+  const scopes = new Map<ClaimId | null, string[]>();
+  for (const block of prose) {
+    const text = visibleText(block.source);
+    for (const run of verbatimRuns(text, sourceChars)) {
+      found.add(
+        "exposition.verbatim-source",
+        `${block.claimId ? "解读" : "一句话核心"}中有 ${run.length} 字与冻结来源 ${run.paragraph} 逐字相同：「${preview(run.text)}」。引文之外不照录原文：用自己的话讲清，或改为摘录`,
+        block.claimId,
+      );
+    }
+    scopes.set(block.claimId, [...(scopes.get(block.claimId) ?? []), text]);
+  }
+  for (const [claimId, texts] of scopes) {
+    for (const hit of aiPatternHits(texts.join("\n"))) {
+      hints.push({ rule: "style.ai-pattern", message: `「${hit.label}」${hit.count > 1 ? `出现 ${hit.count} 次` : ""}：${hit.advice}`, claimId });
+    }
+  }
+
   // --- 伪诠释者（ADR-0007） -----------------------------------------------
   const names: [string, string][] = [
     ["工作目录诠释者", workdir.interpreter],
@@ -351,6 +501,7 @@ export function validatePerspective(workdirPath: string, key: ConceptKey): Valid
     ok: findings.length === 0,
     findings,
     overridden,
+    hints,
   };
 }
 
@@ -369,6 +520,8 @@ export interface ValidateResult {
   errors: number;
   limits: number;
   overridden: number;
+  /** 不阻断的文风提示条数 */
+  hints: number;
   review: ReturnType<typeof reviewStatus>;
 }
 
@@ -386,6 +539,7 @@ export function validate(workdirPath: string, keys: ConceptKey[] = []): Validate
       errors: report.findings.filter((f) => f.severity === "error").length,
       limits: report.findings.filter((f) => f.severity === "limit").length,
       overridden: report.overridden.length,
+      hints: report.hints.length,
       review: reviewStatus(workdirPath, report.conceptKey),
     };
   });

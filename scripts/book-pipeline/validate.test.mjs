@@ -43,9 +43,13 @@ function setup() {
   mkdirSync(join(wd, "candidates"));
   cpSync(join(fixtures, "assemble", "candidates.json"), join(wd, "candidates", "candidates.json"));
   cpSync(join(fixtures, "validate", "site-terms.json"), join(wd, "candidates", "site-terms.json"));
+  // 每篇都经过文风档案与润色：夹具的论点映射视为已润色（润色前副本与之相同）
+  mkdirSync(join(wd, "style"));
+  cpSync(join(fixtures, "style", "profile.md"), join(wd, "style", "profile.md"));
   for (const key of ["kaiduan", "cunzai"]) {
     mkdirSync(join(wd, "perspectives", key), { recursive: true });
     cpSync(join(fixtures, "assemble", `claim-map.${key}.json`), path(wd, key, "claim-map.json"));
+    cpSync(join(fixtures, "assemble", `claim-map.${key}.json`), path(wd, key, "claim-map.pre-polish.json"));
   }
   const list = readFileSync(join(wd, "candidates", "candidates.json"));
   writeFileSync(
@@ -97,12 +101,13 @@ test("validate reports every violation class, honours limit overrides, and check
       const results = run.stdout.trim().split("\n").map((line) => JSON.parse(line));
       assert.deepEqual(results.map((r) => [r.key, r.ok, r.errors, r.limits, r.review.status]), [["kaiduan", true, 0, 0, "missing"], ["cunzai", true, 0, 0, "missing"]]);
       assert.deepEqual(json(path(wd, "kaiduan", "validation.json")), {
-        schema: "phosky.book-pipeline/validation@1",
+        schema: "phosky.book-pipeline/validation@2",
         conceptKey: "kaiduan",
         perspectiveSha256: sha256(readFileSync(path(wd, "kaiduan", "perspective.md"))),
         ok: true,
         findings: [],
         overridden: [],
+        hints: [],
       });
     }
 
@@ -302,6 +307,135 @@ test("validate reports every violation class, honours limit overrides, and check
       assert.deepEqual(readFileSync(path(wd, "kaiduan", "validation.json")), first);
       assert.deepEqual(rules(json(path(wd, "kaiduan", "validation.json"))), []);
     }
+  } finally {
+    rmSync(wd, { recursive: true, force: true });
+  }
+});
+
+test("exposition must not copy frozen source text outside excerpts (≥ 20 chars, whitespace ignored); head blocks are exempt", () => {
+  const wd = setup();
+  try {
+    const reset = restorer(wd);
+    const verbatim = (report) => report.findings.filter((f) => f.rule === "exposition.verbatim-source");
+    // sample:d02.p4 第 7 句开头恰好 20 字
+    const twenty = "我们毋宁应当把这种困难本身当作考察的对象";
+    assert.equal(Array.from(twenty).length, 20);
+
+    // 19 字不报，20 字报；报告给出字数、段落和所在论点，且不可放行（error）
+    edit(wd, "kaiduan", [["通常的看法以为开端可以随意选取。", `${twenty.slice(0, -1)}照此。`]], { fresh: true });
+    assert.deepEqual(verbatim(validate(wd).report), []);
+    reset();
+    edit(wd, "kaiduan", [["通常的看法以为开端可以随意选取。", `${twenty}。`]], { fresh: true });
+    let { run, report } = validate(wd);
+    assert.equal(run.status, 1);
+    assert.deepEqual(verbatim(report).map((f) => [f.severity, f.claimId]), [["error", "k2"]]);
+    assert.match(verbatim(report)[0].message, /解读中有 20 字与冻结来源 sample:d02\.p4 逐字相同/);
+    reset();
+
+    // 空白与软换行不能绕过；较长的照录报告整段的长度；短引语（如格言）照常允许
+    edit(wd, "kaiduan", [["通常的看法以为开端可以随意选取。", "人们往往以为， 开端只是一个可以\n随意选择的起点，仿佛无论从哪里出发。他引过“开端是最困难的。”这句话。"]], { fresh: true });
+    ({ report } = validate(wd));
+    assert.equal(verbatim(report).length, 1, JSON.stringify(report.findings));
+    assert.match(verbatim(report)[0].message, /有 32 字与冻结来源 sample:d02\.p4/);
+    reset();
+
+    // 一句话核心同样受限（claimId 为 null）
+    edit(wd, "kaiduan", [["范例思把开端（Anfang）理解为直接的规定性", `范例思说${twenty}，并把开端（Anfang）理解为直接的规定性`]], { fresh: true });
+    ({ report } = validate(wd));
+    assert.deepEqual(verbatim(report).map((f) => f.claimId), [null]);
+    assert.match(verbatim(report)[0].message, /^一句话核心中有 21 字/);
+    reset();
+
+    // 增量与改写稿：与 base.json 的 head 逐字相同的块（已发表、不许改动）不再检查
+    const md = edit(wd, "kaiduan", [["通常的看法以为开端可以随意选取。", `${twenty}。`]], { fresh: true });
+    writeFileSync(path(wd, "kaiduan", "base.json"), JSON.stringify({ schema: "phosky.book-pipeline/incremental-base@1", pageId: 5, head: { revisionId: 9, content: md }, lastAi: null }));
+    assert.deepEqual(verbatim(validate(wd).report), []);
+    rmSync(path(wd, "kaiduan", "base.json"));
+    reset();
+  } finally {
+    rmSync(wd, { recursive: true, force: true });
+  }
+});
+
+test("Chinese AI-writing patterns are non-blocking hints: listed per claim, never affecting ok", () => {
+  const wd = setup();
+  try {
+    edit(wd, "kaiduan", [
+      ["通常的看法以为开端可以随意选取。", "值得注意的是，通常的看法以为开端可以随意选取，这可以说明许多问题。"],
+      ["它直接地就是它自己，不靠别的东西来规定。", "它不是被给予的，而是直接地就是它自己。"],
+    ], { fresh: true });
+    const run = pipeline("validate", "--workdir", wd, "--key", "kaiduan");
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(JSON.parse(run.stdout.trim()).hints, 2);
+    const report = json(path(wd, "kaiduan", "validation.json"));
+    assert.deepEqual([report.ok, report.findings], [true, []]);
+    assert.deepEqual(
+      report.hints.map((h) => [h.rule, h.claimId, h.message.slice(0, h.message.indexOf("："))]),
+      [["style.ai-pattern", "k1", "「不是……而是」出现 2 次"], ["style.ai-pattern", "k2", "「值得注意的是」"]],
+      "“可以说明”不算“可以说”；单个“不是……而是”不提示",
+    );
+  } finally {
+    rmSync(wd, { recursive: true, force: true });
+  }
+});
+
+test("every perspective needs the style profile and a polish pass that changed only core and exposition text", () => {
+  const wd = setup();
+  try {
+    const only = (report, prefix) => report.findings.filter((f) => f.rule.startsWith(prefix)).map((f) => [f.rule, f.severity, f.claimId, f.message]);
+    const profile = join(wd, "style", "profile.md");
+    const original = readFileSync(profile, "utf8");
+
+    // 文风档案：缺文件、缺小节都是 error
+    rmSync(profile);
+    let { run, report } = validate(wd);
+    assert.equal(run.status, 1);
+    assert.deepEqual(only(report, "style."), [["style.profile-missing", "error", null, "style/profile.md 不存在：写论点映射前先整理文风档案"]]);
+    writeFileSync(profile, original.replace("## 论证次序", "## 论证").replace("## 仿写风险\n", ""));
+    assert.deepEqual(only(validate(wd).report, "style.").map((f) => f[3]), ["style/profile.md 缺少小节：「论证次序」、「仿写风险」"]);
+    writeFileSync(profile, original);
+
+    // 没有润色前副本 = 没有润色
+    const pre = path(wd, "kaiduan", "claim-map.pre-polish.json");
+    const map = json(pre);
+    rmSync(pre);
+    ({ run, report } = validate(wd));
+    assert.equal(run.status, 1);
+    assert.deepEqual(only(report, "polish.").map((f) => f.slice(0, 3)), [["polish.missing", "error", null]]);
+
+    // 润色后的论点映射：只比较 claim-map.json 与润色前副本，perspective.md 不受影响
+    const polished = (mutate, before = map) => {
+      writeFileSync(pre, JSON.stringify(before, null, 2) + "\n");
+      const after = structuredClone(before);
+      mutate(after);
+      writeFileSync(path(wd, "kaiduan", "claim-map.json"), JSON.stringify(after, null, 2) + "\n");
+      return only(validate(wd).report, "polish.").map(([rule, , claimId, message]) => [rule, claimId, message]);
+    };
+    // 允许：改核心与解读的文字、双链的显示文字
+    assert.deepEqual(polished((m) => {
+      m.core = "范例思认为开端（Anfang）是直接的规定性，开端的困难正是思维要先考察的。";
+      m.claims[0].exposition = m.claims[0].exposition.replace("[[存在|存在]]", "[[存在|有]]").replace("不靠别的东西来规定", "不由他物规定");
+    }), []);
+    // 不允许：其余任何结构
+    assert.deepEqual(polished((m) => (m.term = "起点")), [["polish.structure-changed", null, "润色改动了 term：「开端」→「起点」"]]);
+    assert.deepEqual(polished((m) => m.claims.reverse()), [["polish.structure-changed", null, "润色改动了论点的 ID 或顺序：[k1, k2, k3] → [k3, k2, k1]"]]);
+    assert.deepEqual(polished((m) => (m.claims[1].heading = "开端的困难")), [["polish.structure-changed", "k2", "润色改动了 heading：「开端的困难本身是考察对象」→「开端的困难」"]]);
+    assert.deepEqual(polished((m) => (m.claims[1].excerpts[1].to = 7)), [["polish.structure-changed", "k2", "润色改动了摘录引用"]]);
+    assert.deepEqual(polished((m) => (m.claims[2].revision = "extended")), [["polish.structure-changed", "k3", "润色改动了 revision：「new」→「extended」"]]);
+    assert.deepEqual(polished((m) => (m.claims[0].exposition = m.claims[0].exposition.replace("[[存在|存在]]", "[[开端|存在]]"))), [
+      ["polish.structure-changed", "k1", "润色改变了解读的双链目标：[存在] → [开端]"],
+    ]);
+    assert.deepEqual(polished((m) => (m.core += "这与[[存在]]有关。")), [["polish.structure-changed", null, "润色改变了一句话核心的双链目标：[] → [存在]"]]);
+
+    // 增量论点映射：核心照抄 head、kept 论点整体不动；extended / new 的解读照常可改
+    const incremental = structuredClone(map);
+    incremental.claims[0].revision = "kept";
+    incremental.claims[0].exposition = "";
+    incremental.claims[0].excerpts = [];
+    incremental.claims[1].revision = "extended";
+    assert.deepEqual(polished((m) => (m.claims[1].exposition = "追加的解读，润色过。"), incremental), []);
+    assert.deepEqual(polished((m) => (m.core = "改写的核心。"), incremental), [["polish.structure-changed", null, "增量论点映射的一句话核心须照抄 head，润色不得改动"]]);
+    assert.deepEqual(polished((m) => (m.claims[0].exposition = "补一句。"), incremental), [["polish.structure-changed", "k1", "保留（kept）的论点润色时不得改动"]]);
   } finally {
     rmSync(wd, { recursive: true, force: true });
   }

@@ -43,7 +43,7 @@ const report = (wd, key, over = {}) => {
   writeFileSync(
     join(wd, "perspectives", key, "validation.json"),
     JSON.stringify({
-      schema: "phosky.book-pipeline/validation@1", conceptKey: key, perspectiveSha256: hash, ok: true, findings: [], overridden: [],
+      schema: "phosky.book-pipeline/validation@2", conceptKey: key, perspectiveSha256: hash, ok: true, findings: [], overridden: [], hints: [],
       ...over.validation,
     }, null, 2),
   );
@@ -132,6 +132,14 @@ test("the note carries the review and validation summary and stays within the si
     assert.match(note, /摘录均支持相应论点/);
     assert.match(note, /措辞可再精炼/);
     assert.match(note, /校验.*通过/);
+    assert.doesNotMatch(note, /文风提示/);
+    // 文风提示不阻断提交，原样列入说明
+    const hint = { rule: "style.ai-pattern", message: "「值得注意的是」：套话：删去，直接陈述要点", claimId: "k2" };
+    report(wd, "kaiduan", { validation: { hints: [hint] } });
+    const hinted = requests(dry(wd)).find((r) => r.opKey === "perspective:kaiduan").request.note;
+    assert.match(hinted, /【文风提示】中文 AI 腔清单命中 1 项（不阻断）/);
+    assert.match(hinted, /- style\.ai-pattern k2：「值得注意的是」/);
+    report(wd, "kaiduan");
     // 超长审稿问题：说明被截断而不超限
     const issues = Array.from({ length: 200 }, (_, i) => ({ claimId: "k1", kind: "other", severity: "warning", message: `问题${i}：` + "长".repeat(1000), excerpt: null }));
     report(wd, "kaiduan", { review: { issues } });
@@ -152,6 +160,9 @@ test("a perspective with unresolved validation failures is refused (limits need 
     report(wd, "kaiduan", { validation: { ok: true, findings: [{ ...finding, rule: "quotation", severity: "error" }], overridden: [{ ...override, rule: "quotation" }] } });
     refused("VALIDATION_FAILED", "submit", "--workdir", wd);
     report(wd, "kaiduan", { validation: { perspectiveSha256: "0".repeat(64) } });
+    refused("VALIDATION_STALE", "submit", "--workdir", wd);
+    // 旧 schema 的报告（没有 hints）须重跑 validate
+    report(wd, "kaiduan", { validation: { schema: "phosky.book-pipeline/validation@1", hints: undefined } });
     refused("VALIDATION_STALE", "submit", "--workdir", wd);
     report(wd, "kaiduan", { review: { perspectiveSha256: "0".repeat(64) } });
     refused("REVIEW_STALE", "submit", "--workdir", wd);

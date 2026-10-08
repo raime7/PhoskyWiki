@@ -133,7 +133,10 @@ test("merging keeps untouched claims byte-identical and locked blocks unchanged;
     assert.ok(md.includes("- 《论尺度》：某译者译，示例出版社，2026\n- 《论开端》：另一译者译\n"));
     assert.equal(merge(wd).status, "unchanged");
 
-    // validate：通过，含锁定段落检查
+    // validate：通过，含锁定段落检查（文风档案与润色前副本照常要求，此处视论点映射为已润色）
+    mkdirSync(join(wd, "style"));
+    cpSync(join(fixtures, "style", "profile.md"), join(wd, "style", "profile.md"));
+    cpSync(CLAIM_MAP, file("claim-map.pre-polish.json"));
     assert.equal(ok("validate", "--workdir", wd, "--key", "cunzai")[0].ok, true);
     assert.deepEqual(json(file("validation.json")).findings, []);
     // submit 试运行：编辑以 head 为 base

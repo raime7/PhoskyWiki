@@ -110,6 +110,11 @@ export function buildNote(opts: {
   for (const o of validation.overridden) {
     lines.push(`- 放行 ${o.rule}${o.claimId ? ` ${o.claimId}` : ""}（${o.approvedBy}）：${clip(o.reason, 300)}`);
   }
+  // 文风提示不阻断提交，但如实告诉受理者
+  if (validation.hints.length) {
+    lines.push("", `【文风提示】中文 AI 腔清单命中 ${validation.hints.length} 项（不阻断）：`);
+    for (const h of validation.hints) lines.push(`- ${h.rule} ${h.claimId ?? "核心"}：${clip(h.message, 300)}`);
+  }
   // 总长兜底：逐行累加，超出预算即截断并注明
   const out: string[] = [];
   let used = 0;
@@ -136,9 +141,10 @@ function gate(workdir: string, key: ConceptKey, markdown: string, assembled: Ass
   if (!existsSync(paths.review)) fail("REVIEW_MISSING", `${key}: review.json not found; the review report is required`);
   const validation = readJson<ValidationReport>(paths.validation);
   const review = readJson<ReviewReport>(paths.review);
+  if (validation.schema !== SCHEMAS.validation) fail("VALIDATION_STALE", `${key}: validation.json is ${validation.schema}, expected ${SCHEMAS.validation}; run validate again`);
   if (validation.perspectiveSha256 !== hash) fail("VALIDATION_STALE", `${key}: validation.json was made for a different perspective.md; run validate again`);
   if (review.perspectiveSha256 !== hash) fail("REVIEW_STALE", `${key}: review.json was made for a different perspective.md; review again`);
-  // error 不可放行；limit 须有同 rule + claimId 的人工放行
+  // error 不可放行；limit 须有同 rule + claimId 的人工放行；hints 不在 findings 里，不参与门禁
   const unresolved = validation.findings.filter(
     (f) => f.severity === "error" || !validation.overridden.some((o) => o.rule === f.rule && o.claimId === f.claimId),
   );
