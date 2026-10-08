@@ -51,3 +51,15 @@ pnpm test:pipeline                                      # node --test scripts/bo
 - **规范化**：只去掉段首尾空白和不可见字符，合并空白，并把中文之间的排版换行直接接上（不插空格）。不做 Unicode 归一化，不改字形和标点。每一项都记入日志。
 - **不支持 OCR**：只接受有文字层的 EPUB、UTF-8 编码的 TXT 和 Markdown。
 - **退出码**：0 表示成功；1 表示运行错误，错误信息以 `CODE: …` 开头；2 表示用法错误或命令尚未实现。
+
+## 候选与确认（#108）
+
+```bash
+pnpm book-pipeline candidates --workdir <dir>      # 读 candidates/session-candidates.json + site-terms.json，写 candidates.json
+pnpm book-pipeline confirm --workdir <dir> --by <站长名> (--all | --keys a,b)
+```
+
+- 站点词条按规范名与别名（NFKC、去空白和间隔点、不分大小写）对标题与别名匹配，标题优先；已删除的词条不参与。一个候选命中多个词条（`AMBIGUOUS_TERM`）、两个候选命中同一词条或名称重叠（`DUPLICATE_CONCEPT`）都是错误，应回会话合并（相同）或改成 `related`（相关）。
+- 准入：`treatment=dedicated` 且（有效论点至少 2 个，或 `centralParagraphs` 至少 1 段）；其余进入 `excluded` 并写明原因。引用的段落必须是已冻结的范围内段落。
+- `confirm` 只接受 `entries` 中的键；清单与输入不一致时拒绝（`STALE_LIST`）。确认绑定 `candidates.json` 的 sha256，之后任何改动清单的重新生成都使确认失效。
+- 闸门：后续命令调用 `candidates.ts` 的 `requireConfirmed(workdir, key?)`，未确认、已失效或键不在确认之列时抛出 `UNCONFIRMED: …`。
