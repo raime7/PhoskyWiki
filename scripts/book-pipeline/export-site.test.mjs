@@ -59,7 +59,7 @@ function call(body, input) {
 test("the site catalog becomes a deterministic site-terms.json; malformed payloads are refused", () => {
   const { ok: site } = call(`return m.siteExportFromCatalog(input, { origin: "${ORIGIN}", exportedAt: "2026-10-08T00:00:00.000Z" });`, catalog);
   assert.deepEqual(site, {
-    schema: "phosky.book-pipeline/site-export@1",
+    schema: "phosky.book-pipeline/site-export@2",
     exportedAt: "2026-10-08T00:00:00.000Z",
     origin: ORIGIN,
     terms: [
@@ -71,12 +71,38 @@ test("the site catalog becomes a deterministic site-terms.json; malformed payloa
       { pageId: 30, termId: 10, interpreterId: 20, headRevisionId: 300, deleted: false },
       { pageId: 42, termId: 41, interpreterId: 20, headRevisionId: 9, deleted: false },
     ],
+    // 游客响应没有该字段：未做已删除词条的同名检查
+    deletedTermTitles: null,
   });
-  const refuse = (payload) => assert.match(call(`return m.siteExportFromCatalog(input, { origin: "x", exportedAt: "y" });`, payload).error, /^EXPORT_SITE_PAYLOAD: /);
+  // 登录后的响应带已删除词条的标题（去重、排序）
+  const { ok: withDeleted } = call(`return m.siteExportFromCatalog(input, { origin: "x", exportedAt: "y" }).deletedTermTitles;`, { ...catalog, deletedTermTitles: ["乙", "甲", "乙"] });
+  assert.deepEqual(withDeleted, ["乙", "甲"].sort());
+  assert.match(call(`return m.siteExportFromCatalog(input, { origin: "x", exportedAt: "y" });`, { ...catalog, deletedTermTitles: "甲" }).error, /^EXPORT_SITE_PAYLOAD: .*deletedTermTitles/);
+  const refuse =(payload) => assert.match(call(`return m.siteExportFromCatalog(input, { origin: "x", exportedAt: "y" });`, payload).error, /^EXPORT_SITE_PAYLOAD: /);
   refuse({ ...catalog, terms: undefined });
   refuse({ ...catalog, terms: [{ ...catalog.terms[0], aliases: "Sein" }] });
   refuse({ ...catalog, perspectives: [{ ...catalog.perspectives[0], headRevisionId: null }] });
   refuse([]);
+});
+
+test("export-site warns when the deleted-term check is skipped (no credentials) and not when the site returned deletedTermTitles", () => {
+  const wd = mkdtempSync(join(tmpdir(), "book-pipeline-export-warn-"));
+  try {
+    const run = (payload) => call(
+      `const warnings = [];
+       await m.exportSite({ workdir: ${JSON.stringify(wd)}, origin: "${ORIGIN}", env: {}, fetch: async () => input, warn: (w) => warnings.push(w) });
+       return warnings;`,
+      payload,
+    );
+    const warnings = run(catalog).ok;
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /^WARN: .*BOOK_PIPELINE_EMAIL.*skipped/);
+    assert.equal(json(join(wd, "candidates", "site-terms.json")).deletedTermTitles, null);
+    assert.deepEqual(run({ ...catalog, deletedTermTitles: ["规定性"] }).ok, []);
+    assert.deepEqual(json(join(wd, "candidates", "site-terms.json")).deletedTermTitles, ["规定性"]);
+  } finally {
+    rmSync(wd, { recursive: true, force: true });
+  }
 });
 
 test("a perspective's history becomes base.json: head = highest revision id, last AI = the AI account's latest", () => {

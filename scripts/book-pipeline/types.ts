@@ -258,6 +258,11 @@ export interface SiteExport {
     headRevisionId: RevisionId;
     deleted: boolean;
   }[];
+  /**
+   * 已软删除词条的标题（站点标题唯一索引也覆盖它们）。仅编者以上登录后的 /api/site-catalog 才给；
+   * null = 导出时未登录，没有做同名检查。
+   */
+  deletedTermTitles: string[] | null;
 }
 
 export type AdmissionBasis = "claims>=2" | "central-paragraph";
@@ -277,6 +282,13 @@ export interface CandidateEntry {
   admission: AdmissionBasis[];
 }
 
+/** 不能确认为新词条的候选：新词条标题与已软删除的词条同名。 */
+export interface BlockedCandidate {
+  key: ConceptKey;
+  canonicalName: string;
+  reason: string;
+}
+
 export interface ExcludedCandidate {
   key: ConceptKey;
   canonicalName: string;
@@ -291,6 +303,8 @@ export interface CandidateList {
   inputs: { sessionCandidates: string; siteExport: string };
   entries: CandidateEntry[];
   excluded: ExcludedCandidate[];
+  /** 与已删除词条同名而被拦下的候选；不可确认 */
+  blocked: BlockedCandidate[];
 }
 
 /** candidates/confirmation.json：站长确认。绑定清单哈希，清单重生成即失效。 */
@@ -528,8 +542,8 @@ export const SCHEMAS = {
   workdir: "phosky.book-pipeline/workdir@1",
   sourceManifest: "phosky.book-pipeline/source-manifest@1",
   sessionCandidates: "phosky.book-pipeline/session-candidates@2",
-  siteExport: "phosky.book-pipeline/site-export@1",
-  candidateList: "phosky.book-pipeline/candidate-list@2",
+  siteExport: "phosky.book-pipeline/site-export@2",
+  candidateList: "phosky.book-pipeline/candidate-list@3",
   confirmation: "phosky.book-pipeline/confirmation@1",
   claimMap: "phosky.book-pipeline/claim-map@1",
   assembled: "phosky.book-pipeline/assembled@1",

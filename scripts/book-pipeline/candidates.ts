@@ -7,6 +7,7 @@ import type {
   AdmissionBasis,
   CandidateConfirmation,
   CandidateEntry,
+  BlockedCandidate,
   CandidateList,
   ConceptKey,
   ExcludedCandidate,
@@ -110,6 +111,9 @@ export function buildCandidateList(workdir: string): { list: CandidateList; text
 
   const entries: CandidateEntry[] = [];
   const excluded: ExcludedCandidate[] = [];
+  const blocked: BlockedCandidate[] = [];
+  // 站点标题唯一索引也覆盖软删除词条（pages_term_title_unique），按原文标题比较
+  const deletedTitles = new Set(site.deletedTermTitles ?? []);
   const termClaimedBy = new Map<number, string>();
 
   for (const c of session.candidates) {
@@ -142,6 +146,11 @@ export function buildCandidateList(workdir: string): { list: CandidateList; text
     if (termSummary !== null && (!termSummary || termSummary.includes("\n"))) {
       fail("TERM_SUMMARY_MISSING", `candidate ${c.key} ("${c.canonicalName}") is a new term and needs termSummary: one neutral sentence saying what the term means (not ${interpreter}'s view)`);
     }
+    // 新建词条的标题与已删除词条同名：站点会拒绝，须先恢复该词条
+    if (!hit && deletedTitles.has(c.canonicalName)) {
+      blocked.push({ key: c.key, canonicalName: c.canonicalName, reason: "与已删除词条同名：先在站上恢复该词条，再重新 export-site 与 candidates" });
+      continue;
+    }
     const perspective = hit
       ? site.perspectives.find((p) => p.termId === hit!.id && !p.deleted && interpreterIds.has(p.interpreterId))
       : undefined;
@@ -169,6 +178,7 @@ export function buildCandidateList(workdir: string): { list: CandidateList; text
     inputs: { sessionCandidates: sha256(sessionText), siteExport: sha256(siteText) },
     entries,
     excluded,
+    blocked,
   };
   return { list, text: jsonText(list) };
 }
@@ -203,7 +213,8 @@ export function writeConfirmation(
   for (const key of confirmed) {
     if (!live.has(key)) {
       const ex = list.excluded.find((e) => e.key === key);
-      fail("NOT_CONFIRMABLE", ex ? `${key} was excluded: ${ex.reason}` : `${key} is not in candidates.json`);
+      const bl = list.blocked.find((e) => e.key === key);
+      fail("NOT_CONFIRMABLE", ex ? `${key} was excluded: ${ex.reason}` : bl ? `${key} is blocked: ${bl.reason}` : `${key} is not in candidates.json`);
     }
   }
   if (!confirmed.length) fail("CONFIRM_ARGS", "nothing to confirm");

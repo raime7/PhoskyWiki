@@ -77,6 +77,37 @@ test("candidates matches existing terms by title and alias, and excludes sub-thr
     assert.deepEqual(readFileSync(join(dir, "candidates/candidates.json")), before);
   }));
 
+test("a new term whose title equals a deleted term is blocked and can not be confirmed; no check without deletedTermTitles", () => {
+  const sitePath = (dir) => join(dir, "candidates/site-terms.json");
+  const setDeleted = (dir, titles) => {
+    const site = JSON.parse(readFileSync(sitePath(dir), "utf8"));
+    site.deletedTermTitles = titles;
+    writeFileSync(sitePath(dir), JSON.stringify(site));
+  };
+  withWorkdir((dir) => {
+    setDeleted(dir, ["规定性", "别的已删词条"]);
+    const run = candidates(dir);
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(JSON.parse(run.stdout).blocked, 1);
+    const list = readList(dir);
+    assert.deepEqual(list.entries.map((e) => e.key), ["chidu", "zhijiexing", "ziguanxi"]);
+    assert.deepEqual(list.blocked.map((b) => [b.key, b.canonicalName]), [["guidingxing", "规定性"]]);
+    assert.match(list.blocked[0].reason, /^与已删除词条同名：先在站上恢复该词条，再重新 export-site 与 candidates$/);
+    const blocked = confirm(dir, "--keys", "guidingxing");
+    assert.equal(blocked.status, 1);
+    assert.match(blocked.stderr, /NOT_CONFIRMABLE: guidingxing is blocked: 与已删除词条同名/);
+    assert.equal(confirm(dir, "--all").status, 0);
+    assert.deepEqual(JSON.parse(gate(dir)), ["chidu", "zhijiexing", "ziguanxi"]);
+  });
+  // 站点导出没做检查（null）：不拦
+  withWorkdir((dir) => {
+    setDeleted(dir, null);
+    assert.equal(candidates(dir).status, 0);
+    assert.deepEqual(readList(dir).blocked, []);
+    assert.ok(readList(dir).entries.some((e) => e.key === "guidingxing"));
+  });
+});
+
 test("an unconfirmed list can not pass the gate; regenerating a changed list invalidates the confirmation", () =>
   withWorkdir((dir) => {
     assert.match(gate(dir), /^UNCONFIRMED/);

@@ -59,8 +59,9 @@ pnpm book-pipeline export-site --workdir <dir> --origin <url>                   
 pnpm book-pipeline export-site --workdir <dir> --origin <url> --key <key> ... --ai-user <用户 id>  # → perspectives/<key>/base.json
 ```
 
-- 只读：游客 GET 站点公开接口，不登录、不写站点。HTTP 只是 `export-site.ts` 底部的薄层；载荷整理是纯函数（`siteExportFromCatalog`、`incrementalBaseFromHistory`），测试用夹具覆盖。
+- 只读：只 GET 站点接口，不写站点；唯一的副作用是登录。设了 `BOOK_PIPELINE_EMAIL` / `BOOK_PIPELINE_PASSWORD`（与 submit 同一账号，登录逻辑在 `site-session.ts`）时先登录，否则以游客身份读取。`--key` 的历史接口始终以游客身份读取。HTTP 只是 `export-site.ts` 底部的薄层；载荷整理是纯函数（`siteExportFromCatalog`、`incrementalBaseFromHistory`），测试用夹具覆盖。
 - `site-terms.json` 取自 `GET /api/site-catalog`（`src/lib/site-catalog.ts`）：在线的词条（含别名）、诠释者、视角（`headRevisionId` = 该页最大修订 id）。软删除的页面不在其中，`deleted` 一律为 false。每次运行都重写（含 `exportedAt`）。
+- `deletedTermTitles`：已软删除词条的标题（站点的词条标题唯一索引 `pages_term_title_unique` 也覆盖它们，同名新建会被拒绝）。只有编者以上登录时接口才返回（只有标题，没有 id 和正文）；游客导出时为 null，并打印 `WARN`，说明已删除词条的同名检查被跳过。
 - `--key` 按候选清单里的 `existingPerspective` 取 `GET /api/pages/<pageId>/history`：head = 最大修订 id；上一次 AI 修订 = `createdBy` 等于 `--ai-user` 的最大修订 id，没有则为 null。全部键取到后才落盘；输出行的 `headMovedSinceCandidates` 表示 head 在生成候选清单之后又有了新修订（incremental 与 submit 以 base.json 为准）。
 - 错误码：`EXPORT_SITE_ORIGIN`、`EXPORT_SITE_HTTP`、`EXPORT_SITE_PAYLOAD`、`EXPORT_SITE_AI_USER`、`EXPORT_SITE_UNKNOWN_KEY`、`EXPORT_SITE_NO_PERSPECTIVE`、`MISSING_INPUT`。
 
@@ -71,6 +72,7 @@ pnpm book-pipeline candidates --workdir <dir>      # 读 candidates/session-cand
 pnpm book-pipeline confirm --workdir <dir> --by <站长名> (--all | --keys a,b)
 ```
 
+- 新词条（未命中站上词条）的规范名若与 `deletedTermTitles` 中的标题相同，候选不进 `entries` 而进 `blocked`，原因「与已删除词条同名：先在站上恢复该词条，再重新 export-site 与 candidates」；`confirm` 拒绝它（`NOT_CONFIRMABLE`）。`submit` 对 `new_term` 再做一次同样的防御检查（`SUBMIT_DELETED_TERM`）。
 - 站点词条按规范名与别名（NFKC、去空白和间隔点、不分大小写）对标题与别名匹配，标题优先；已删除的词条不参与。一个候选命中多个词条（`AMBIGUOUS_TERM`）、两个候选命中同一词条或名称重叠（`DUPLICATE_CONCEPT`）都是错误，应回会话合并（相同）或改成 `related`（相关）。
 - 准入：`treatment=dedicated` 且（有效论点至少 2 个，或 `centralParagraphs` 至少 1 段）；其余进入 `excluded` 并写明原因。引用的段落必须是已冻结的范围内段落。
 - 词条简介：准入且未命中站上词条的候选（将新建词条）须有 `termSummary`——一句中性的词条说明，单行非空，否则 `TERM_SUMMARY_MISSING`。它进入清单条目，submit 用作 `new_term` 的 `summary`；诠释者的理解属于视角的一句话核心，两者不混用。命中已有词条时清单里为 null。
