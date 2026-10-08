@@ -70,7 +70,7 @@ pnpm book-pipeline confirm --workdir <dir> --by <站长名> --keys a,b   # 或 -
 
 ### 7. 润色
 
-每个概念派一个**全新上下文**的润色子代理，提示词取自 [润色子代理提示词](references/polish-prompt.md)，按其中说明填入占位符。它按 [中文 humanizer](references/humanizer.md) 只改写一句话核心与解读（增量时只改 `extended`、`new` 论点的解读），论点 ID、标题、摘录和双链不动。完成条件：按该提示词末尾的核对，`claim-map.json` 与 `claim-map.pre-polish.json` 只差范围内的文字，意思未变。
+每个概念派一个**全新上下文**的润色子代理，提示词取自 [润色子代理提示词](references/polish-prompt.md)，按其中说明填入占位符。它按 [中文 humanizer](references/humanizer.md) 只改写一句话核心与解读（增量时只改 `extended`、`new` 论点的解读），论点 ID、标题、摘录和双链不动。完成条件：`claim-map.pre-polish.json` 已写出、`claim-map.json` 已改写。润色只改了文字由第 9 步的 `validate` 检查（`polish.missing`、`polish.structure-changed`），意思未变由审稿检查。
 
 ### 8. 组装
 
@@ -89,7 +89,7 @@ pnpm book-pipeline validate --workdir <dir> [--key <key> …]
 
 改稿一律回到第 6 步改 claim-map，再润色、组装、校验。
 
-- `error` 不可放行。其中 `exposition.verbatim-source` 是解读照录了原文：用自己的话讲，或把那句改成摘录。
+- `error` 不可放行。其中 `exposition.verbatim-source` 是解读照录了原文：用自己的话讲，或把那句改成摘录。`style.profile-missing` 回第 5 步补齐文风档案；`polish.missing`、`polish.structure-changed` 回第 7 步重新润色。
 - `limit` 先压缩到上限内；确有必要的例外交给站长决定，站长同意后写 `perspectives/<key>/overrides.json`（`LimitOverride[]`，`approvedBy` 填站长）。
 - `hints` 的 `style.ai-pattern` 不阻断：照 humanizer 改得掉的就改，留下的会列入提交说明。
 

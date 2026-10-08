@@ -11,7 +11,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { markdownParser, visitWikiLinks } from "@/lib/markdown-ast";
 import { renderMarkdownText, renderMarkdownTree } from "@/lib/markdown";
-import { parseWikiLink, type WikiLinkRef } from "@/lib/wiki-links";
+import { parseWikiLink, parseWikiLinks, type WikiLinkRef } from "@/lib/wiki-links";
 
 import { citationFor, citedLabel, rangeLabel, sourceLoader, translationLabel } from "./assemble";
 import { topLevelBlocks } from "./blocks";
@@ -21,6 +21,7 @@ import { expectedVisibleEmphasis, expectedVisibleQuote, parsePerspectiveMarkdown
 import {
   isPseudoInterpreter,
   SCHEMAS,
+  STYLE_PROFILE_SECTIONS,
   type AssembledPerspective,
   type CandidateList,
   type ClaimId,
@@ -169,6 +170,60 @@ function verbatimRuns(text: string, paragraphs: readonly { id: string; chars: st
   return runs;
 }
 
+/** style/profile.md 缺失或缺少 STYLE_PROFILE_SECTIONS 中的小节（`## 标题`）时的说明；完整则为 null。 */
+function styleProfileProblem(path: string): string | null {
+  if (!existsSync(path)) return "style/profile.md 不存在：写论点映射前先整理文风档案";
+  const headings = new Set(
+    readFileSync(path, "utf8")
+      .split("\n")
+      .flatMap((line) => /^##\s+(.+?)\s*$/.exec(line)?.[1] ?? []),
+  );
+  const missing = STYLE_PROFILE_SECTIONS.filter((section) => !headings.has(section));
+  return missing.length ? `style/profile.md 缺少小节：${missing.map((m) => `「${m}」`).join("、")}` : null;
+}
+
+/** 一段 Markdown 里的双链目标（词条名，显式视角另带 @诠释者），排序后的列表。 */
+function linkTargets(markdown: string): string[] {
+  return [...new Set(parseWikiLinks(markdown).map((l) => (l.interpreter === null ? l.term : `${l.term}@${l.interpreter}`)))].sort();
+}
+
+/**
+ * 润色只许改 core 与各论点 exposition 的文字（polish.structure-changed）：比较润色前副本与 claim-map.json，
+ * 其余字段、论点的 ID 与顺序、标题、revision、摘录引用须完全一致，每段（核心、各论点解读）的双链目标集合不变。
+ * 增量论点映射（有非 new 的论点）的 core 照抄 head，kept 论点整体不得改动。
+ */
+function polishProblems(before: ClaimMap, after: ClaimMap): { message: string; claimId: ClaimId | null }[] {
+  const problems: { message: string; claimId: ClaimId | null }[] = [];
+  for (const field of ["schema", "conceptKey", "term", "interpreter"] as const) {
+    if (before[field] !== after[field]) problems.push({ message: `润色改动了 ${field}：「${before[field]}」→「${after[field]}」`, claimId: null });
+  }
+  const ids = (map: ClaimMap) => (map.claims ?? []).map((c) => c.id).join(", ");
+  if (ids(before) !== ids(after)) {
+    problems.push({ message: `润色改动了论点的 ID 或顺序：[${ids(before)}] → [${ids(after)}]`, claimId: null });
+    return problems;
+  }
+  if (!Array.isArray(before.claims) || !Array.isArray(after.claims)) return problems;
+  const incremental = before.claims.some((c) => c.revision !== "new");
+  if (incremental && before.core !== after.core) problems.push({ message: "增量论点映射的一句话核心须照抄 head，润色不得改动", claimId: null });
+  if (linkTargets(before.core).join("\n") !== linkTargets(after.core).join("\n")) {
+    problems.push({ message: `润色改变了一句话核心的双链目标：[${linkTargets(before.core).join("、")}] → [${linkTargets(after.core).join("、")}]`, claimId: null });
+  }
+  before.claims.forEach((was, i) => {
+    const now = after.claims[i];
+    if (was.revision === "kept" && JSON.stringify(was) !== JSON.stringify(now)) {
+      problems.push({ message: "保留（kept）的论点润色时不得改动", claimId: was.id });
+      return;
+    }
+    for (const field of ["heading", "revision"] as const) {
+      if (was[field] !== now[field]) problems.push({ message: `润色改动了 ${field}：「${was[field]}」→「${now[field]}」`, claimId: was.id });
+    }
+    if (JSON.stringify(was.excerpts) !== JSON.stringify(now.excerpts)) problems.push({ message: "润色改动了摘录引用", claimId: was.id });
+    const [from, to] = [linkTargets(was.exposition), linkTargets(now.exposition)];
+    if (from.join("\n") !== to.join("\n")) problems.push({ message: `润色改变了解读的双链目标：[${from.join("、")}] → [${to.join("、")}]`, claimId: was.id });
+  });
+  return problems;
+}
+
 /** 双链能否落到已有词条或本批确认候选；显式视角语法还要求该视角存在或属于本批。 */
 function linkProblem(ctx: Context, ref: WikiLinkRef): string | null {
   const term = nameKey(ref.term);
@@ -207,6 +262,14 @@ export function validatePerspective(workdirPath: string, key: ConceptKey): Valid
   const assembledRaw = readOptional<AssembledPerspective>(paths.assembled);
   // assembled.json 仅在与当前 perspective.md 一致时用作回查的依据
   const assembled = assembledRaw && assembledRaw.markdownSha256 === sha256(markdown) ? assembledRaw : null;
+
+  // --- 文风档案与润色（ADR-0009：每篇都经过文风档案与润色） ----------------
+  const profileProblem = styleProfileProblem(layout.style.profile);
+  if (profileProblem) found.add("style.profile-missing", profileProblem);
+  const prePolish = readOptional<ClaimMap>(paths.claimMapPrePolish);
+  if (!prePolish) found.add("polish.missing", `perspectives/${key}/claim-map.pre-polish.json 不存在：论点映射须经润色子代理润色后再组装`);
+  else if (!claimMap) found.add("polish.structure-changed", `perspectives/${key}/claim-map.json 不存在，无法与润色前副本比对`);
+  else for (const problem of polishProblems(prePolish, claimMap)) found.add("polish.structure-changed", problem.message, problem.claimId);
 
   // --- 模板 ---------------------------------------------------------------
   const parsed = parsePerspectiveMarkdown(markdown);

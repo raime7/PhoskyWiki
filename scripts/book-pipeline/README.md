@@ -89,6 +89,7 @@ pnpm book-pipeline confirm --workdir <dir> --by <站长名> (--all | --keys a,b)
 
 - `style/profile.md`：确认之后、写论点映射之前，会话从冻结来源整理一次（一个工作目录只有一位诠释者，所以只有一份），按 `types.ts` 的 `STYLE_PROFILE_SECTIONS` 分节。写解读借用其中的术语、译名和论证次序，句子保持现代中文。增量运行沿用，新书带来新术语时追加。
 - 润色：论点映射写完后、assemble / incremental 之前，子代理先把 `claim-map.json` 存为 `claim-map.pre-polish.json`，再只改写 `core` 与各论点的 `exposition`；`id`、`heading`、`revision`、`excerpts` 和双链目标原样不动。增量论点映射的 `core` 必须照抄 head，所以增量时只改 `extended` / `new` 论点的 `exposition`。
+- 两者都是必经环节，由 validate 强制（见「校验」的 `style.profile-missing`、`polish.missing`、`polish.structure-changed`）。
 
 ## 组装（#109）
 
@@ -117,6 +118,8 @@ pnpm book-pipeline validate --workdir <dir> [--key <key> ...]   # 缺省 = 全�
 - 引文逐字回查：`assembled.json` 的 `markdownSha256` 与当前稿一致时，按其记录的摘录引用从冻结段落重新取引文，与站点渲染出的可见文字、强调和出处逐项比对。稿子被改过（哈希不一致）时退化为：引文须是某个范围内冻结段落的逐字子串，出处须与该段落相符。
 - 资料覆盖范围：由实际引用推导（与 assemble 同一套文案），「资料覆盖范围」「译本」两个列表须与之完全一致；缺项、多项、文字不同都报 `coverage`。
 - 照录原文（`exposition.verbatim-source`，error）：一句话核心与各论点解读（引用块之外的段落和列表，止于分隔线）按站点渲染的可见文字（双链取显示文字）、去掉全部空白后，与某一个冻结段落（含范围外注释段落）去掉全部空白后的文字有连续 ≥ 20 个码点（`VERBATIM_RUN_CHARS`，标点计入）相同即报，给出整段相同片段的长度和段落 ID。只在单个段落内比较。短于 20 字的引语、术语照常允许；要引更长的原文就改为摘录。`perspectives/<key>/base.json` 存在时，与其 head 逐字相同的块（已发表，增量也不许改动）不检查。
+- 文风档案（`style.profile-missing`，error，整篇项）：`style/profile.md` 不存在，或缺少 `STYLE_PROFILE_SECTIONS` 中任一 `## 标题`（逐字匹配）。
+- 润色（error）：`perspectives/<key>/claim-map.pre-polish.json` 不存在即 `polish.missing`。存在时与 `claim-map.json` 比较，以下任一项即 `polish.structure-changed`：`schema`、`conceptKey`、`term`、`interpreter` 不同；论点 ID 或顺序不同；某论点的 `heading`、`revision`、`excerpts` 不同；一句话核心或某论点解读的双链目标集合（词条名，显式视角另带 `@诠释者`；显示文字不算）不同。增量论点映射（有非 `new` 的论点）另要求 `core` 不变、`kept` 论点整体不变。只比较论点映射，不看 perspective.md。
 - 文风提示（`style.ai-pattern`，hint）：同样范围的可见文字按论点合并（一句话核心 `claimId` 为 null），对 `style-patterns.ts` 的中文 AI 腔清单计数，达到各模式的阈值即提示。清单只收正则认得准的套话与句式，这是唯一的一份；判断性的模式由润色子代理处理（技能的 `references/humanizer.md`）。与 base.json head 相同的块同样跳过。
 - 伪诠释者：工作目录、论点映射、assembled.json 的诠释者名、来源著者、双链里的诠释者名，命中 `isPseudoInterpreter` 即报。
 - 锁定段落：`locks.json`（`LockInfo`，#111 产生；不存在即无锁定）。每个锁定块的 `text` 必须仍作为稿子的某个顶层块逐字存在（位置可以移动）；块的切法与哈希见 `blocks.ts` 的 `topLevelBlocks`，#111 生成锁定信息时须用同一函数。`LockInfo.headRevisionId` 须等于 `assembled.json` 的 `baseRevisionId`（若有）。

@@ -459,6 +459,9 @@ export type ValidationRule =
   | "pseudo-interpreter"
   | "locked-block"
   | "exposition.verbatim-source"
+  | "style.profile-missing"
+  | "polish.missing"
+  | "polish.structure-changed"
   | "unconfirmed";
 
 /** 不阻断的提示类规则：不计入 ok，不能也不必放行；submit 原样列入提交说明。 */

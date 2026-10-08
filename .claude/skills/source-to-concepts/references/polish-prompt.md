@@ -34,10 +34,4 @@
 
 ## 子代理返回后
 
-主会话核对润色只改了文字：
-
-```bash
-git diff --no-index --word-diff <工作目录>/perspectives/<key>/claim-map.pre-polish.json <工作目录>/perspectives/<key>/claim-map.json
-```
-
-只有 <范围> 内的文字变化，双链与术语原文注都还在，读来意思未变。任一项不符就把 `claim-map.pre-polish.json` 复制回 `claim-map.json`，再派一个新的润色子代理。
+不必人工比对：`validate`（第 9 步）比较 `claim-map.pre-polish.json` 与 `claim-map.json`，润色改了 <范围> 以外的任何东西、或改变了双链目标，都报 `polish.structure-changed`。出现时把 `claim-map.pre-polish.json` 复制回 `claim-map.json`，再派一个新的润色子代理。润色是否改了原意由审稿核对。
