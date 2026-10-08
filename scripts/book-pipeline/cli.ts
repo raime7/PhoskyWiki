@@ -8,6 +8,7 @@ import { parseArgs } from "node:util";
 import { assemble } from "./assemble";
 import { writeCandidateList, writeConfirmation } from "./candidates";
 import { DEFAULT_RULES, detectFormat, freezeBook, writeFrozenSource } from "./freeze";
+import { submit } from "./submit";
 import type { FreezeRules } from "./types";
 
 class UsageError extends Error {}
@@ -25,15 +26,20 @@ const USAGE = `用法：book-pipeline <command> [options]
   assemble --workdir <dir> [--key <key> ...]     按模板把已确认概念的 claim-map.json 组装为 perspective.md 与 assembled.json
                                                  （缺省 = 全部已确认且已有论点映射的概念；清单未确认即拒绝）
 
+  submit --workdir <dir> [--key <key> ...] [--origin <url>] [--send] [--rate <每分钟次数，默认 60>]
+         [--resubmit <opKey> ...] [--reconcile <opKey[=pageId]> ...]
+                                                 默认试运行：校验门禁后写 submit/plan.json 并列出将发出的请求（账本里已完成的略去）。
+                                                 --send 才真正发出（环境变量 BOOK_PIPELINE_EMAIL / BOOK_PIPELINE_PASSWORD，须为 editor 账号）；
+                                                 第一阶段（诠释者、词条）被受理后用 --reconcile opKey=pageId 记账，再 --send 发第二阶段
+
   后续命令（尚未实现）：
-  validate (#110)   incremental (#111)   submit (#112)
+  validate (#110)   incremental (#111)
 
 工作目录布局见 scripts/book-pipeline/README.md。`;
 
 const PENDING: Record<string, string> = {
   validate: "#110",
   incremental: "#111",
-  submit: "#112",
 };
 
 function loadRules(path: string | undefined): Partial<FreezeRules> | undefined {
@@ -122,7 +128,34 @@ function assembleCommand(args: string[]): void {
   for (const result of assemble(values.workdir, values.key ?? [])) console.log(JSON.stringify(result));
 }
 
-function main(argv: string[]): number {
+async function submitCommand(args: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args,
+    options: {
+      workdir: { type: "string" },
+      key: { type: "string", multiple: true },
+      origin: { type: "string" },
+      send: { type: "boolean", default: false },
+      rate: { type: "string" },
+      resubmit: { type: "string", multiple: true },
+      reconcile: { type: "string", multiple: true },
+    },
+  });
+  if (!values.workdir) throw new UsageError("--workdir is required");
+  const rate = values.rate === undefined ? undefined : Number(values.rate);
+  if (rate !== undefined && (!Number.isInteger(rate) || rate < 1)) throw new UsageError("--rate must be a positive integer");
+  await submit({
+    workdir: values.workdir,
+    keys: values.key,
+    origin: values.origin,
+    send: values.send,
+    rate,
+    resubmit: values.resubmit,
+    reconcile: values.reconcile,
+  });
+}
+
+async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
   try {
     if (!command || command === "help" || command === "--help" || command === "-h") {
@@ -145,6 +178,10 @@ function main(argv: string[]): number {
       assembleCommand(rest);
       return 0;
     }
+    if (command === "submit") {
+      await submitCommand(rest);
+      return 0;
+    }
     if (command === "rules") {
       console.log(JSON.stringify(DEFAULT_RULES, null, 2));
       return 0;
@@ -164,4 +201,6 @@ function main(argv: string[]): number {
   }
 }
 
-process.exitCode = main(process.argv.slice(2));
+void main(process.argv.slice(2)).then((code) => {
+  process.exitCode = code;
+});
