@@ -63,3 +63,15 @@ pnpm book-pipeline confirm --workdir <dir> --by <站长名> (--all | --keys a,b)
 - 准入：`treatment=dedicated` 且（有效论点至少 2 个，或 `centralParagraphs` 至少 1 段）；其余进入 `excluded` 并写明原因。引用的段落必须是已冻结的范围内段落。
 - `confirm` 只接受 `entries` 中的键；清单与输入不一致时拒绝（`STALE_LIST`）。确认绑定 `candidates.json` 的 sha256，之后任何改动清单的重新生成都使确认失效。
 - 闸门：后续命令调用 `candidates.ts` 的 `requireConfirmed(workdir, key?)`，未确认、已失效或键不在确认之列时抛出 `UNCONFIRMED: …`。
+
+## 组装（#109）
+
+```bash
+pnpm book-pipeline assemble --workdir <dir> [--key <key> ...]   # 缺省 = 全部已确认且已有 claim-map.json 的概念
+```
+
+- 先过 `requireConfirmed` 闸门；全部概念在内存中组装并自检通过后才落盘，任何一个失败都不写文件。重跑逐字节一致。
+- 模板结构、引文 Markdown 的写法与解析器都在 `template.ts`（`TEMPLATE`、`parsePerspectiveMarkdown`、`renderedExcerpts`），validate 与 incremental 复用，不要另写一套。
+- 摘录只能引用范围内段落（`inRange`），引用对象只许 `{ paragraph, from, to }` 三个字段；引文 ASCII 标点全部转义，强调两侧加 `<!-- -->`，自检用站点渲染管线核对可见文字与强调。
+- `mode` 由候选清单的 `existingPerspective` 决定：已有视角即 `edit`，`baseRevisionId` 取其 `headRevisionId`。
+- 错误码：`UNCONFIRMED`、`MISSING_INPUT`、`ASSEMBLE_CLAIM_MAP`、`ASSEMBLE_EXCERPT`、`ASSEMBLE_PSEUDO_INTERPRETER`、`ASSEMBLE_SOURCE_TAMPERED`、`ASSEMBLE_SELF_CHECK`、`ASSEMBLE_NOTHING`。

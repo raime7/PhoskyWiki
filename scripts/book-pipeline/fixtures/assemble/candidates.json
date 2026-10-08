@@ -1,0 +1,47 @@
+{
+  "schema": "phosky.book-pipeline/candidate-list@1",
+  "interpreter": "范例思",
+  "inputs": {
+    "sessionCandidates": "0000000000000000000000000000000000000000000000000000000000000001",
+    "siteExport": "0000000000000000000000000000000000000000000000000000000000000002"
+  },
+  "entries": [
+    {
+      "key": "kaiduan",
+      "canonicalName": "开端",
+      "aliases": ["起点"],
+      "originalTerms": ["Anfang"],
+      "related": ["存在"],
+      "existingTerm": null,
+      "existingPerspective": null,
+      "proposedClaimCount": 3,
+      "evidenceParagraphs": ["sample:d02.p1", "sample:d02.p2", "sample:d02.p4", "sample:d02.p5"],
+      "admission": ["claims>=2", "central-paragraph"]
+    },
+    {
+      "key": "cunzai",
+      "canonicalName": "存在",
+      "aliases": [],
+      "originalTerms": ["Sein"],
+      "related": ["开端"],
+      "existingTerm": { "pageId": 41, "title": "存在", "matchedBy": "title" },
+      "existingPerspective": { "pageId": 42, "headRevisionId": 7 },
+      "proposedClaimCount": 2,
+      "evidenceParagraphs": ["sample:d02.p1", "sample-md:t.p2"],
+      "admission": ["claims>=2"]
+    },
+    {
+      "key": "liang",
+      "canonicalName": "量",
+      "aliases": [],
+      "originalTerms": ["Quantität"],
+      "related": [],
+      "existingTerm": null,
+      "existingPerspective": null,
+      "proposedClaimCount": 2,
+      "evidenceParagraphs": ["sample:d02.p6"],
+      "admission": ["claims>=2"]
+    }
+  ],
+  "excluded": []
+}
