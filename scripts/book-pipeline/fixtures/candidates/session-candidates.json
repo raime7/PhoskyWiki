@@ -1,0 +1,88 @@
+{
+  "schema": "phosky.book-pipeline/session-candidates@1",
+  "interpreter": "范例思",
+  "sourceIds": ["sample"],
+  "candidates": [
+    {
+      "key": "chidu",
+      "canonicalName": "尺度",
+      "aliases": ["Maß", "度量"],
+      "originalTerms": ["Maß"],
+      "mergedFrom": ["度量"],
+      "related": ["质"],
+      "treatment": "dedicated",
+      "proposedClaims": [
+        { "summary": "尺度是质与量的统一", "paragraphs": ["sample:t.p1"] },
+        { "summary": "尺度的变化会引起质变", "paragraphs": ["sample:t.p2"] }
+      ],
+      "centralParagraphs": ["sample:t.p1"],
+      "notes": null
+    },
+    {
+      "key": "zhijiexing",
+      "canonicalName": "直接性",
+      "aliases": ["无中介性"],
+      "originalTerms": ["Unmittelbarkeit"],
+      "mergedFrom": [],
+      "related": [],
+      "treatment": "dedicated",
+      "proposedClaims": [
+        { "summary": "存在以直接性为其规定", "paragraphs": ["sample:t.p1"] },
+        { "summary": "直接性本身是被中介的", "paragraphs": ["sample:t.p3"] }
+      ],
+      "centralParagraphs": [],
+      "notes": "站上以「直接存在」为题，直接性是其别名"
+    },
+    {
+      "key": "guidingxing",
+      "canonicalName": "规定性",
+      "aliases": [],
+      "originalTerms": ["Bestimmtheit"],
+      "mergedFrom": [],
+      "related": ["尺度"],
+      "treatment": "dedicated",
+      "proposedClaims": [
+        { "summary": "规定性即质", "paragraphs": ["sample:t.p1"] },
+        { "summary": "规定性是否定", "paragraphs": ["sample:t.p2"] }
+      ],
+      "centralParagraphs": [],
+      "notes": "站上有同名但已删除的词条，不应匹配"
+    },
+    {
+      "key": "ziguanxi",
+      "canonicalName": "自身关系",
+      "aliases": [],
+      "originalTerms": [],
+      "mergedFrom": [],
+      "related": [],
+      "treatment": "dedicated",
+      "proposedClaims": [{ "summary": "存在只与自己相关", "paragraphs": ["sample:t.p1"] }],
+      "centralParagraphs": ["sample:t.p1"],
+      "notes": null
+    },
+    {
+      "key": "bianzhengfa",
+      "canonicalName": "辩证法",
+      "aliases": [],
+      "originalTerms": [],
+      "mergedFrom": [],
+      "related": [],
+      "treatment": "mention",
+      "proposedClaims": [],
+      "centralParagraphs": [],
+      "notes": "仅顺带提及"
+    },
+    {
+      "key": "zhiliang",
+      "canonicalName": "质量",
+      "aliases": [],
+      "originalTerms": [],
+      "mergedFrom": [],
+      "related": [],
+      "treatment": "dedicated",
+      "proposedClaims": [{ "summary": "只有一个论点", "paragraphs": ["sample:t.p2"] }],
+      "centralParagraphs": [],
+      "notes": null
+    }
+  ]
+}

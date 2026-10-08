@@ -5,6 +5,7 @@
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
+import { writeCandidateList, writeConfirmation } from "./candidates";
 import { DEFAULT_RULES, detectFormat, freezeBook, writeFrozenSource } from "./freeze";
 import type { FreezeRules } from "./types";
 
@@ -18,15 +19,15 @@ const USAGE = `用法：book-pipeline <command> [options]
   freeze <file> --toc [--rules <rules.json>]     只列出标题与节号（不写文件），用于选择 --from/--to
   rules                                          打印默认冻结规则（可另存为 --rules 起点）
 
+  candidates --workdir <dir>                     读 candidates/session-candidates.json 与 site-terms.json，生成 candidates.json
+  confirm --workdir <dir> --by <站长名> (--all | --keys a,b)   确认候选清单（清单变动后确认即失效）
+
   后续命令（尚未实现）：
-  candidates  (#108)   confirm  (#108)   assemble  (#109)
-  validate    (#110)   incremental (#111)   submit (#112)
+  assemble (#109)   validate (#110)   incremental (#111)   submit (#112)
 
 工作目录布局见 scripts/book-pipeline/README.md。`;
 
 const PENDING: Record<string, string> = {
-  candidates: "#108",
-  confirm: "#108",
   assemble: "#109",
   validate: "#110",
   incremental: "#111",
@@ -88,6 +89,31 @@ function freeze(args: string[]): void {
   console.log(JSON.stringify({ status: result.status, source: result.manifest.sourceId, dir: result.dir, ...result.manifest.counts }));
 }
 
+function candidates(args: string[]): void {
+  const { values } = parseArgs({ args, options: { workdir: { type: "string" } } });
+  if (!values.workdir) throw new UsageError("--workdir is required");
+  const { list, changed, confirmationInvalidated } = writeCandidateList(values.workdir);
+  console.log(
+    JSON.stringify({ status: changed ? "written" : "unchanged", entries: list.entries.length, excluded: list.excluded.length, confirmationInvalidated }),
+  );
+}
+
+function confirm(args: string[]): void {
+  const { values } = parseArgs({
+    args,
+    options: { workdir: { type: "string" }, by: { type: "string" }, keys: { type: "string" }, all: { type: "boolean", default: false } },
+  });
+  if (!values.workdir) throw new UsageError("--workdir is required");
+  if (!values.by) throw new UsageError("--by is required");
+  if (Boolean(values.all) === Boolean(values.keys)) throw new UsageError("give exactly one of --all or --keys a,b,c");
+  const result = writeConfirmation(values.workdir, {
+    by: values.by,
+    all: values.all,
+    keys: values.keys?.split(",").map((k) => k.trim()).filter(Boolean),
+  });
+  console.log(JSON.stringify({ status: "confirmed", confirmed: result.confirmed, candidateListSha256: result.candidateListSha256 }));
+}
+
 function main(argv: string[]): number {
   const [command, ...rest] = argv;
   try {
@@ -97,6 +123,14 @@ function main(argv: string[]): number {
     }
     if (command === "freeze") {
       freeze(rest);
+      return 0;
+    }
+    if (command === "candidates") {
+      candidates(rest);
+      return 0;
+    }
+    if (command === "confirm") {
+      confirm(rest);
       return 0;
     }
     if (command === "rules") {
