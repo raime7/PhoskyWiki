@@ -42,6 +42,7 @@ function parseSubmissionInput(body: Record<string, unknown>): SubmissionInput {
     interpreterId: optionalInt(body.interpreterId, "interpreterId"),
     baseRevisionId: optionalInt(body.baseRevisionId, "baseRevisionId"),
     supersedes: optionalInt(body.supersedes, "supersedes"),
+    note: typeof body.note === "string" ? body.note : undefined,
     confirmedBaseRevisionId: optionalInt(body.confirmedBaseRevisionId, "confirmedBaseRevisionId"),
   };
 }

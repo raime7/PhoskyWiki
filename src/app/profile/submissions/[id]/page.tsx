@@ -81,6 +81,13 @@ export default async function SubmissionDetailPage({ params }: Props) {
         </section>
       </div>
 
+      {submission.note && (
+        <section aria-label="提交说明" data-testid="submission-note" className="mt-6 rounded-lg border border-border bg-card p-4 text-sm">
+          <p className="font-medium">提交说明</p>
+          <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{submission.note}</p>
+        </section>
+      )}
+
       <section aria-labelledby="submission-diff-heading" className="mt-8">
         <h2 id="submission-diff-heading" className="border-t border-border pt-6 text-xl font-semibold tracking-tight">提交差异</h2>
         <p className="mt-2 mb-4 text-sm text-muted-foreground">
