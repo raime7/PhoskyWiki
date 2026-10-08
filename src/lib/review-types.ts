@@ -2,6 +2,9 @@
 // 单独成文件是因为 review.ts 带 server-only，客户端组件不能直接引它的类型；
 // 收敛在这里避免两端各自声明同一形状后悄悄漂移。
 
+/** 提交说明（submissions.note）的长度上限：服务端校验与表单 maxLength 共用。 */
+export const SUBMISSION_NOTE_MAX_LENGTH = 20000;
+
 export type ReviewOutcome =
   | { outcome: "pending"; approveCount: number; quorum: number }
   | { outcome: "approved" }

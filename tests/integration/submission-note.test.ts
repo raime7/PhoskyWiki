@@ -58,6 +58,20 @@ it("超长说明返回 400，恰好上限可通过", async () => {
   expect((await post({ kind: "new_interpreter", title, note: "x".repeat(20000) }, editor.cookie)).status).toBe(201);
 });
 
+it("在场但不是字符串的说明返回 400，不落库；null 按未填处理", async () => {
+  const title = `Typed ${randomUUID()}`;
+  for (const note of [123, true, ["说明"], { text: "说明" }]) {
+    const response = await post({ kind: "new_interpreter", title, note }, editor.cookie);
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/提交说明/);
+  }
+  const pending = (await listQueue()).filter(i => i.title === title);
+  expect(pending).toEqual([]);
+  const ok = await post({ kind: "new_interpreter", title, note: null }, editor.cookie);
+  expect(ok.status).toBe(201);
+  expect(await noteOf((await ok.json()).submissionId)).toBeNull();
+});
+
 it("修改重提不继承说明，可重新填写", async () => {
   const payload = { kind: "new_interpreter", title: `Resub ${randomUUID()}` };
   const { submissionId } = await (await post({ ...payload, note: "原说明" }, editor.cookie)).json();

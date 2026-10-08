@@ -1,5 +1,5 @@
 {
-  "schema": "phosky.book-pipeline/candidate-list@1",
+  "schema": "phosky.book-pipeline/candidate-list@2",
   "interpreter": "范例思",
   "inputs": {
     "sessionCandidates": "0000000000000000000000000000000000000000000000000000000000000001",
@@ -14,6 +14,7 @@
       "related": ["存在"],
       "existingTerm": null,
       "existingPerspective": null,
+      "termSummary": "开端：思维或体系由以出发的起点。",
       "proposedClaimCount": 3,
       "evidenceParagraphs": ["sample:d02.p1", "sample:d02.p2", "sample:d02.p4", "sample:d02.p5"],
       "admission": ["claims>=2", "central-paragraph"]
@@ -26,6 +27,7 @@
       "related": ["开端"],
       "existingTerm": { "pageId": 41, "title": "存在", "matchedBy": "title" },
       "existingPerspective": { "pageId": 42, "headRevisionId": 7 },
+      "termSummary": null,
       "proposedClaimCount": 2,
       "evidenceParagraphs": ["sample:d02.p1", "sample-md:t.p2"],
       "admission": ["claims>=2"]
@@ -38,6 +40,7 @@
       "related": [],
       "existingTerm": null,
       "existingPerspective": null,
+      "termSummary": "量：与质相对、对事物本身无关紧要的规定性。",
       "proposedClaimCount": 2,
       "evidenceParagraphs": ["sample:d02.p6"],
       "admission": ["claims>=2"]

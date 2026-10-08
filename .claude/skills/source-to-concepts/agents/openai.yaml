@@ -1,4 +1,4 @@
 interface:
   display_name: "原典生成视角"
   short_description: "用书籍流水线把诠释者著作整理成按论点组织、配对原文摘录的视角，并支持新书增量并入"
-  default_prompt: "使用 $source-to-concepts，用书籍流水线把我指定的著作和章节整理成视角：冻结来源、列出候选供我确认，再写解读、组装、审稿、校验，提交前给我看试运行清单。"
+  default_prompt: "使用 $source-to-concepts，用书籍流水线把我指定的著作和章节整理成视角：冻结来源、列出候选供我确认，再写解读、组装、校验、审稿，提交前给我看试运行清单。"

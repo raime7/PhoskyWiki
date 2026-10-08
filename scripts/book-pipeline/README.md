@@ -1,6 +1,6 @@
 # 书籍流水线（#105）
 
-把诠释者著作的中译本整理成视角的本地离线流水线。领域规则见 `CONTEXT.md` 和 ADR-0009。所有命令都作用于同一个**工作目录**：每个命令读写确定的文件，可以单独重跑。各产物的类型定义在 `types.ts`，路径定义在 `workdir.ts`，命令不要自己拼接文件名。
+把诠释者著作的中译本整理成视角的本地离线流水线。领域规则见 `CONTEXT.md` 和 ADR-0009。所有命令都作用于同一个**工作目录**：每个命令读写确定的文件，可以单独重跑。各产物的类型定义在 `types.ts`，路径定义在 `workdir.ts`，命令都经它取路径。运行错误一律用 `errors.ts` 的 `fail(code, message)` 抛出。
 
 ```bash
 pnpm book-pipeline freeze <file> --toc                  # 先列出标题与节号，用来选择范围
@@ -26,8 +26,8 @@ pnpm test:pipeline                                      # node --test scripts/bo
 | `sources/<id>/landmarks.json` | `Landmark[]`：全书的标题与节号 | freeze |
 | `sources/<id>/normalization-log.jsonl` | `NormalizationLogEntry`：每段做了哪些规范化，以及规范化前后的文字 | freeze |
 | `sources/<id>/reading.md` | 供会话阅读的稿子，标出段落 ID 和 ⟨n⟩ 句号；不是发表格式 | freeze |
-| `candidates/session-candidates.json` | `SessionCandidates`：会话产出的候选与去重结果 | 会话 |
-| `candidates/site-terms.json` | `SiteExport`：站上已有的词条、别名、诠释者和视角 | 导出 |
+| `candidates/session-candidates.json` | `SessionCandidates`：会话产出的候选与去重结果（新词条含 `termSummary`） | 会话 |
+| `candidates/site-terms.json` | `SiteExport`：站上在线的词条、别名、诠释者和视角 | export-site |
 | `candidates/candidates.json` | `CandidateList`：供站长确认的候选清单，含被排除的候选及原因 | candidates（#108） |
 | `candidates/confirmation.json` | `CandidateConfirmation`：绑定清单哈希；清单一旦重新生成，确认即失效 | confirm（#108） |
 | `perspectives/<key>/claim-map.json` | `ClaimMap`：一句话核心，以及各论点的解读和摘录引用 | 会话 |
@@ -36,7 +36,7 @@ pnpm test:pipeline                                      # node --test scripts/bo
 | `perspectives/<key>/review.json` | `ReviewReport`：审稿子代理的报告，绑定 perspective.md 的哈希 | 会话子代理 |
 | `perspectives/<key>/overrides.json` | `LimitOverride[]`：人工放行的超限项 | 站长 |
 | `perspectives/<key>/validation.json` | `ValidationReport` | validate（#110） |
-| `perspectives/<key>/base.json` | `IncrementalBase`：现有视角的 head 修订和最近一次 AI 修订 | incremental（#111，取自导出的修订） |
+| `perspectives/<key>/base.json` | `IncrementalBase`：现有视角的 head 修订和最近一次 AI 修订 | export-site --key，或 incremental --head |
 | `perspectives/<key>/locks.json` | `LockInfo`：人工改过而锁定的块 | incremental（#111） |
 | `submit/plan.json` | `SubmitPlan`：试运行时列出的提交请求 | submit（#112） |
 | `submit/ledger.jsonl` | `LedgerEntry`：写入账本，只追加 | submit（#112） |
@@ -52,6 +52,18 @@ pnpm test:pipeline                                      # node --test scripts/bo
 - **不支持 OCR**：只接受有文字层的 EPUB、UTF-8 编码的 TXT 和 Markdown。
 - **退出码**：0 表示成功；1 表示运行错误，错误信息以 `CODE: …` 开头；2 表示用法错误。
 
+## 站点导出（export-site）
+
+```bash
+pnpm book-pipeline export-site --workdir <dir> --origin <url>                                  # → candidates/site-terms.json
+pnpm book-pipeline export-site --workdir <dir> --origin <url> --key <key> ... --ai-user <用户 id>  # → perspectives/<key>/base.json
+```
+
+- 只读：游客 GET 站点公开接口，不登录、不写站点。HTTP 只是 `export-site.ts` 底部的薄层；载荷整理是纯函数（`siteExportFromCatalog`、`incrementalBaseFromHistory`），测试用夹具覆盖。
+- `site-terms.json` 取自 `GET /api/site-catalog`（`src/lib/site-catalog.ts`）：在线的词条（含别名）、诠释者、视角（`headRevisionId` = 该页最大修订 id）。软删除的页面不在其中，`deleted` 一律为 false。每次运行都重写（含 `exportedAt`）。
+- `--key` 按候选清单里的 `existingPerspective` 取 `GET /api/pages/<pageId>/history`：head = 最大修订 id；上一次 AI 修订 = `createdBy` 等于 `--ai-user` 的最大修订 id，没有则为 null。全部键取到后才落盘；输出行的 `headMovedSinceCandidates` 表示 head 在生成候选清单之后又有了新修订（incremental 与 submit 以 base.json 为准）。
+- 错误码：`EXPORT_SITE_ORIGIN`、`EXPORT_SITE_HTTP`、`EXPORT_SITE_PAYLOAD`、`EXPORT_SITE_AI_USER`、`EXPORT_SITE_UNKNOWN_KEY`、`EXPORT_SITE_NO_PERSPECTIVE`、`MISSING_INPUT`。
+
 ## 候选与确认（#108）
 
 ```bash
@@ -61,20 +73,22 @@ pnpm book-pipeline confirm --workdir <dir> --by <站长名> (--all | --keys a,b)
 
 - 站点词条按规范名与别名（NFKC、去空白和间隔点、不分大小写）对标题与别名匹配，标题优先；已删除的词条不参与。一个候选命中多个词条（`AMBIGUOUS_TERM`）、两个候选命中同一词条或名称重叠（`DUPLICATE_CONCEPT`）都是错误，应回会话合并（相同）或改成 `related`（相关）。
 - 准入：`treatment=dedicated` 且（有效论点至少 2 个，或 `centralParagraphs` 至少 1 段）；其余进入 `excluded` 并写明原因。引用的段落必须是已冻结的范围内段落。
+- 词条简介：准入且未命中站上词条的候选（将新建词条）须有 `termSummary`——一句中性的词条说明，单行非空，否则 `TERM_SUMMARY_MISSING`。它进入清单条目，submit 用作 `new_term` 的 `summary`；诠释者的理解属于视角的一句话核心，两者不混用。命中已有词条时清单里为 null。
 - `confirm` 只接受 `entries` 中的键；清单与输入不一致时拒绝（`STALE_LIST`）。确认绑定 `candidates.json` 的 sha256，之后任何改动清单的重新生成都使确认失效。
 - 闸门：后续命令调用 `candidates.ts` 的 `requireConfirmed(workdir, key?)`，未确认、已失效或键不在确认之列时抛出 `UNCONFIRMED: …`。
 
 ## 组装（#109）
 
 ```bash
-pnpm book-pipeline assemble --workdir <dir> [--key <key> ...]   # 缺省 = 全部已确认且已有 claim-map.json 的概念
+pnpm book-pipeline assemble --workdir <dir> [--key <key> ...] [--rewrite <key> ...]   # 缺省 = 全部已确认且已有 claim-map.json 的新视角
 ```
 
 - 先过 `requireConfirmed` 闸门；全部概念在内存中组装并自检通过后才落盘，任何一个失败都不写文件。重跑逐字节一致。
 - 模板结构、引文 Markdown 的写法与解析器都在 `template.ts`（`TEMPLATE`、`parsePerspectiveMarkdown`、`renderedExcerpts`），validate 与 incremental 复用，不要另写一套。
 - 摘录只能引用范围内段落（`inRange`），引用对象只许 `{ paragraph, from, to }` 三个字段；引文 ASCII 标点全部转义，强调两侧加 `<!-- -->`，自检用站点渲染管线核对可见文字与强调。
-- `mode` 由候选清单的 `existingPerspective` 决定：已有视角即 `edit`，`baseRevisionId` 取其 `headRevisionId`。
-- 错误码：`UNCONFIRMED`、`MISSING_INPUT`、`ASSEMBLE_CLAIM_MAP`、`ASSEMBLE_EXCERPT`、`ASSEMBLE_PSEUDO_INTERPRETER`、`ASSEMBLE_SOURCE_TAMPERED`、`ASSEMBLE_SELF_CHECK`、`ASSEMBLE_NOTHING`。
+- 论点映射的共用规则（schema、身份、论点 ID、`revision`、解读块类型、摘录引用字段）在 `claim-map.ts`，与 incremental 共用；assemble 另要求核心是一个段落、每个论点有标题和解读。
+- 已有视角（候选清单的 `existingPerspective`）归 incremental：缺省跳过并输出 `{status: "skipped"}` 行，`--key` 点名则拒绝（`ASSEMBLE_EXISTING_PERSPECTIVE`）。`--rewrite <key>`（同时选中该键）才整篇重写为 `mode: "edit"`，`baseRevisionId` 取 `base.json` 的 head（与 submit 同一取法），没有 base.json 时取清单的 `headRevisionId`；用于 head 不合模板、无法增量的视角（如试点时期的《小逻辑》A．质），会覆盖已受理的措辞，须经站长同意。对新视角用 `--rewrite` 报 `ASSEMBLE_REWRITE_NEW`。
+- 错误码：`UNCONFIRMED`、`MISSING_INPUT`、`ASSEMBLE_CLAIM_MAP`、`ASSEMBLE_EXCERPT`、`ASSEMBLE_PSEUDO_INTERPRETER`、`ASSEMBLE_SOURCE_TAMPERED`、`ASSEMBLE_SELF_CHECK`、`ASSEMBLE_EXISTING_PERSPECTIVE`、`ASSEMBLE_REWRITE_NEW`、`ASSEMBLE_NOTHING`。
 
 ## 校验（#110）
 
@@ -100,18 +114,19 @@ pnpm book-pipeline validate --workdir <dir> [--key <key> ...]   # 缺省 = 全�
 ## 增量更新（#111）
 
 ```bash
-# 1. 导入现有视角：head 与上一次 AI 编者修订的 Markdown 导出 → base.json、locks.json，并输出增量论点映射的骨架
-pnpm book-pipeline incremental --workdir <dir> --key <key> \
-  --head head.md --head-revision <id> (--last-ai ai.md --last-ai-revision <id> | --no-last-ai) [--page <id>]
+# 1. 导入现有视角：export-site --key 写好的 base.json（或用 --head 等参数直接导入 Markdown 导出）→ locks.json，并输出增量论点映射的骨架
+pnpm book-pipeline export-site --workdir <dir> --origin <url> --key <key> --ai-user <用户 id>
+pnpm book-pipeline incremental --workdir <dir> --key <key>
+#   或：incremental --workdir <dir> --key <key> --head head.md --head-revision <id> (--last-ai ai.md --last-ai-revision <id> | --no-last-ai) [--page <id>]
 # 2. 会话按骨架写 perspectives/<key>/claim-map.json（增量形式），再并稿（省略 --head 即沿用 base.json）
 pnpm book-pipeline incremental --workdir <dir> --key <key>
 pnpm book-pipeline validate --workdir <dir> --key <key>
 ```
 
-- 只用于候选清单里已有视角（`existingPerspective`）的概念，并先过确认闸门；`--page` 缺省取该视角，给出时须一致。head 必须符合模板（否则用 assemble 整篇重写）；从无 AI 修订时用 `--no-last-ai`。
-- **锁定**：用 `blocks.ts` 的 `topLevelBlocks` 切 head；分隔线之前的正文块，若不以同样文字出现在上一次 AI 修订中，即人工改过，写入 `locks.json`（`--no-last-ai` 时正文全部锁定）。分隔线之后的资料说明由程序依引用推导，不锁；其中的人工改动会被覆盖，命令在 stderr 给出 `WARN`。
-- **增量论点映射**：仍是 `ClaimMap`（`claim-map@1`）。`core` 须逐字照抄 head；head 的每个论点按原顺序、以原标题出现一次：`kept` 不加任何东西，`extended` 的 `exposition` 只写追加的解读、`excerpts` 只列追加的摘录；`revision: "new"` 是新论点，可插在任意位置，标题不得与既有论点相同。不能删除、改写或调换既有论点。
+- 只用于候选清单里已有视角（`existingPerspective`）的概念，并先过确认闸门；`--page` 缺省取该视角，给出时须一致。head 必须符合模板（否则经站长同意用 `assemble --rewrite <key>` 整篇重写）；从无 AI 修订时用 `--no-last-ai`。
+- **锁定**：用 `blocks.ts` 的 `topLevelBlocks` 切 head；分隔线之前的正文块，若不以同样文字出现在上一次 AI 修订中，即人工改过，写入 `locks.json`（没有 AI 修订时正文全部锁定）。分隔线之后的资料说明由程序依引用推导，不锁；若其中有块不见于上一次 AI 修订（人工改过），命令拒绝（`INCREMENTAL_FOOTER_EDITED`），什么都不写。站长同意按引用重新推导、放弃这些改动时，每次运行都加 `--rederive-footer`（stderr 给出 `NOTE`，输出行的 `footerHumanEdits` 为被覆盖的块数）。
+- **增量论点映射**：仍是 `ClaimMap`（`claim-map@1`），共用检查见 `claim-map.ts`（与 assemble 相同），其上叠加增量规则：`core` 须逐字照抄 head；head 的每个论点按原顺序、以原标题出现一次：`kept` 不加任何东西，`extended` 的 `exposition` 只写追加的解读、`excerpts` 只列追加的摘录；`revision: "new"` 是新论点，可插在任意位置，标题不得与既有论点相同。不能删除、改写或调换既有论点。
 - **并稿**：正文以 head 原文为底，只插入，既有字节一个不改：追加的解读接在该论点原解读之后，追加的摘录接在原摘录之后，新论点整节插在前一个论点之后。新摘录与 assemble 一样依引用回填，出处行以《书名》标注所出书目；资料覆盖范围与译本按全部引用重新推导（与 assemble 同一套文案与顺序）。
 - **既有摘录**须能在本工作目录的冻结来源中逐字定位（出处行一致、某个句子范围回填出相同的可见文字），所以旧书也要冻结在同一目录；定位结果写入 `assembled.json`，validate 因而走精确回查。
 - 产物：`base.json`、`locks.json`，以及 `perspective.md` + `assembled.json`（`mode: "edit"`，`baseRevisionId` = head）。全部在内存中算好并自检（模板、站点渲染、既有正文块原样且顺序不变）后才落盘；重跑逐字节一致。submit 以 `base.json` 的 head 为 base，稿子的 `baseRevisionId` 与之不同即拒绝（`SUBMIT_STALE`）。
-- 错误码：`UNCONFIRMED`、`MISSING_INPUT`、`INCREMENTAL_NO_PERSPECTIVE`、`INCREMENTAL_PAGE_MISMATCH`、`INCREMENTAL_BASE_INVALID`、`INCREMENTAL_HEAD_TEMPLATE`、`INCREMENTAL_EXCERPT_UNRESOLVED`、`INCREMENTAL_CLAIM_MAP`、`INCREMENTAL_SELF_CHECK`、`ASSEMBLE_EXCERPT`、`ASSEMBLE_PSEUDO_INTERPRETER`、`ASSEMBLE_SOURCE_TAMPERED`。
+- 错误码：`UNCONFIRMED`、`MISSING_INPUT`、`INCREMENTAL_NO_PERSPECTIVE`、`INCREMENTAL_PAGE_MISMATCH`、`INCREMENTAL_BASE_INVALID`、`INCREMENTAL_HEAD_TEMPLATE`、`INCREMENTAL_FOOTER_EDITED`、`INCREMENTAL_EXCERPT_UNRESOLVED`、`INCREMENTAL_CLAIM_MAP`、`INCREMENTAL_SELF_CHECK`、`ASSEMBLE_EXCERPT`、`ASSEMBLE_PSEUDO_INTERPRETER`、`ASSEMBLE_SOURCE_TAMPERED`。

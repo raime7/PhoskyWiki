@@ -102,7 +102,8 @@ test("队列显示票数、批准者、过期基准与两侧 diff；提交详情
   await edit(request, source.perspective.pageId, "直编推进 head。");
   const note = "审稿说明 <img src=x onerror=\"window.__noteXss=1\"> **不渲染**";
   const fresh = await edit(page.request, source.perspective.pageId, "第二条待审提交。", note);
-  const staleProposal = await edit(page.request, source.perspective.pageId, "等待旧基准受理的提案。");
+  const longNote = ["机器审稿报告：", ...Array.from({ length: 8 }, (_, i) => `- 第 ${i + 1} 条意见`)].join("\n");
+  const staleProposal = await edit(page.request, source.perspective.pageId, "等待旧基准受理的提案。", longNote);
 
   await loginAdmin(page.request);
   await page.goto("/review");
@@ -121,6 +122,13 @@ test("队列显示票数、批准者、过期基准与两侧 diff；提交详情
   await expect(freshItem.getByTestId("submission-note")).toContainText(note);
   await expect(freshItem.getByTestId("submission-note").locator("img")).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { __noteXss?: number }).__noteXss)).toBeUndefined();
+  // 长说明在队列中折叠为一行预览，展开后显示全文
+  const longNoteBox = page.locator(`[data-submission-id="${staleProposal.submissionId}"]`).getByTestId("submission-note");
+  await expect(longNoteBox.getByTestId("submission-note-collapsible")).not.toHaveAttribute("open", /.*/);
+  await expect(longNoteBox.locator("details > p")).toBeHidden();
+  await longNoteBox.locator("summary").click();
+  await expect(longNoteBox.locator("details > p")).toBeVisible();
+  await expect(longNoteBox.locator("details > p")).toContainText("- 第 8 条意见");
   const queueIds = await page.locator("[data-submission-id]").filter({ hasText: source.perspectiveTitle }).evaluateAll((items) => items.map((entry) => entry.getAttribute("data-submission-id")));
   await edit(request, source.perspective.pageId, "再次直编，不进入审核队列。");
   await page.reload();

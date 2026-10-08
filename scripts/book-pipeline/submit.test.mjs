@@ -65,7 +65,7 @@ function withWorkdir(fn) {
       join(wd, "candidates", "confirmation.json"),
       JSON.stringify({ schema: "phosky.book-pipeline/confirmation@1", candidateListSha256: sha256(readFileSync(join(wd, "candidates", "candidates.json"))), confirmedBy: "站长", confirmedAt: "2026-10-08T00:00:00.000Z", confirmed: ["kaiduan", "cunzai"] }),
     );
-    ok("assemble", "--workdir", wd);
+    ok("assemble", "--workdir", wd, "--key", "kaiduan", "--rewrite", "cunzai");
     report(wd, "kaiduan");
     report(wd, "cunzai");
     return fn(wd);
@@ -95,6 +95,8 @@ test("dry run lists phase 1 (interpreter, term) before phase 2 and an edit carri
     assert.equal(sent[3].request.content, readFileSync(join(wd, "perspectives", "cunzai", "perspective.md"), "utf8"));
     assert.equal(sent[1].request.title, "开端");
     assert.deepEqual(sent[1].request.aliases, ["起点"]);
+    // 新词条的简介取会话给出的中性词条简介，不是诠释者视角的一句话核心
+    assert.equal(sent[1].request.summary, "开端：思维或体系由以出发的起点。");
     assert.equal(json(join(wd, "submit", "plan.json")).requests.length, 4);
     assert.equal(lines.at(-1).mode, "dry-run");
     assert.equal(existsSync(join(wd, "submit", "ledger.jsonl")), false, "dry run never touches the ledger");

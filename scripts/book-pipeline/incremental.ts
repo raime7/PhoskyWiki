@@ -8,7 +8,8 @@
 // 合并规则：
 // - 正文（一句话核心与各论点，直到分隔线）以 head 原文为底，只做插入，不改写任何既有字节：
 //   kept 论点原样保留；extended 论点在原解读之后追加解读、在原摘录之后追加摘录；new 论点整节插入。
-// - 资料说明（分隔线及其后）由程序依实际引用重新推导（与 assemble 同一套文案）。
+// - 资料说明（分隔线及其后）由程序依实际引用重新推导（与 assemble 同一套文案）；head 的资料说明
+//   与上一次 AI 修订不同（人工改过）时拒绝（INCREMENTAL_FOOTER_EDITED），除非显式 rederiveFooter。
 // - 锁定：head 正文中不以同样文字出现在上一次 AI 修订里的顶层块，即人工改过的块（blocks.ts 的切法）。
 //   没有 AI 修订时，正文全部锁定。合并只插入，锁定块必然原样保留；validate 再按 locks.json 复查。
 // - 既有摘录须能在工作目录的冻结来源中逐字定位（出处行 + 句子范围），从而 assembled.json 记录全部引用，
@@ -20,9 +21,10 @@ import type { Node } from "unist";
 
 import { markdownParser } from "@/lib/markdown-ast";
 
-import { citationFor, deriveCoverage, selfCheck, sourceLoader, topLevelTypes } from "./assemble";
+import { citationFor, deriveCoverage, selfCheck, sourceLoader } from "./assemble";
 import { topLevelBlocks } from "./blocks";
 import { requireConfirmed } from "./candidates";
+import { checkClaimMapCommon, validHeading } from "./claim-map";
 import {
   claimBlocks,
   excerptBlockMarkdown,
@@ -37,7 +39,6 @@ import {
   type RenderedExcerpt,
 } from "./template";
 import {
-  isPseudoInterpreter,
   SCHEMAS,
   type AssembledExcerpt,
   type AssembledPerspective,
@@ -56,10 +57,7 @@ import {
   type WorkdirManifest,
 } from "./types";
 import { fileEquals, jsonText, readJson, sha256, workdirLayout, writeText } from "./workdir";
-
-function fail(code: string, message: string): never {
-  throw new Error(`${code}: ${message}`);
-}
+import { fail } from "./errors";
 
 interface MdNode extends Node {
   depth?: number;
@@ -118,7 +116,7 @@ function locateExcerpt(
 function analyzeHead(content: string, workdir: WorkdirManifest, load: Loader): HeadStructure {
   const parsed = parsePerspectiveMarkdown(content);
   if (parsed.errors.length) {
-    fail("INCREMENTAL_HEAD_TEMPLATE", `the head revision does not follow the perspective template (${parsed.errors.join("; ")}); regenerate it with assemble instead`);
+    fail("INCREMENTAL_HEAD_TEMPLATE", `the head revision does not follow the perspective template (${parsed.errors.join("; ")}); rewrite it wholesale with \`assemble --rewrite <key>\` instead`);
   }
   const tree = markdownParser().parse(content) as MdNode;
   const all = tree.children ?? [];
@@ -195,50 +193,27 @@ function computeLocks(base: IncrementalBase, head: HeadStructure): { locks: Lock
 // 增量论点映射
 // ---------------------------------------------------------------------------
 
-const REF_KEYS = ["from", "paragraph", "to"].join();
-
-/** 会话的增量论点映射：可新增论点、往既有论点追加摘录或解读；既有论点按 head 顺序逐个出现。 */
+/**
+ * 会话的增量论点映射：在共用规则（claim-map.ts）之上，核心照抄 head；既有论点按 head 顺序、以原标题逐个出现，
+ * 可追加摘录或解读；新增论点须有合法且不与既有论点重复的标题、解读与摘录。
+ */
 function checkClaimMap(map: ClaimMap, key: ConceptKey, entry: CandidateEntry, interpreter: string, head: HeadStructure): (HeadClaim | null)[] {
-  const bad = (message: string): never => fail("INCREMENTAL_CLAIM_MAP", `${key}: ${message}`);
-  if (map.schema !== SCHEMAS.claimMap) bad(`schema must be ${SCHEMAS.claimMap}`);
-  if (map.conceptKey !== key) bad(`conceptKey is "${map.conceptKey}"`);
-  if (isPseudoInterpreter(map.interpreter ?? "")) fail("ASSEMBLE_PSEUDO_INTERPRETER", `${key}: "${map.interpreter}" is not an interpreter (ADR-0007)`);
-  if (map.interpreter !== interpreter) bad(`interpreter "${map.interpreter}" differs from the workdir interpreter "${interpreter}"`);
-  if (map.term !== entry.canonicalName && map.term !== entry.existingTerm?.title) {
-    bad(`term "${map.term}" is neither the confirmed name "${entry.canonicalName}" nor the matched site term`);
-  }
+  const bad = checkClaimMapCommon(map, { key, entry, interpreter, code: "INCREMENTAL_CLAIM_MAP" });
   if (map.core !== head.core) bad("core must be copied verbatim from the head revision (incremental never rewrites it)");
-  if (!Array.isArray(map.claims) || map.claims.length === 0) bad("claims must be a non-empty array");
 
-  const ids = new Set<string>();
   const headings = new Set(head.claims.map((c) => c.heading));
   const matched: (HeadClaim | null)[] = [];
   let next = 0;
   for (const claim of map.claims) {
-    if (!claim.id || ids.has(claim.id)) bad(`claim id "${claim.id}" is missing or duplicated`);
-    ids.add(claim.id);
-    const exposition = typeof claim.exposition === "string" ? claim.exposition.trim() : bad(`${claim.id}: exposition must be a string`);
-    if (!Array.isArray(claim.excerpts)) bad(`${claim.id}: excerpts must be an array`);
-    for (const ref of claim.excerpts) {
-      if (!ref || typeof ref !== "object" || Object.keys(ref).sort().join() !== REF_KEYS) {
-        bad(`${claim.id}: an excerpt ref must be exactly { paragraph, from, to }; quotation text is never written by the session`);
-      }
-    }
-    const types = exposition ? topLevelTypes(exposition) : [];
-    if (types.some((t) => t !== "paragraph" && t !== "list")) bad(`${claim.id}: exposition must be paragraphs or lists only (found ${types.join(", ")})`);
-
+    const exposition = claim.exposition.trim();
     if (claim.revision === "new") {
-      const heading = `${"#".repeat(TEMPLATE.claimHeadingDepth)} ${claim.heading ?? ""}`;
-      if (!claim.heading?.trim() || claim.heading.includes("\n") || topLevelTypes(heading).join() !== "heading") {
-        bad(`${claim.id}: heading must be a single non-empty line`);
-      }
+      if (!validHeading(claim.heading)) bad(`${claim.id}: heading must be a single non-empty line`);
       if (headings.has(claim.heading.trim())) bad(`${claim.id}: a new claim cannot reuse the existing heading "${claim.heading}"; mark it extended`);
       if (!exposition) bad(`${claim.id}: a new claim needs exposition`);
       if (!claim.excerpts.length) bad(`${claim.id}: a new claim needs at least one excerpt`);
       matched.push(null);
       continue;
     }
-    if (claim.revision !== "kept" && claim.revision !== "extended") bad(`${claim.id}: revision must be kept, extended or new`);
     const existing = head.claims[next];
     if (!existing || existing.heading !== claim.heading) {
       bad(
@@ -288,6 +263,8 @@ export interface IncrementalOptions {
   lastAi?: RevisionExport | null;
   /** 缺省取候选清单的 existingPerspective.pageId；给出时须与之一致 */
   pageId?: PageId;
+  /** 资料说明（分隔线之后）有人工改动时，确认接受按引用重新推导（覆盖人工改动）；否则拒绝 */
+  rederiveFooter?: boolean;
 }
 
 export interface IncrementalResult {
@@ -299,7 +276,7 @@ export interface IncrementalResult {
   baseRevisionId: RevisionId;
   lastAiRevisionId: RevisionId | null;
   locked: number;
-  /** 资料说明中人工改过、会被重新推导覆盖的块数 */
+  /** 资料说明中人工改过、经 rederiveFooter 确认后被重新推导覆盖的块数 */
   footerHumanEdits: number;
   claims: { kept: number; extended: number; new: number } | null;
   newExcerpts: number;
@@ -356,6 +333,13 @@ export function incremental(options: IncrementalOptions): IncrementalResult {
   const load = sourceLoader(layout, workdir);
   const head = analyzeHead(base.head.content, workdir, load);
   const { locks, footerHumanEdits } = computeLocks(base, head);
+  // 资料说明总是按引用重新推导；人工改过它时不静默覆盖，须操作者显式确认
+  if (footerHumanEdits && !options.rederiveFooter) {
+    fail(
+      "INCREMENTAL_FOOTER_EDITED",
+      `${key}: ${footerHumanEdits} block(s) after the separator differ from the last AI revision (a human edited the source notes); they would be re-derived from the citations and the edit lost. Carry the edit into the session's material, or pass --rederive-footer to accept the re-derivation`,
+    );
+  }
 
   const outputs: [string, string][] = [
     [paths.base, jsonText(base)],

@@ -153,6 +153,27 @@ test("merging keeps untouched claims byte-identical and locked blocks unchanged;
     assert.ok(json(file("validation.json")).findings.some((f) => f.rule === "locked-block"));
   }));
 
+test("a human edit in the head's source notes is refused unless --rederive-footer accepts the re-derivation", () =>
+  withWorkdir((wd, file) => {
+    const edited = join(wd, "head-footer-edited.md");
+    const original = "- 《论开端》：另一译者译\n";
+    assert.ok(text(HEAD).includes(original), "fixture drifted");
+    writeFileSync(edited, text(HEAD).replace(original, "- 《论开端》：另一译者译，人工补注的版次\n"));
+    const args = ["incremental", "--workdir", wd, "--key", "cunzai", "--head", edited, "--head-revision", "9", "--last-ai", LAST_AI, "--last-ai-revision", "7"];
+    assert.match(refused("INCREMENTAL_FOOTER_EDITED", ...args), /--rederive-footer/);
+    assert.equal(existsSync(file("base.json")), false, "nothing is written");
+
+    const run = pipeline(...args, "--rederive-footer");
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(JSON.parse(run.stdout).footerHumanEdits, 1);
+    assert.match(run.stderr, /re-derived/);
+    // base.json 沿用时同样要求确认；确认后资料说明按引用重新推导，人工补注不再出现
+    cpSync(CLAIM_MAP, file("claim-map.json"));
+    refused("INCREMENTAL_FOOTER_EDITED", "incremental", "--workdir", wd, "--key", "cunzai");
+    assert.equal(ok("incremental", "--workdir", wd, "--key", "cunzai", "--rederive-footer")[0].stage, "merged");
+    assert.ok(!text(file("perspective.md")).includes("人工补注"));
+  }));
+
 test("incremental refuses rewrites, dropped claims and untraceable or mismatched input, writing nothing", () =>
   withWorkdir((wd, file) => {
     importHead(wd);

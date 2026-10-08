@@ -34,7 +34,7 @@ import { rebuildPageLinks, resolvePreviewWikiLinks } from "@/lib/page-links";
 import type { WikiLinkTarget } from "@/lib/markdown";
 import { queueSearchSync, transactionWithSearchSync } from "@/lib/search/search-sync";
 import { pagePath, slugify as slugifyTitle } from "@/lib/slug";
-import type { CreateSubmissionResult, ReviewOutcome } from "@/lib/review-types";
+import { SUBMISSION_NOTE_MAX_LENGTH, type CreateSubmissionResult, type ReviewOutcome } from "@/lib/review-types";
 import { ImageError } from "@/lib/image-markdown";
 import { publishImageReferences, validateImageReferences } from "@/lib/images";
 import { lockPerspectiveParents } from "@/lib/perspective-parents";
@@ -116,8 +116,6 @@ export interface SubmissionInput {
   note?: string;
 }
 
-export const SUBMISSION_NOTE_MAX_LENGTH = 20000;
-
 interface ValidatedSubmission {
   keyTexts?: KeyText[] | null;
   aliases?: string[];
@@ -148,7 +146,7 @@ async function validateSubmissionInput(
   try { keyTexts = parseKeyTexts(input.keyTexts); } catch (error) { throw new ReviewError(400, (error as Error).message); }
   const summary = input.summary?.trim() || null;
   if (input.note !== undefined && input.note !== null && typeof input.note !== "string") {
-    throw new ReviewError(400, "note 必须是字符串");
+    throw new ReviewError(400, "提交说明（note）必须是字符串");
   }
   const note = input.note?.trim() || null;
   if (note !== null && note.length > SUBMISSION_NOTE_MAX_LENGTH) {

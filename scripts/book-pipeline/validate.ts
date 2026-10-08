@@ -35,6 +35,7 @@ import {
   type WorkdirManifest,
 } from "./types";
 import { jsonText, readJson, sha256, workdirLayout, writeText } from "./workdir";
+import { fail } from "./errors";
 
 /** 硬上限（ADR-0009 / #105）。数字按“字”计：不含空白的字符数。 */
 export const LIMITS = {
@@ -45,10 +46,6 @@ export const LIMITS = {
   /** 一句话核心加全部论点解读的可见文字（不含引用块、标题、资料说明） */
   expositionChars: 1500,
 } as const;
-
-function fail(code: string, message: string): never {
-  throw new Error(`${code}: ${message}`);
-}
 
 const charCount = (text: string): number => Array.from(text.replace(/\s/g, "")).length;
 const preview = (text: string): string => (Array.from(text).length > 24 ? Array.from(text).slice(0, 24).join("") + "…" : text);

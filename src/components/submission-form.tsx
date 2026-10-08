@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { Callout, StatusChip } from "@/components/task-page";
-import type { CreateSubmissionResult } from "@/lib/review-types";
+import { SUBMISSION_NOTE_MAX_LENGTH, type CreateSubmissionResult } from "@/lib/review-types";
 import type { WikiLinkTarget } from "@/lib/markdown";
 import { KeyTextsEditor } from "@/components/key-texts";
 import { KeyTextValidationError, parseKeyTexts, type KeyText } from "@/lib/key-texts";
@@ -460,7 +460,7 @@ export function SubmissionForm(props: SubmissionFormProps) {
               name="note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              maxLength={20000}
+              maxLength={SUBMISSION_NOTE_MAX_LENGTH}
               rows={3}
               placeholder="写给审核者的修改理由或补充材料，按纯文本显示"
               className="min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-normal"

@@ -52,7 +52,7 @@ function setup() {
     join(wd, "candidates", "confirmation.json"),
     JSON.stringify({ schema: "phosky.book-pipeline/confirmation@1", candidateListSha256: sha256(list), confirmedBy: "站长", confirmedAt: "2026-10-08T00:00:00.000Z", confirmed: ["kaiduan", "cunzai"] }, null, 2) + "\n",
   );
-  ok("assemble", "--workdir", wd);
+  ok("assemble", "--workdir", wd, "--key", "kaiduan", "--rewrite", "cunzai");
   return wd;
 }
 
