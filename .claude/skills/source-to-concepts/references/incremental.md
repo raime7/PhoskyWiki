@@ -24,8 +24,9 @@
    命令写 `locks.json`，并在输出的 `scaffold` 里给出增量论点映射的起点。手头只有 Markdown 文件时，也可以用 `--head head.md --head-revision <id> (--last-ai ai.md --last-ai-revision <id> | --no-last-ai)` 直接导入。
    - head 不符合模板（`INCREMENTAL_HEAD_TEMPLATE`，如试点时期的旧格式视角）时无法增量：征得站长同意后用 `assemble --rewrite <key>` 整篇重写成以 head 为 base 的编辑稿（正常写全量论点映射）。
    - head 的资料说明（分隔线之后）被人改过时，命令拒绝（`INCREMENTAL_FOOTER_EDITED`），因为资料说明总按引用重新推导。把人工改动报告给站长：站长同意重新推导时，此后每次运行 `incremental` 都加 `--rederive-footer`；要保留的内容先搬进解读或请站长另行处理。
-2. 以 `scaffold` 为底写 `perspectives/<key>/claim-map.json`（规则见下），写作规范同 [解读写作规范](writing.md)。
-3. 并稿：`pnpm book-pipeline incremental --workdir <dir> --key <key>`（省略 `--head` 即沿用 `base.json`）。之后回到主流程的校验、审稿、提交。
+2. 以 `scaffold` 为底写 `perspectives/<key>/claim-map.json`（规则见下），写作规范同 [解读写作规范](writing.md)，沿用工作目录已有的文风档案。
+3. 润色（主流程第 7 步）：范围只是 `extended`、`new` 论点的解读；`core` 照抄 head，与 kept 论点一样不动。
+4. 并稿：`pnpm book-pipeline incremental --workdir <dir> --key <key>`（省略 `--head` 即沿用 `base.json`）。之后回到主流程的校验、审稿、提交。
 
 ## 增量论点映射的规则
 

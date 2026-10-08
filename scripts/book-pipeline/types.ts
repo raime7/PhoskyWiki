@@ -352,6 +352,27 @@ export interface ClaimMap {
 }
 
 // ---------------------------------------------------------------------------
+// 3a. 文风档案（会话环节）：style/profile.md
+// ---------------------------------------------------------------------------
+
+/**
+ * 文风档案：会话从冻结来源为本工作目录的诠释者整理的 Markdown（一个工作目录只有一位诠释者，
+ * 所以只有一份）。写论点映射与润色时都读它；增量运行沿用，新书带来新术语时追加。
+ * 没有 schema 标识、不进入任何哈希，也不发表。按下列顺序各写一个 `## 标题` 小节，写法见技能
+ * source-to-concepts 的 references/style-profile.md。档案只供借用术语与论证次序，不是仿写的范本（ADR-0009）。
+ */
+export const STYLE_PROFILE_SECTIONS = [
+  /** 关键术语：译本译名、原文、出现的段落 ID；同一原词的不同译法与本书取哪一个 */
+  "术语与译名",
+  /** 诠释者展开论证的次序与惯用步骤（如先立直接规定、再揭示其矛盾、再过渡），各附段落 ID */
+  "论证次序",
+  /** 原文里标示推理关系的连接与转折（因此、但是、这就是说……），写解读时可借用的那几个 */
+  "推理与转折",
+  /** 本诠释者特有的仿写风险：哪些句式、腔调一借就像原文，写解读时避开 */
+  "仿写风险",
+] as const;
+
+// ---------------------------------------------------------------------------
 // 4. 组装（assemble，#109）：perspectives/<key>/perspective.md + assembled.json
 // ---------------------------------------------------------------------------
 
@@ -437,7 +458,19 @@ export type ValidationRule =
   | "quotation"
   | "pseudo-interpreter"
   | "locked-block"
+  | "exposition.verbatim-source"
   | "unconfirmed";
+
+/** 不阻断的提示类规则：不计入 ok，不能也不必放行；submit 原样列入提交说明。 */
+export type ValidationHintRule = "style.ai-pattern";
+
+/** 提示：中文 AI 腔清单（style-patterns.ts）的命中，供润色与受理参考。 */
+export interface ValidationHint {
+  rule: ValidationHintRule;
+  message: string;
+  /** 所在论点；一句话核心为 null */
+  claimId: ClaimId | null;
+}
 
 export interface ValidationFinding {
   rule: ValidationRule;
@@ -462,6 +495,8 @@ export interface ValidationReport {
   ok: boolean;
   findings: ValidationFinding[];
   overridden: LimitOverride[];
+  /** validation@2 新增：不阻断的提示，不影响 ok */
+  hints: ValidationHint[];
 }
 
 // ---------------------------------------------------------------------------
@@ -548,7 +583,7 @@ export const SCHEMAS = {
   claimMap: "phosky.book-pipeline/claim-map@1",
   assembled: "phosky.book-pipeline/assembled@1",
   review: "phosky.book-pipeline/review@1",
-  validation: "phosky.book-pipeline/validation@1",
+  validation: "phosky.book-pipeline/validation@2",
   incrementalBase: "phosky.book-pipeline/incremental-base@1",
   locks: "phosky.book-pipeline/locks@1",
   submitPlan: "phosky.book-pipeline/submit-plan@1",

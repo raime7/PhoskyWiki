@@ -31,6 +31,8 @@ export function workdirLayout(root: string) {
     return {
       dir,
       claimMap: join(dir, "claim-map.json"),
+      /** 润色前的论点映射副本（润色子代理先存这一份，供会话比对润色只改了文字） */
+      claimMapPrePolish: join(dir, "claim-map.pre-polish.json"),
       markdown: join(dir, "perspective.md"),
       assembled: join(dir, "assembled.json"),
       review: join(dir, "review.json"),
@@ -50,6 +52,11 @@ export function workdirLayout(root: string) {
       siteExport: join(base, "candidates", "site-terms.json"),
       list: join(base, "candidates", "candidates.json"),
       confirmation: join(base, "candidates", "confirmation.json"),
+    },
+    style: {
+      dir: join(base, "style"),
+      /** 文风档案（会话环节，Markdown；小节见 types.ts 的 STYLE_PROFILE_SECTIONS） */
+      profile: join(base, "style", "profile.md"),
     },
     perspective,
     submit: {

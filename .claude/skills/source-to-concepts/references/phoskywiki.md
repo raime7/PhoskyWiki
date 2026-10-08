@@ -28,7 +28,7 @@ pnpm book-pipeline submit --workdir <dir> --origin <站点> --reconcile <opKey>=
 - `--origin` 缺省是 `http://localhost:3000`，提交到其他站点时必须显式给出。
 - 门禁：每个概念须已确认、校验通过（或已放行）、审稿报告与当前稿一致且无 blocker，否则整条命令拒绝、不写任何文件。
 - 两阶段：`--send` 先发新诠释者和新词条（`new_interpreter:…`、`new_term:…`），它们进入审核队列。管理员受理后，用 `--reconcile <opKey>=<pageId>` 把站上生成的页面 ID 记入账本，再 `--send` 发出依赖它们的视角。这一步只用 `--reconcile`：刷新 `site-terms.json` 后重跑 `candidates` 会改变清单，使确认失效。
-- 新词条的简介取候选的 `termSummary`；提交说明由程序从 `review.json` 和 `validation.json` 生成，审核者在审核页能看到。
+- 新词条的简介取候选的 `termSummary`；提交说明由程序从 `review.json` 和 `validation.json` 生成（含不阻断的文风提示），审核者在审核页能看到。
 - `submit/ledger.jsonl` 是只追加的写入账本，只经命令写入。`LEDGER_AMBIGUOUS`（发出后结果未知）时先到站上查实际结果，存在则 `--reconcile`，再继续；已提交的内容改动后要重发，用 `--resubmit <opKey>`。
 - 站点写入限额是每个账号每分钟 60 次，`--rate` 缺省即 60，只往低调。
 
