@@ -19,6 +19,8 @@
     "backup": "node scripts/backup.mjs",
     "test:backups": "node scripts/test-backups.mjs",
     "test:ops": "node --test scripts/backup-retention.test.mjs scripts/monitor.test.mjs",
+    "test:pipeline": "node --test \"scripts/book-pipeline/*.test.mjs\"",
+    "book-pipeline": "node --conditions=react-server --import tsx scripts/book-pipeline/cli.ts",
     "search:reindex": "node --conditions react-server --import tsx scripts/reindex-search.ts",
     "content:consolidate": "node --conditions react-server --import tsx scripts/consolidate-mvp.ts",
     "links:reconcile": "node --conditions react-server --import tsx scripts/reconcile-links.ts"

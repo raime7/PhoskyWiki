@@ -1,2 +1,5 @@
 deploy/phoskywiki-release text eol=lf
 drizzle/*.sql text eol=lf
+scripts/book-pipeline/fixtures/*.epub binary
+scripts/book-pipeline/fixtures/*.txt text eol=lf
+scripts/book-pipeline/fixtures/*.md text eol=lf
