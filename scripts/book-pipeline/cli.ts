@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 import { assemble } from "./assemble";
+import { validate } from "./validate";
 import { writeCandidateList, writeConfirmation } from "./candidates";
 import { DEFAULT_RULES, detectFormat, freezeBook, writeFrozenSource } from "./freeze";
 import type { FreezeRules } from "./types";
@@ -25,13 +26,15 @@ const USAGE = `用法：book-pipeline <command> [options]
   assemble --workdir <dir> [--key <key> ...]     按模板把已确认概念的 claim-map.json 组装为 perspective.md 与 assembled.json
                                                  （缺省 = 全部已确认且已有论点映射的概念；清单未确认即拒绝）
 
+  validate --workdir <dir> [--key <key> ...]     确定性校验已组装的视角，写 perspectives/<key>/validation.json
+                                                 （有未放行的发现项时退出码 1，报告照常写出）
+
   后续命令（尚未实现）：
-  validate (#110)   incremental (#111)   submit (#112)
+  incremental (#111)   submit (#112)
 
 工作目录布局见 scripts/book-pipeline/README.md。`;
 
 const PENDING: Record<string, string> = {
-  validate: "#110",
   incremental: "#111",
   submit: "#112",
 };
@@ -122,6 +125,16 @@ function assembleCommand(args: string[]): void {
   for (const result of assemble(values.workdir, values.key ?? [])) console.log(JSON.stringify(result));
 }
 
+function validateCommand(args: string[]): boolean {
+  const { values } = parseArgs({ args, options: { workdir: { type: "string" }, key: { type: "string", multiple: true } } });
+  if (!values.workdir) throw new UsageError("--workdir is required");
+  const results = validate(values.workdir, values.key ?? []);
+  for (const result of results) console.log(JSON.stringify(result));
+  const failed = results.filter((r) => !r.ok).map((r) => r.key);
+  if (failed.length) console.error(`VALIDATION_FAILED: ${failed.join(", ")} (see perspectives/<key>/validation.json)`);
+  return failed.length === 0;
+}
+
 function main(argv: string[]): number {
   const [command, ...rest] = argv;
   try {
@@ -145,6 +158,7 @@ function main(argv: string[]): number {
       assembleCommand(rest);
       return 0;
     }
+    if (command === "validate") return validateCommand(rest) ? 0 : 1;
     if (command === "rules") {
       console.log(JSON.stringify(DEFAULT_RULES, null, 2));
       return 0;

@@ -256,7 +256,7 @@ test("--toc lists landmarks without writing, and later commands are explicit stu
   assert.equal(toc.status, 0, toc.stderr);
   assert.match(toc.stdout, /d02\.h2 {2}A．质/);
   assert.match(toc.stdout, /d02\.h4 {2}§2/);
-  for (const command of ["validate", "incremental", "submit"]) {
+  for (const command of ["incremental", "submit"]) {
     const run = pipeline(command);
     assert.equal(run.status, 2, command);
     assert.match(run.stderr, /NOT_IMPLEMENTED/);

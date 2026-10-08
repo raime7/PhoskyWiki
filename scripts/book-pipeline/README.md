@@ -75,3 +75,24 @@ pnpm book-pipeline assemble --workdir <dir> [--key <key> ...]   # 缺省 = 全�
 - 摘录只能引用范围内段落（`inRange`），引用对象只许 `{ paragraph, from, to }` 三个字段；引文 ASCII 标点全部转义，强调两侧加 `<!-- -->`，自检用站点渲染管线核对可见文字与强调。
 - `mode` 由候选清单的 `existingPerspective` 决定：已有视角即 `edit`，`baseRevisionId` 取其 `headRevisionId`。
 - 错误码：`UNCONFIRMED`、`MISSING_INPUT`、`ASSEMBLE_CLAIM_MAP`、`ASSEMBLE_EXCERPT`、`ASSEMBLE_PSEUDO_INTERPRETER`、`ASSEMBLE_SOURCE_TAMPERED`、`ASSEMBLE_SELF_CHECK`、`ASSEMBLE_NOTHING`。
+
+## 校验（#110）
+
+```bash
+pnpm book-pipeline validate --workdir <dir> [--key <key> ...]   # 缺省 = 全部已确认且已组装的概念
+```
+
+- 先过确认闸门；每个概念写 `perspectives/<key>/validation.json`（`ValidationReport`，不含时间戳，重跑逐字节一致）。有未放行的发现项时仍写报告，然后以退出码 1 结束（`VALIDATION_FAILED: <keys>`）。显式 `--key` 且清单未确认时，不中止，而是报告 `unconfirmed` 发现项。
+- `findings[].severity`：`limit` = 硬上限，可放行；`error` = 不可放行。`ok` 为真当且仅当放行后没有剩余发现项。被放行的项不在 `findings` 里，而在 `overridden`（原样回显 `LimitOverride`）里列出。`claimId` 对应 `claim-map.json` 的论点 ID（没有论点映射时为 `claim-<序号>`），与整篇有关的项为 null。
+- 硬上限（`validate.ts` 的 `LIMITS`，按不含空白的字符数计）：论点 ≤ 5；每论点摘录 ≤ 3；单段摘录的可见引文 ≤ 200 字（不含“……”）；一句话核心加全部论点解读的可见文字 ≤ 1500 字（`limit.exposition-length`，整篇一项，`claimId` 为 null）。
+- 放行：`perspectives/<key>/overrides.json` 是 `LimitOverride[]`。只接受 `limit.*` 规则；`rule` 与 `claimId` 须与发现项完全一致（整篇项用 null）；`reason`、`approvedBy` 必填。格式不对即 `OVERRIDES_INVALID`，不静默忽略。
+- 双链：用站点的 `wiki-links.ts` 解析、`markdown.ts` 渲染。目标须是 `site-terms.json` 中未删除的词条（含别名）或本批已确认候选（规范名与别名）。`[[词条|视角@诠释者]]` 的诠释者须是站上诠释者或本工作目录的诠释者，且该视角存在于站上（或属于本批）。`wikilink.reserved-at`：词条名含 `@`、`@` 前无显示文字、`@` 后无诠释者、显示文字中含第二个 `@`。
+- 引文逐字回查：`assembled.json` 的 `markdownSha256` 与当前稿一致时，按其记录的摘录引用从冻结段落重新取引文，与站点渲染出的可见文字、强调和出处逐项比对。稿子被改过（哈希不一致）时退化为：引文须是某个范围内冻结段落的逐字子串，出处须与该段落相符。
+- 资料覆盖范围：由实际引用推导（与 assemble 同一套文案），「资料覆盖范围」「译本」两个列表须与之完全一致；缺项、多项、文字不同都报 `coverage`。
+- 伪诠释者：工作目录、论点映射、assembled.json 的诠释者名、来源著者、双链里的诠释者名，命中 `isPseudoInterpreter` 即报。
+- 锁定段落：`locks.json`（`LockInfo`，#111 产生；不存在即无锁定）。每个锁定块的 `text` 必须仍作为稿子的某个顶层块逐字存在（位置可以移动）；块的切法与哈希见 `blocks.ts` 的 `topLevelBlocks`，#111 生成锁定信息时须用同一函数。`LockInfo.headRevisionId` 须等于 `assembled.json` 的 `baseRevisionId`（若有）。
+- 错误码：`UNCONFIRMED`（缺省全部概念时）、`MISSING_INPUT`、`OVERRIDES_INVALID`、`VALIDATE_NOTHING`、`ASSEMBLE_SOURCE_TAMPERED`。
+
+### 审稿报告的落盘位置
+
+审稿由会话中全新上下文的子代理执行，不由本命令执行。报告写到 `perspectives/<key>/review.json`（`ReviewReport`），其 `perspectiveSha256` 必须是被审阅的 `perspective.md` 的 sha256。稿子重新组装或被改动后，报告即过期，须重审。`validate` 在每个概念的输出行里给出 `review: {status: missing|stale|current, blockers}`，但不把审稿结果计入 `ok`；提交器（#112）应把当前的审稿报告与 `validation.json` 摘要一并写入提交说明，并拒绝过期的报告。
