@@ -1,5 +1,5 @@
 {
-  "schema": "phosky.book-pipeline/site-export@1",
+  "schema": "phosky.book-pipeline/site-export@2",
   "exportedAt": "2026-10-01T00:00:00.000Z",
   "origin": "https://wiki.example.test",
   "terms": [
@@ -15,5 +15,6 @@
   "perspectives": [
     { "pageId": 30, "termId": 10, "interpreterId": 20, "headRevisionId": 300, "deleted": false },
     { "pageId": 31, "termId": 11, "interpreterId": 21, "headRevisionId": 310, "deleted": false }
-  ]
+  ],
+  "deletedTermTitles": null
 }

@@ -26,6 +26,7 @@ import {
   type WorkdirManifest,
 } from "./types";
 import { fail } from "./errors";
+import { loginPipelineAccount, siteHttp } from "./site-session";
 
 /** 与站点 SUBMISSION_NOTE_MAX_LENGTH（src/lib/review-types.ts）一致；脚本不引入站点模块，故复制，另留余量。 */
 export const NOTE_MAX_LENGTH = 20000;
@@ -209,6 +210,10 @@ export function buildPlan(workdir: string, options: { keys?: ConceptKey[]; origi
       termId = resolvedId(termOp);
       if (termId === null) {
         const termSummary = entry.termSummary?.trim();
+        // 防御：站点的词条标题唯一索引也覆盖软删除词条，同名新建必被拒绝
+        if (site?.deletedTermTitles?.includes(entry.canonicalName)) {
+          fail("SUBMIT_DELETED_TERM", `${key}: new term "${entry.canonicalName}" has the same title as a deleted term; restore that term on the site first, then rerun export-site and candidates`);
+        }
         if (!termSummary) fail("SUBMIT_TERM_SUMMARY", `${key}: new term "${entry.canonicalName}" has no termSummary in candidates.json; add it to the session candidates and rerun candidates`);
         termOps.push({
           opKey: termOp,
@@ -355,30 +360,13 @@ export async function submit(options: SubmitOptions): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// HTTP（薄层）：登录 → 逐个 POST /api/submissions → 写账本。不在测试范围内。
+// HTTP（薄层，登录见 site-session.ts）：登录 → 逐个 POST /api/submissions → 写账本。不在测试范围内。
 // ---------------------------------------------------------------------------
 
-async function http(origin: string, cookie: string, path: string, body?: unknown): Promise<Response> {
-  return fetch(origin + path, {
-    method: body === undefined ? "GET" : "POST",
-    redirect: "error",
-    headers: { "Content-Type": "application/json", Origin: origin, ...(cookie ? { Cookie: cookie } : {}) },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    signal: AbortSignal.timeout(60000),
-  });
-}
-
 async function send(options: SubmitOptions, plan: SubmitPlan, origin: string, log: (line: string) => void): Promise<void> {
-  const env = options.env ?? process.env;
-  const email = env.BOOK_PIPELINE_EMAIL;
-  const password = env.BOOK_PIPELINE_PASSWORD;
-  if (!email || !password) fail("SUBMIT_CREDENTIALS", "set BOOK_PIPELINE_EMAIL and BOOK_PIPELINE_PASSWORD (the AI editor account)");
-  const login = await http(origin, "", "/api/auth/sign-in/email", { email, password });
-  if (!login.ok) fail("SUBMIT_LOGIN", `login failed: HTTP ${login.status}`);
-  const cookie = login.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
-  const session = (await (await http(origin, cookie, "/api/auth/get-session")).json()) as { user?: { role?: string } } | null;
+  const { cookie, role } = await loginPipelineAccount(origin, options.env ?? process.env);
   // 管理员提交会直接生效而绕过审核；AI 编者必须是 editor。
-  if (session?.user?.role !== "editor") fail("SUBMIT_ROLE", `account role is "${session?.user?.role}"; the AI account must be an editor`);
+  if (role !== "editor") fail("SUBMIT_ROLE", `account role is "${role}"; the AI account must be an editor`);
 
   const interval = Math.ceil(60000 / Math.max(1, options.rate ?? 60));
   let last = 0;
@@ -403,7 +391,7 @@ async function send(options: SubmitOptions, plan: SubmitPlan, origin: string, lo
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     last = Date.now();
     appendLedger(options.workdir, { opKey: op.opKey, event: "intent", contentSha256: op.contentSha256, httpStatus: null, submissionId: null, pageId: null, message: null });
-    const response = await http(origin, cookie, "/api/submissions", request);
+    const response = await siteHttp(origin, cookie, "/api/submissions", request);
     const result = (await response.json().catch(() => ({}))) as { submissionId?: number; pageId?: number; error?: string };
     if (!response.ok) {
       appendLedger(options.workdir, { opKey: op.opKey, event: "failed", contentSha256: op.contentSha256, httpStatus: response.status, submissionId: null, pageId: null, message: result.error ?? null });

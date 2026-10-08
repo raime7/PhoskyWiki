@@ -102,6 +102,18 @@ test("dry run lists phase 1 (interpreter, term) before phase 2 and an edit carri
     assert.equal(existsSync(join(wd, "submit", "ledger.jsonl")), false, "dry run never touches the ledger");
   }));
 
+test("submit refuses a new term whose title is a deleted term's title", () =>
+  withWorkdir((wd) => {
+    const site = (deletedTermTitles) =>
+      writeFileSync(join(wd, "candidates", "site-terms.json"), JSON.stringify({ schema: "phosky.book-pipeline/site-export@2", exportedAt: "x", origin: "https://wiki.example.test", terms: [], interpreters: [], perspectives: [], deletedTermTitles }));
+    site(null);
+    assert.equal(requests(dry(wd)).length, 4);
+    site(["开端"]);
+    const run = pipeline("submit", "--workdir", wd);
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /^SUBMIT_DELETED_TERM: kaiduan: new term "开端"/);
+  }));
+
 test("an edit uses base.json head when present and refuses a draft built on another revision", () =>
   withWorkdir((wd) => {
     const base = (revisionId) =>

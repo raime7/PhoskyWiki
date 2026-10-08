@@ -1,10 +1,11 @@
 // 站点目录（只读）：全部在线词条（含别名）、诠释者与视角（含 head 修订 id）。
 // 供书籍流水线的 export-site 生成 site-terms.json（scripts/book-pipeline/export-site.ts）；
-// 只含游客本就能看到的信息，软删除页面及其子视角不出现（page-visibility.ts）。
+// 默认只含游客本就能看到的信息，软删除页面及其子视角不出现（page-visibility.ts）；
+// 编者以上登录时另给软删除词条的标题（deletedTermTitles），供同名检查。
 
 import "server-only";
 
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { interpreters, pages, perspectives, revisions, terms } from "@/db/schema";
@@ -15,9 +16,11 @@ export interface SiteCatalog {
   interpreters: { pageId: number; title: string; slug: string }[];
   /** headRevisionId 与编辑的 base 修订同一取法：该页最大的修订 id */
   perspectives: { pageId: number; termId: number; interpreterId: number; headRevisionId: number }[];
+  /** 仅编者以上登录时给出：已软删除词条的标题（词条标题唯一索引也覆盖它们）；只有标题 */
+  deletedTermTitles?: string[];
 }
 
-export async function getSiteCatalog(): Promise<SiteCatalog> {
+export async function getSiteCatalog(options: { includeDeletedTermTitles?: boolean } = {}): Promise<SiteCatalog> {
   const db = getDb();
   // 每页最大修订 id；内连接同时去掉没有修订（无法作为编辑 base）的视角
   const heads = db.select({ pageId: revisions.pageId, headRevisionId: sql<number>`max(${revisions.id})`.mapWith(Number).as("head_revision_id") })
@@ -33,5 +36,11 @@ export async function getSiteCatalog(): Promise<SiteCatalog> {
       .from(perspectives).innerJoin(heads, eq(heads.pageId, perspectives.pageId))
       .where(isPageVisible(perspectives.pageId)).orderBy(asc(perspectives.pageId)),
   ]);
-  return { terms: termRows, interpreters: interpreterRows, perspectives: perspectiveRows };
+  const catalog: SiteCatalog = { terms: termRows, interpreters: interpreterRows, perspectives: perspectiveRows };
+  if (options.includeDeletedTermTitles) {
+    const deleted = await db.select({ title: pages.title }).from(pages)
+      .where(and(eq(pages.type, "term"), isNotNull(pages.deletedAt))).orderBy(asc(pages.title));
+    catalog.deletedTermTitles = deleted.map((row) => row.title);
+  }
+  return catalog;
 }

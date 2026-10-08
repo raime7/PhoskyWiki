@@ -1,5 +1,5 @@
 {
-  "schema": "phosky.book-pipeline/candidate-list@2",
+  "schema": "phosky.book-pipeline/candidate-list@3",
   "interpreter": "范例思",
   "inputs": {
     "sessionCandidates": "0000000000000000000000000000000000000000000000000000000000000001",
@@ -46,5 +46,6 @@
       "admission": ["claims>=2"]
     }
   ],
-  "excluded": []
+  "excluded": [],
+  "blocked": []
 }

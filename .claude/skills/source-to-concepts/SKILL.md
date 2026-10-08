@@ -49,7 +49,7 @@ pnpm book-pipeline candidates --workdir <dir>
 
 ### 4. 站长确认
 
-把 `candidates/candidates.json` 整理成表交给站长：规范名、别名、命中的已有词条与视角、论点数、依据段落；`excluded` 连同原因一并列出。等站长回复要哪些，再用站长的名字确认：
+把 `candidates/candidates.json` 整理成表交给站长：规范名、别名、命中的已有词条与视角、论点数、依据段落；`excluded` 与 `blocked`（与已删除词条同名，需站长先在站上恢复该词条）连同原因一并列出。等站长回复要哪些，再用站长的名字确认：
 
 ```bash
 pnpm book-pipeline confirm --workdir <dir> --by <站长名> --keys a,b   # 或 --all

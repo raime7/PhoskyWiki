@@ -126,7 +126,7 @@ function candidates(args: string[]): void {
   if (!values.workdir) throw new UsageError("--workdir is required");
   const { list, changed, confirmationInvalidated } = writeCandidateList(values.workdir);
   console.log(
-    JSON.stringify({ status: changed ? "written" : "unchanged", entries: list.entries.length, excluded: list.excluded.length, confirmationInvalidated }),
+    JSON.stringify({ status: changed ? "written" : "unchanged", entries: list.entries.length, excluded: list.excluded.length, blocked: list.blocked.length, confirmationInvalidated }),
   );
 }
 

@@ -1,5 +1,7 @@
-// 站点导出（export-site）：经站点的公开只读接口（游客权限，不登录、不写站点）取得流水线需要的站上现状。
+// 站点导出（export-site）：经站点的只读接口取得流水线需要的站上现状；唯一的副作用是登录，不写站点。
 // - 缺省：GET /api/site-catalog → candidates/site-terms.json（SiteExport，只含在线页面）。
+//   设了 BOOK_PIPELINE_EMAIL / BOOK_PIPELINE_PASSWORD 时先登录，目录会多给已删除词条的标题（deletedTermTitles），
+//   用于 candidates 的同名检查；否则跳过该检查并 WARN。
 // - --key：按候选清单里的已有视角，GET /api/pages/<id>/history → perspectives/<key>/base.json
 //   （IncrementalBase：head = 最大修订 id；上一次 AI 修订 = --ai-user 账号产生的最大修订 id），供 incremental 沿用。
 // HTTP 只是下面的薄层；把接口载荷整理成工作目录产物的逻辑是纯函数，测试用夹具覆盖。
@@ -9,6 +11,7 @@ import { existsSync } from "node:fs";
 import type { SiteCatalog } from "@/lib/site-catalog";
 
 import { fail } from "./errors";
+import { hasPipelineCredentials, loginPipelineAccount } from "./site-session";
 import { SCHEMAS, type CandidateList, type ConceptKey, type IncrementalBase, type PageId, type SiteExport } from "./types";
 import { fileEquals, jsonText, readJson, workdirLayout, writeText } from "./workdir";
 
@@ -45,6 +48,11 @@ export function siteExportFromCatalog(payload: unknown, meta: { origin: string; 
         : bad("perspectives", p),
     ),
   };
+  // deletedTermTitles 只在登录后出现；缺省记为 null（未做同名检查）
+  const deleted = body.deletedTermTitles;
+  if (deleted !== undefined && (!Array.isArray(deleted) || !deleted.every(isText))) {
+    fail("EXPORT_SITE_PAYLOAD", `${what}: "deletedTermTitles" must be an array of strings`);
+  }
   return {
     schema: SCHEMAS.siteExport,
     exportedAt: meta.exportedAt,
@@ -52,6 +60,7 @@ export function siteExportFromCatalog(payload: unknown, meta: { origin: string; 
     terms: byId(catalog.terms.map((t) => ({ ...t, deleted: false }))),
     interpreters: byId(catalog.interpreters.map((i) => ({ ...i, deleted: false }))),
     perspectives: byId(catalog.perspectives.map((p) => ({ ...p, deleted: false }))),
+    deletedTermTitles: deleted === undefined ? null : [...new Set(deleted as string[])].sort(),
   };
 }
 
@@ -90,11 +99,11 @@ export function incrementalBaseFromHistory(payload: unknown, options: { pageId: 
 
 export type FetchJson = (url: string) => Promise<unknown>;
 
-/** 薄 HTTP 层：游客 GET，不带 Cookie，不跟随重定向。 */
-const fetchJson: FetchJson = async (url) => {
+/** 薄 HTTP 层：GET，登录后带 Cookie（可为空），不跟随重定向。 */
+const fetchJson = (cookie: string): FetchJson => async (url) => {
   let response: Response;
   try {
-    response = await fetch(url, { redirect: "error", headers: { Accept: "application/json" }, signal: AbortSignal.timeout(60000) });
+    response = await fetch(url, { redirect: "error", headers: { Accept: "application/json", ...(cookie ? { Cookie: cookie } : {}) }, signal: AbortSignal.timeout(60000) });
   } catch (error) {
     fail("EXPORT_SITE_HTTP", `GET ${url}: ${(error as Error).message}`);
   }
@@ -113,7 +122,10 @@ export interface ExportSiteOptions {
   keys?: ConceptKey[];
   /** AI 编者账号的用户 id（修订历史的 createdBy），导出视角时必填 */
   aiUser?: string;
+  /** 注入后不登录（测试用）；缺省按环境变量登录 */
   fetch?: FetchJson;
+  env?: NodeJS.ProcessEnv;
+  warn?: (message: string) => void;
   now?: Date;
 }
 
@@ -124,15 +136,25 @@ export type ExportSiteResult =
 export async function exportSite(options: ExportSiteOptions): Promise<ExportSiteResult[]> {
   const origin = options.origin.replace(/\/+$/, "");
   if (!/^https?:\/\/[^/]+$/.test(origin)) fail("EXPORT_SITE_ORIGIN", `--origin must be a site origin such as https://wiki.example.org, got "${options.origin}"`);
-  const get = options.fetch ?? fetchJson;
+  const env = options.env ?? process.env;
+  const warn = options.warn ?? ((m: string) => console.error(m));
   const layout = workdirLayout(options.workdir);
 
+  let get = options.fetch;
   if (!options.keys?.length) {
+    // 登录是唯一的副作用；任何登录角色都能看到 deletedTermTitles
+    get ??= fetchJson(hasPipelineCredentials(env) ? (await loginPipelineAccount(origin, env)).cookie : "");
     const site = siteExportFromCatalog(await get(`${origin}/api/site-catalog`), { origin, exportedAt: (options.now ?? new Date()).toISOString() });
+    if (site.deletedTermTitles === null) {
+      warn(hasPipelineCredentials(env)
+        ? "WARN: the site did not return deletedTermTitles (is the account logged in?); the deleted-term collision check is skipped"
+        : "WARN: BOOK_PIPELINE_EMAIL / BOOK_PIPELINE_PASSWORD are not set; the deleted-term collision check is skipped");
+    }
     writeText(layout.candidates.siteExport, jsonText(site));
     return [{ file: "site-terms.json", status: "written", terms: site.terms.length, interpreters: site.interpreters.length, perspectives: site.perspectives.length }];
   }
 
+  get ??= fetchJson("");
   if (!options.aiUser?.trim()) fail("EXPORT_SITE_AI_USER", "exporting a perspective needs --ai-user <user id of the AI editor account>");
   if (!existsSync(layout.candidates.list)) fail("MISSING_INPUT", "candidates.json not found; run `candidates` first");
   const candidateList = readJson<CandidateList>(layout.candidates.list);

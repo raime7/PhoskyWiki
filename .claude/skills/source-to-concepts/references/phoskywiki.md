@@ -11,7 +11,7 @@ pnpm book-pipeline export-site --workdir <dir> --origin <站点>                
 pnpm book-pipeline export-site --workdir <dir> --origin <站点> --key <key> … --ai-user <用户 id>   # 已有视角 → base.json（增量用）
 ```
 
-`site-terms.json` 是 `types.ts` 的 `SiteExport`，取自 `/api/site-catalog`：在线的词条（含别名）、诠释者和视角（含 head 修订）。软删除的页面游客看不到，导出里也就没有；候选与已删除词条同名时，站点会拒绝新建同名词条，这时请站长决定是否恢复原词条。
+`site-terms.json` 是 `types.ts` 的 `SiteExport`，取自 `/api/site-catalog`：在线的词条（含别名）、诠释者和视角（含 head 修订）。软删除的页面不在其中。站点的词条标题唯一索引连软删除的词条也算，所以新建同名词条会被拒绝：导出时设好 `BOOK_PIPELINE_EMAIL` / `BOOK_PIPELINE_PASSWORD`（AI 编者账号，同提交），`export-site` 会登录并把已删除词条的标题写进 `deletedTermTitles`；`candidates` 把同名的新词条列入 `blocked`（不能确认），`submit` 也会拒绝。出现 `blocked` 时请站长决定是否在站上恢复原词条，恢复后重新 `export-site` 与 `candidates`。没设凭据时导出会打印 `WARN`，这项检查被跳过，需要自行留意同名风险。
 
 导出后顺便核对现状：该诠释者是否已有页面，有无同名或别名冲突的词条，站上的诠释者是否都是真实思想家（“编委会”之类的伪诠释者视角已由迁移 0019 删除）。发现异常先报告站长。
 
