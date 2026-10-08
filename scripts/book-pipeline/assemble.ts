@@ -6,9 +6,8 @@
 
 import { existsSync, readFileSync } from "node:fs";
 
-import { markdownParser } from "@/lib/markdown-ast";
-
 import { requireConfirmed } from "./candidates";
+import { checkClaimMapCommon, topLevelTypes, validHeading } from "./claim-map";
 import {
   expectedVisibleEmphasis,
   expectedVisibleQuote,
@@ -19,7 +18,6 @@ import {
   TEMPLATE,
 } from "./template";
 import {
-  isPseudoInterpreter,
   SCHEMAS,
   type AssembledExcerpt,
   type AssembledPerspective,
@@ -29,16 +27,14 @@ import {
   type ConceptKey,
   type ExcerptRef,
   type FrozenParagraph,
+  type IncrementalBase,
   type Landmark,
   type SourceCoverage,
   type SourceManifest,
   type WorkdirManifest,
 } from "./types";
 import { fileEquals, jsonText, readJson, readJsonl, sha256, workdirLayout, writeText, type WorkdirLayout } from "./workdir";
-
-function fail(code: string, message: string): never {
-  throw new Error(`${code}: ${message}`);
-}
+import { fail } from "./errors";
 
 export interface LoadedSource {
   manifest: SourceManifest;
@@ -109,46 +105,15 @@ export function translationLabel(manifest: SourceManifest): string {
   return `《${manifest.work.title}》：${parts.filter(Boolean).join("，")}`;
 }
 
-export function topLevelTypes(markdown: string): string[] {
-  const tree = markdownParser().parse(markdown) as { children?: { type: string }[] };
-  return (tree.children ?? []).map((node) => node.type);
-}
-
-const REF_KEYS = ["from", "paragraph", "to"].join();
-
-/** 论点映射的形状与身份检查；摘录引用只许三个字段，杜绝夹带引文文字。 */
+/** 新建（或 --rewrite 整篇重写）的论点映射：在共用规则之上，核心是一句话，每个论点都有完整标题与解读。 */
 function checkClaimMap(map: ClaimMap, key: ConceptKey, entry: CandidateEntry, interpreter: string): void {
-  const bad = (message: string) => fail("ASSEMBLE_CLAIM_MAP", `${key}: ${message}`);
-  if (map.schema !== SCHEMAS.claimMap) bad(`schema must be ${SCHEMAS.claimMap}`);
-  if (map.conceptKey !== key) bad(`conceptKey is "${map.conceptKey}"`);
-  if (isPseudoInterpreter(map.interpreter ?? "")) fail("ASSEMBLE_PSEUDO_INTERPRETER", `${key}: "${map.interpreter}" is not an interpreter (ADR-0007)`);
-  if (map.interpreter !== interpreter) bad(`interpreter "${map.interpreter}" differs from the workdir interpreter "${interpreter}"`);
-  if (map.term !== entry.canonicalName && map.term !== entry.existingTerm?.title) {
-    bad(`term "${map.term}" is neither the confirmed name "${entry.canonicalName}" nor the matched site term`);
-  }
+  const bad = checkClaimMapCommon(map, { key, entry, interpreter, code: "ASSEMBLE_CLAIM_MAP" });
   if (typeof map.core !== "string" || !map.core.trim() || map.core.includes("\n") || topLevelTypes(map.core).join() !== "paragraph") {
     bad("core must be one non-empty sentence (a single Markdown paragraph)");
   }
-  if (!Array.isArray(map.claims) || map.claims.length === 0) bad("claims must be a non-empty array");
-  const ids = new Set<string>();
   for (const claim of map.claims) {
-    if (!claim.id || ids.has(claim.id)) bad(`claim id "${claim.id}" is missing or duplicated`);
-    ids.add(claim.id);
-    if (!["kept", "extended", "new"].includes(claim.revision)) bad(`${claim.id}: revision must be kept, extended or new`);
-    const heading = `${"#".repeat(TEMPLATE.claimHeadingDepth)} ${claim.heading ?? ""}`;
-    if (!claim.heading?.trim() || claim.heading.includes("\n") || topLevelTypes(heading).join() !== "heading") {
-      bad(`${claim.id}: heading must be a single non-empty line`);
-    }
-    const types = typeof claim.exposition === "string" ? topLevelTypes(claim.exposition) : [];
-    if (!types.length || types.some((t) => t !== "paragraph" && t !== "list")) {
-      bad(`${claim.id}: exposition must be paragraphs or lists only (found ${types.join(", ") || "nothing"})`);
-    }
-    if (!Array.isArray(claim.excerpts)) bad(`${claim.id}: excerpts must be an array`);
-    for (const ref of claim.excerpts) {
-      if (!ref || typeof ref !== "object" || Object.keys(ref).sort().join() !== REF_KEYS) {
-        bad(`${claim.id}: an excerpt ref must be exactly { paragraph, from, to }; quotation text is never written by the session`);
-      }
-    }
+    if (!validHeading(claim.heading)) bad(`${claim.id}: heading must be a single non-empty line`);
+    if (!claim.exposition.trim()) bad(`${claim.id}: exposition must be paragraphs or lists only (found nothing)`);
   }
 }
 
@@ -158,13 +123,24 @@ export interface AssembledOutput {
   assembled: AssembledPerspective;
 }
 
-export function assemblePerspective(workdirPath: string, key: ConceptKey): AssembledOutput {
+/**
+ * 组装一个概念。已有视角（existingPerspective）的概念归 incremental 处理；只有 rewrite 为真
+ * （命令行 --rewrite <key>）时才在这里整篇重写，作为以 head 为 base 的编辑。
+ */
+export function assemblePerspective(workdirPath: string, key: ConceptKey, rewrite = false): AssembledOutput {
   requireConfirmed(workdirPath, key);
   const layout = workdirLayout(workdirPath);
   const paths = layout.perspective(key);
   const listText = readFileSync(layout.candidates.list, "utf8");
   const confirmationText = readFileSync(layout.candidates.confirmation, "utf8");
   const entry = (JSON.parse(listText) as CandidateList).entries.find((e) => e.key === key)!;
+  if (entry.existingPerspective && !rewrite) {
+    fail(
+      "ASSEMBLE_EXISTING_PERSPECTIVE",
+      `${key}: the site already has this perspective (page ${entry.existingPerspective.pageId}); merge new material with \`incremental\`, or pass --rewrite ${key} to replace it wholesale`,
+    );
+  }
+  if (rewrite && !entry.existingPerspective) fail("ASSEMBLE_REWRITE_NEW", `${key}: --rewrite only applies to an existing perspective; this one is new`);
   if (!existsSync(paths.claimMap)) fail("MISSING_INPUT", `perspectives/${key}/claim-map.json not found`);
   const claimMapText = readFileSync(paths.claimMap, "utf8");
   const map = JSON.parse(claimMapText) as ClaimMap;
@@ -217,13 +193,18 @@ export function assemblePerspective(workdirPath: string, key: ConceptKey): Assem
     term: map.term,
     interpreter: map.interpreter,
     mode: entry.existingPerspective ? "edit" : "new",
-    baseRevisionId: entry.existingPerspective?.headRevisionId ?? null,
+    baseRevisionId: entry.existingPerspective ? rewriteBase(paths.base, entry.existingPerspective.headRevisionId) : null,
     inputs: { claimMap: sha256(claimMapText), candidateList: sha256(listText), confirmation: sha256(confirmationText) },
     markdownSha256: sha256(markdown),
     excerpts,
     coverage: derived.coverage,
   };
   return { key, markdown, assembled };
+}
+
+/** 整篇重写的 base：与 submit 的取法一致，优先 incremental / export-site 导出的 base.json 的 head，否则取候选清单的 head。 */
+function rewriteBase(basePath: string, listed: number): number {
+  return existsSync(basePath) ? readJson<IncrementalBase>(basePath).head.revisionId : listed;
 }
 
 /**
@@ -274,22 +255,41 @@ export function selfCheck(
   });
 }
 
-export interface AssembleResult {
-  key: ConceptKey;
-  status: "written" | "unchanged";
-  mode: AssembledPerspective["mode"];
-  excerpts: number;
-  markdownSha256: string;
-}
+export type AssembleResult =
+  | {
+      key: ConceptKey;
+      status: "written" | "unchanged";
+      mode: AssembledPerspective["mode"];
+      excerpts: number;
+      markdownSha256: string;
+    }
+  | { key: ConceptKey; status: "skipped"; reason: string };
 
-/** 组装给定概念（缺省为全部已确认且已有论点映射的概念）；任何一个失败则不写任何文件。 */
-export function assemble(workdirPath: string, keys: ConceptKey[] = []): AssembleResult[] {
+/**
+ * 组装给定概念（缺省为全部已确认且已有论点映射的概念）；任何一个失败则不写任何文件。
+ * 已有视角的概念归 incremental：缺省时跳过（输出 skipped 行），用 --key 点名则拒绝；
+ * rewrite 中的键（--rewrite）才整篇重写，并且一并被选中。
+ */
+export function assemble(workdirPath: string, keys: ConceptKey[] = [], rewrite: ConceptKey[] = []): AssembleResult[] {
   const layout = workdirLayout(workdirPath);
   const confirmed = requireConfirmed(workdirPath);
-  const targets = keys.length ? keys : confirmed.filter((key) => existsSync(layout.perspective(key).claimMap));
-  if (!targets.length) fail("ASSEMBLE_NOTHING", "no confirmed concept has perspectives/<key>/claim-map.json");
-  const outputs = [...new Set(targets)].map((key) => assemblePerspective(workdirPath, key));
-  return outputs.map(({ key, markdown, assembled }) => {
+  const explicit = [...new Set([...keys, ...rewrite])];
+  const skipped: AssembleResult[] = [];
+  let targets = explicit;
+  if (!explicit.length) {
+    const list = readJson<CandidateList>(layout.candidates.list);
+    const existing = new Set(list.entries.filter((e) => e.existingPerspective).map((e) => e.key));
+    const ready = confirmed.filter((key) => existsSync(layout.perspective(key).claimMap));
+    targets = ready.filter((key) => !existing.has(key));
+    for (const key of ready.filter((k) => existing.has(k))) {
+      skipped.push({ key, status: "skipped", reason: `existing perspective: run \`incremental --key ${key}\`, or \`assemble --rewrite ${key}\` to replace it wholesale` });
+    }
+  }
+  if (!targets.length) {
+    fail("ASSEMBLE_NOTHING", skipped.length ? `only existing perspectives have a claim map (${skipped.map((s) => s.key).join(", ")}); use incremental or --rewrite` : "no confirmed concept has perspectives/<key>/claim-map.json");
+  }
+  const outputs = targets.map((key) => assemblePerspective(workdirPath, key, rewrite.includes(key)));
+  const written = outputs.map(({ key, markdown, assembled }): AssembleResult => {
     const paths = layout.perspective(key);
     const json = jsonText(assembled);
     const unchanged = fileEquals(paths.markdown, markdown) && fileEquals(paths.assembled, json);
@@ -305,4 +305,5 @@ export function assemble(workdirPath: string, keys: ConceptKey[] = []): Assemble
       markdownSha256: assembled.markdownSha256,
     };
   });
+  return [...written, ...skipped];
 }

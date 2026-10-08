@@ -2,11 +2,18 @@
 
 导出站点数据、正式提交、提交后核验时读。操作远端前另读 `docs/production.md`（仅本地）。先确认本次面对的是哪个站点和数据库，后面每个命令都用同一个 origin。
 
-## 导出 `site-terms.json`
+## 导出站点现状
 
-流水线不连数据库，`candidates/site-terms.json` 由会话只读导出，形状为 `types.ts` 的 `SiteExport`：全部词条（标题、slug、别名、`deleted`）、诠释者、视角（`termId`、`interpreterId`、`headRevisionId`、`deleted`）。已删除的也要列出并标 `deleted: true`。只用只读查询，不写目标库。
+流水线不连数据库，站上现状经站点的公开只读接口导出（游客权限，不登录）：
 
-导出时顺便核对现状：站上没有“编委会”之类的伪诠释者视角（迁移 0019 已删除），该诠释者是否已有页面，同名或别名冲突的词条。发现异常先报告站长。
+```bash
+pnpm book-pipeline export-site --workdir <dir> --origin <站点>                 # candidates/site-terms.json
+pnpm book-pipeline export-site --workdir <dir> --origin <站点> --key <key> … --ai-user <用户 id>   # 已有视角 → base.json（增量用）
+```
+
+`site-terms.json` 是 `types.ts` 的 `SiteExport`，取自 `/api/site-catalog`：在线的词条（含别名）、诠释者和视角（含 head 修订）。软删除的页面游客看不到，导出里也就没有；候选与已删除词条同名时，站点会拒绝新建同名词条，这时请站长决定是否恢复原词条。
+
+导出后顺便核对现状：该诠释者是否已有页面，有无同名或别名冲突的词条，站上的诠释者是否都是真实思想家（“编委会”之类的伪诠释者视角已由迁移 0019 删除）。发现异常先报告站长。
 
 ## 提交
 
@@ -20,9 +27,9 @@ pnpm book-pipeline submit --workdir <dir> --origin <站点> --reconcile <opKey>=
 
 - `--origin` 缺省是 `http://localhost:3000`，提交到其他站点时必须显式给出。
 - 门禁：每个概念须已确认、校验通过（或已放行）、审稿报告与当前稿一致且无 blocker，否则整条命令拒绝、不写任何文件。
-- 两阶段：`--send` 先发新诠释者和新词条（`new_interpreter:…`、`new_term:…`），它们进入审核队列。管理员受理后，用 `--reconcile <opKey>=<pageId>` 把站上生成的页面 ID 记入账本，再 `--send` 发出依赖它们的视角。不要靠刷新 `site-terms.json` 重跑 `candidates` 来代替：清单一变，确认就失效。
-- 提交说明由程序从 `review.json` 和 `validation.json` 生成，审核者在审核页能看到。
-- `submit/ledger.jsonl` 是只追加的写入账本，不手改。`LEDGER_AMBIGUOUS`（发出后结果未知）时先到站上查实际结果，存在则 `--reconcile`，再继续；已提交的内容改动后要重发，用 `--resubmit <opKey>`。
+- 两阶段：`--send` 先发新诠释者和新词条（`new_interpreter:…`、`new_term:…`），它们进入审核队列。管理员受理后，用 `--reconcile <opKey>=<pageId>` 把站上生成的页面 ID 记入账本，再 `--send` 发出依赖它们的视角。这一步只用 `--reconcile`：刷新 `site-terms.json` 后重跑 `candidates` 会改变清单，使确认失效。
+- 新词条的简介取候选的 `termSummary`；提交说明由程序从 `review.json` 和 `validation.json` 生成，审核者在审核页能看到。
+- `submit/ledger.jsonl` 是只追加的写入账本，只经命令写入。`LEDGER_AMBIGUOUS`（发出后结果未知）时先到站上查实际结果，存在则 `--reconcile`，再继续；已提交的内容改动后要重发，用 `--resubmit <opKey>`。
 - 站点写入限额是每个账号每分钟 60 次，`--rate` 缺省即 60，只往低调。
 
 ## 提交后

@@ -1,5 +1,5 @@
 {
-  "schema": "phosky.book-pipeline/session-candidates@1",
+  "schema": "phosky.book-pipeline/session-candidates@2",
   "interpreter": "范例思",
   "sourceIds": ["sample"],
   "candidates": [
@@ -16,6 +16,7 @@
         { "summary": "尺度的变化会引起质变", "paragraphs": ["sample:t.p2"] }
       ],
       "centralParagraphs": ["sample:t.p1"],
+      "termSummary": null,
       "notes": null
     },
     {
@@ -31,6 +32,7 @@
         { "summary": "直接性本身是被中介的", "paragraphs": ["sample:t.p3"] }
       ],
       "centralParagraphs": [],
+      "termSummary": null,
       "notes": "站上以「直接存在」为题，直接性是其别名"
     },
     {
@@ -46,6 +48,7 @@
         { "summary": "规定性是否定", "paragraphs": ["sample:t.p2"] }
       ],
       "centralParagraphs": [],
+      "termSummary": "规定性：使某物成为其所是、并与他物相区别的特征。",
       "notes": "站上有同名但已删除的词条，不应匹配"
     },
     {
@@ -58,6 +61,7 @@
       "treatment": "dedicated",
       "proposedClaims": [{ "summary": "存在只与自己相关", "paragraphs": ["sample:t.p1"] }],
       "centralParagraphs": ["sample:t.p1"],
+      "termSummary": "自身关系：事物只与自己相关、不经由他物的关系形式。",
       "notes": null
     },
     {
@@ -70,6 +74,7 @@
       "treatment": "mention",
       "proposedClaims": [],
       "centralParagraphs": [],
+      "termSummary": "辩证法：通过矛盾及其扬弃来把握事物运动的思维方法。",
       "notes": "仅顺带提及"
     },
     {
@@ -82,6 +87,7 @@
       "treatment": "dedicated",
       "proposedClaims": [{ "summary": "只有一个论点", "paragraphs": ["sample:t.p2"] }],
       "centralParagraphs": [],
+      "termSummary": "质量：事物的质与量合起来的规定。",
       "notes": null
     }
   ]

@@ -5,12 +5,12 @@ description: 用书籍流水线（pnpm book-pipeline）把诠释者著作的中�
 
 # 从原典生成视角
 
-会话做判断（候选、论点、解读、派出审稿），`pnpm book-pipeline` 做其余一切。视角正文是按**论点**组织的**解读**，每个论点配对 1–3 段**原文摘录**（`CONTEXT.md` 术语；ADR-0009、ADR-0007）。命令与参数以 `pnpm book-pipeline help` 为准；产物布局、错误码和各命令细则在 `scripts/book-pipeline/README.md`；每个会话产物的字段在 `scripts/book-pipeline/types.ts`，照它写，不另造格式。
+会话做判断（候选、论点、解读、派出审稿），`pnpm book-pipeline` 做其余一切。视角正文是按**论点**组织的**解读**，每个论点配对 1–3 段**原文摘录**（`CONTEXT.md` 术语；ADR-0009、ADR-0007）。命令与参数以 `pnpm book-pipeline help` 为准；产物布局、错误码和各命令细则在 `scripts/book-pipeline/README.md`；每个会话产物的字段在 `scripts/book-pipeline/types.ts`，照它写。
 
 ## 不变的约束
 
 - **引文只给位置。** 摘录一律写成 `{ "paragraph", "from", "to" }`（段落 ID + 起止句号），引文文字由程序从冻结来源回填。
-- **诠释者是著作的著者。** 一个工作目录服务一位诠释者；二手研究归研究者本人的工作目录。AI 只是编者：诠释者署名和双链的 `@诠释者` 只用真实思想家，“编委会”“编者”“AI”之类一律不作诠释者（`types.ts` 的 `isPseudoInterpreter` 会拒绝）。
+- **诠释者是著作的著者。** 一个工作目录服务一位诠释者；二手研究归研究者本人的工作目录。AI 只是编者：诠释者署名和双链的 `@诠释者` 只用真实思想家（`types.ts` 的 `isPseudoInterpreter` 会拒绝“编委会”“编者”“AI”之类）。
 - **站长是闸门。** 候选清单的确认、超限放行、正式提交，都要站长在对话里明确同意后才执行。
 - **工作目录放在仓库外。** 里面是受版权保护的全文。
 
@@ -27,7 +27,7 @@ pnpm book-pipeline freeze <file> --toc
 pnpm book-pipeline freeze <file> --workdir <dir> --id <sourceId> --title … --author <诠释者> --translator … --edition … --from … --to …
 ```
 
-通读 `sources/<id>/reading.md`，核对章节起止、层次（正文/说明/附释/注）和注释配对。层次或节号切错时，`pnpm book-pipeline rules` 另存一份、修改后用 `--rules` 重冻；下游产物已引用旧 ID 时不要 `--force`。完成条件：范围内每段的层次与节号和原书一致。
+通读 `sources/<id>/reading.md`，核对章节起止、层次（正文/说明/附释/注）和注释配对。层次或节号切错时，`pnpm book-pipeline rules` 另存一份、修改后用 `--rules` 重冻；`--force` 只用在下游产物尚未引用旧 ID 的时候。完成条件：范围内每段的层次与节号和原书一致。
 
 ### 3. 候选
 
@@ -36,14 +36,16 @@ pnpm book-pipeline freeze <file> --workdir <dir> --id <sourceId> --title … --a
 - `treatment`：诠释者**专门论述**的概念标 `dedicated`；顺带提及的标 `mention`，它们只在别的解读里做双链。
 - 准入门槛（程序执行）：`dedicated`，且有效 `proposedClaims` ≥ 2 或 `centralParagraphs` ≥ 1。每个拟定论点写一句 `summary` 和依据段落 ID。
 - 同一概念的译名变体、别名合并为一个候选，记入 `aliases` 与 `mergedFrom`；含义相关但不相同的放进 `related`。拿不准是否相同，就问站长。
+- 站上还没有的词条，写 `termSummary`：一句中性的词条简介，说明这个概念指什么，供新建词条使用（如“定在：有规定的存在，……”）。诠释者怎么理解它属于视角的一句话核心，留给第 5 步。已有词条写 `null`。
 
-再准备 `candidates/site-terms.json`（`SiteExport`：站上全部词条及别名、诠释者、视角及其 head 修订）。流水线没有导出命令，按 [发布与站点](references/phoskywiki.md) 只读导出。然后：
+然后导出站上现状（只读，游客权限）并生成候选清单：
 
 ```bash
+pnpm book-pipeline export-site --workdir <dir> --origin <站点>   # 写 candidates/site-terms.json
 pnpm book-pipeline candidates --workdir <dir>
 ```
 
-`AMBIGUOUS_TERM`、`DUPLICATE_CONCEPT` 回到会话产物里合并或改 `related`，重跑。完成条件：退出码 0。
+`AMBIGUOUS_TERM`、`DUPLICATE_CONCEPT` 回到会话产物里合并或改 `related`，`TERM_SUMMARY_MISSING` 补上 `termSummary`，重跑。完成条件：退出码 0。
 
 ### 4. 站长确认
 
@@ -60,9 +62,11 @@ pnpm book-pipeline confirm --workdir <dir> --by <站长名> --keys a,b   # 或 -
 逐个确认的概念写 `perspectives/<key>/claim-map.json`（`ClaimMap`）。动笔前读 [解读写作规范](references/writing.md)，它规定模板、硬上限、解读怎么写、双链与摘录怎么选。
 
 - 新视角：全部论点 `revision: "new"`，然后 `pnpm book-pipeline assemble --workdir <dir> [--key <key> …]`。
-- 候选清单里有 `existingPerspective` 的概念：读 [增量更新](references/incremental.md)，用 `incremental` 命令并稿。assemble 会把它们整篇重写成新稿、丢掉已受理的措辞，所以工作目录里有这类概念时，assemble 一律用 `--key` 点名新视角。
+- 候选清单里有 `existingPerspective` 的概念：读 [增量更新](references/incremental.md)，用 `incremental` 命令并稿，已受理的措辞因此原样保留。assemble 缺省跳过这类概念（用 `--key` 点名会被拒绝）；整篇重写只用于 head 无法增量的情形，经站长同意后用 `assemble --rewrite <key>`。
 
 ### 6. 校验
+
+先校验、后审稿（#105 列的顺序是审稿在前）：审稿报告绑定稿子的哈希，校验不过就要改稿重组装，先审的报告会随即过期。
 
 ```bash
 pnpm book-pipeline validate --workdir <dir> [--key <key> …]

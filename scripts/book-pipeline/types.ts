@@ -235,10 +235,16 @@ export interface SessionCandidate {
   proposedClaims: ProposedClaim[];
   /** 以该概念为中心的段落 */
   centralParagraphs: ParagraphId[];
+  /**
+   * 词条简介：站上尚无此词条时必填（candidates 校验），用作新建词条的 summary。
+   * 一句中性的词条说明（这个概念指什么），不是本诠释者的观点——那是视角的一句话核心。
+   * 已有词条时不使用，可为 null。
+   */
+  termSummary: string | null;
   notes: string | null;
 }
 
-/** candidates/site-terms.json：站上已有词条、诠释者与视角的导出（只读查询或手工导出）。 */
+/** candidates/site-terms.json：站上已有词条、诠释者与视角的导出（export-site 经站点公开只读接口生成；只含在线页面）。 */
 export interface SiteExport {
   schema: typeof SCHEMAS.siteExport;
   exportedAt: string;
@@ -264,6 +270,8 @@ export interface CandidateEntry {
   related: string[];
   existingTerm: { pageId: PageId; title: string; matchedBy: "title" | "alias" } | null;
   existingPerspective: { pageId: PageId; headRevisionId: RevisionId } | null;
+  /** 新建词条的 summary（会话的 termSummary）；已有词条时为 null */
+  termSummary: string | null;
   proposedClaimCount: number;
   evidenceParagraphs: ParagraphId[];
   admission: AdmissionBasis[];
@@ -446,7 +454,7 @@ export interface ValidationReport {
 // 7. 增量更新（#111）：perspectives/<key>/base.json + locks.json
 // ---------------------------------------------------------------------------
 
-/** 现有视角的导出：当前 head 与上一次 AI 编者账号产生的修订（incremental 由 --head/--last-ai 写入）。 */
+/** 现有视角的导出：当前 head 与上一次 AI 编者账号产生的修订（export-site --key 经修订历史接口写入，或 incremental 由 --head/--last-ai 写入）。 */
 export interface IncrementalBase {
   schema: typeof SCHEMAS.incrementalBase;
   pageId: PageId;
@@ -519,9 +527,9 @@ export interface LedgerEntry {
 export const SCHEMAS = {
   workdir: "phosky.book-pipeline/workdir@1",
   sourceManifest: "phosky.book-pipeline/source-manifest@1",
-  sessionCandidates: "phosky.book-pipeline/session-candidates@1",
+  sessionCandidates: "phosky.book-pipeline/session-candidates@2",
   siteExport: "phosky.book-pipeline/site-export@1",
-  candidateList: "phosky.book-pipeline/candidate-list@1",
+  candidateList: "phosky.book-pipeline/candidate-list@2",
   confirmation: "phosky.book-pipeline/confirmation@1",
   claimMap: "phosky.book-pipeline/claim-map@1",
   assembled: "phosky.book-pipeline/assembled@1",

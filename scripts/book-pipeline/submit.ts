@@ -14,7 +14,6 @@ import {
   type AssembledPerspective,
   type CandidateEntry,
   type CandidateList,
-  type ClaimMap,
   type ConceptKey,
   type LedgerEntry,
   type PageId,
@@ -26,15 +25,12 @@ import {
   type ValidationReport,
   type WorkdirManifest,
 } from "./types";
+import { fail } from "./errors";
 
-/** 与站点 SUBMISSION_NOTE_MAX_LENGTH（src/lib/review.ts）一致；脚本不引入站点模块，故复制，另留余量。 */
+/** 与站点 SUBMISSION_NOTE_MAX_LENGTH（src/lib/review-types.ts）一致；脚本不引入站点模块，故复制，另留余量。 */
 export const NOTE_MAX_LENGTH = 20000;
 const NOTE_BUDGET = 19000;
 const PLACEHOLDER: PageId = 0;
-
-function fail(code: string, message: string): never {
-  throw new Error(`${code}: ${message}`);
-}
 
 // ---------------------------------------------------------------------------
 // 账本
@@ -195,7 +191,6 @@ export function buildPlan(workdir: string, options: { keys?: ConceptKey[]; origi
     const assembled = readJson<AssembledPerspective>(paths.assembled);
     const markdown = readFileSync(paths.markdown, "utf8");
     const { review, validation } = gate(workdir, key, markdown, assembled);
-    const map = readJson<ClaimMap>(paths.claimMap);
     const sources = assembled.coverage.map((c) => `《${c.title}》`);
     const note = buildNote({
       interpreter: manifest.interpreter,
@@ -213,6 +208,8 @@ export function buildPlan(workdir: string, options: { keys?: ConceptKey[]; origi
     if (termId === null) {
       termId = resolvedId(termOp);
       if (termId === null) {
+        const termSummary = entry.termSummary?.trim();
+        if (!termSummary) fail("SUBMIT_TERM_SUMMARY", `${key}: new term "${entry.canonicalName}" has no termSummary in candidates.json; add it to the session candidates and rerun candidates`);
         termOps.push({
           opKey: termOp,
           phase: "entities",
@@ -222,7 +219,7 @@ export function buildPlan(workdir: string, options: { keys?: ConceptKey[]; origi
             kind: "new_term",
             title: entry.canonicalName,
             aliases: entry.aliases,
-            summary: map.core,
+            summary: termSummary,
             note: `书籍流水线（AI 编者）为「${manifest.interpreter}」的视角新建词条。`,
           },
           contentSha256: null,

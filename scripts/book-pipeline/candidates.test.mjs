@@ -55,6 +55,9 @@ test("candidates matches existing terms by title and alias, and excludes sub-thr
     assert.deepEqual(by.chidu.existingTerm, { pageId: 10, title: "尺度", matchedBy: "title" });
     assert.deepEqual(by.chidu.existingPerspective, { pageId: 30, headRevisionId: 300 });
     assert.deepEqual(by.chidu.related, ["质"]);
+    // 新建词条带会话给出的中性词条简介；已有词条不用
+    assert.equal(by.guidingxing.termSummary, "规定性：使某物成为其所是、并与他物相区别的特征。");
+    assert.equal(by.chidu.termSummary, null);
     // 别名命中；已有视角属于别的诠释者，不算本诠释者的视角
     assert.deepEqual(by.zhijiexing.existingTerm, { pageId: 11, title: "直接存在", matchedBy: "alias" });
     assert.equal(by.zhijiexing.existingPerspective, null);
@@ -130,4 +133,7 @@ test("pseudo-interpreters, duplicated concepts, ambiguous matches and unknown pa
   // 一个候选同时命中两个已有词条
   rejects((s) => ({ ...s, candidates: [{ ...s.candidates[0], aliases: ["直接性"] }] }), "AMBIGUOUS_TERM");
   rejects((s) => ({ ...s, candidates: [{ ...s.candidates[3], centralParagraphs: ["sample:t.p99"] }] }), "UNKNOWN_PARAGRAPH");
+  // 站上没有的词条须有中性的一句话简介（新建词条的 summary 不能借用诠释者的一句话核心）
+  rejects((s) => ({ ...s, candidates: [{ ...s.candidates[3], termSummary: null }] }), "TERM_SUMMARY_MISSING");
+  rejects((s) => ({ ...s, candidates: [{ ...s.candidates[3], termSummary: "  " }] }), "TERM_SUMMARY_MISSING");
 });

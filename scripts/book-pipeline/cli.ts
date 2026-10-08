@@ -8,6 +8,7 @@ import { parseArgs } from "node:util";
 import { assemble } from "./assemble";
 import { validate } from "./validate";
 import { writeCandidateList, writeConfirmation } from "./candidates";
+import { exportSite } from "./export-site";
 import { DEFAULT_RULES, detectFormat, freezeBook, writeFrozenSource } from "./freeze";
 import { incremental, type RevisionExport } from "./incremental";
 import { submit } from "./submit";
@@ -23,10 +24,15 @@ const USAGE = `用法：book-pipeline <command> [options]
   freeze <file> --toc [--rules <rules.json>]     只列出标题与节号（不写文件），用于选择 --from/--to
   rules                                          打印默认冻结规则（可另存为 --rules 起点）
 
+  export-site --workdir <dir> --origin <url>     经站点公开只读接口导出站上词条、诠释者与视角 → candidates/site-terms.json
+  export-site --workdir <dir> --origin <url> --key <key> ... --ai-user <AI 编者用户 id>
+                                                 导出已有视角的 head 与上一次 AI 修订 → perspectives/<key>/base.json（供 incremental）
   candidates --workdir <dir>                     读 candidates/session-candidates.json 与 site-terms.json，生成 candidates.json
   confirm --workdir <dir> --by <站长名> (--all | --keys a,b)   确认候选清单（清单变动后确认即失效）
-  assemble --workdir <dir> [--key <key> ...]     按模板把已确认概念的 claim-map.json 组装为 perspective.md 与 assembled.json
-                                                 （缺省 = 全部已确认且已有论点映射的概念；清单未确认即拒绝）
+  assemble --workdir <dir> [--key <key> ...] [--rewrite <key> ...]
+                                                 按模板把已确认概念的 claim-map.json 组装为 perspective.md 与 assembled.json
+                                                 （缺省 = 全部已确认且已有论点映射的新视角；清单未确认即拒绝）。
+                                                 已有视角归 incremental：缺省跳过，--key 点名即拒绝；--rewrite 才整篇重写为以 head 为 base 的编辑
 
   validate --workdir <dir> [--key <key> ...]     确定性校验已组装的视角，写 perspectives/<key>/validation.json
                                                  （有未放行的发现项时退出码 1，报告照常写出）
@@ -39,9 +45,11 @@ const USAGE = `用法：book-pipeline <command> [options]
 
   incremental --workdir <dir> --key <key>
          [--head <head.md> --head-revision <id> (--last-ai <ai.md> --last-ai-revision <id> | --no-last-ai) [--page <id>]]
+         [--rederive-footer]
                                                  增量更新现有视角：导出的 head 修订写入 base.json，人工改过的块写入 locks.json；
                                                  已有 claim-map.json（增量论点映射）时并入新材料，写出以 head 为 base 的编辑稿
-                                                 （perspective.md + assembled.json），否则输出供会话起草的骨架。省略 --head 则沿用 base.json
+                                                 （perspective.md + assembled.json），否则输出供会话起草的骨架。省略 --head 则沿用 base.json。
+                                                 head 的资料说明被人工改过时拒绝，--rederive-footer 确认按引用重新推导
 
 工作目录布局见 scripts/book-pipeline/README.md。`;
 
@@ -100,6 +108,19 @@ function freeze(args: string[]): void {
   console.log(JSON.stringify({ status: result.status, source: result.manifest.sourceId, dir: result.dir, ...result.manifest.counts }));
 }
 
+async function exportSiteCommand(args: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args,
+    options: { workdir: { type: "string" }, origin: { type: "string" }, key: { type: "string", multiple: true }, "ai-user": { type: "string" } },
+  });
+  if (!values.workdir) throw new UsageError("--workdir is required");
+  if (!values.origin) throw new UsageError("--origin is required (the site to read from)");
+  if (values.key?.length && !values["ai-user"]) throw new UsageError("--key needs --ai-user <user id of the AI editor account>");
+  if (!values.key?.length && values["ai-user"]) throw new UsageError("--ai-user only goes with --key");
+  const results = await exportSite({ workdir: values.workdir, origin: values.origin, keys: values.key, aiUser: values["ai-user"] });
+  for (const result of results) console.log(JSON.stringify(result));
+}
+
 function candidates(args: string[]): void {
   const { values } = parseArgs({ args, options: { workdir: { type: "string" } } });
   if (!values.workdir) throw new UsageError("--workdir is required");
@@ -126,9 +147,12 @@ function confirm(args: string[]): void {
 }
 
 function assembleCommand(args: string[]): void {
-  const { values } = parseArgs({ args, options: { workdir: { type: "string" }, key: { type: "string", multiple: true } } });
+  const { values } = parseArgs({
+    args,
+    options: { workdir: { type: "string" }, key: { type: "string", multiple: true }, rewrite: { type: "string", multiple: true } },
+  });
   if (!values.workdir) throw new UsageError("--workdir is required");
-  for (const result of assemble(values.workdir, values.key ?? [])) console.log(JSON.stringify(result));
+  for (const result of assemble(values.workdir, values.key ?? [], values.rewrite ?? [])) console.log(JSON.stringify(result));
 }
 
 async function submitCommand(args: string[]): Promise<void> {
@@ -170,6 +194,7 @@ function incrementalCommand(args: string[]): void {
       "last-ai-revision": { type: "string" },
       "no-last-ai": { type: "boolean", default: false },
       page: { type: "string" },
+      "rederive-footer": { type: "boolean", default: false },
     },
   });
   if (!values.workdir) throw new UsageError("--workdir is required");
@@ -198,9 +223,10 @@ function incrementalCommand(args: string[]): void {
     head,
     lastAi,
     pageId: values.page === undefined ? undefined : id(values.page, "--page"),
+    rederiveFooter: values["rederive-footer"],
   });
   if (result.footerHumanEdits) {
-    console.error(`WARN: ${result.footerHumanEdits} human-edited block(s) in the source notes after the separator are re-derived from the citations`);
+    console.error(`NOTE: ${result.footerHumanEdits} human-edited block(s) in the source notes are re-derived from the citations (--rederive-footer)`);
   }
   console.log(JSON.stringify(result));
 }
@@ -224,6 +250,10 @@ async function main(argv: string[]): Promise<number> {
     }
     if (command === "freeze") {
       freeze(rest);
+      return 0;
+    }
+    if (command === "export-site") {
+      await exportSiteCommand(rest);
       return 0;
     }
     if (command === "candidates") {

@@ -257,7 +257,7 @@ test("--toc lists landmarks without writing, and every command is implemented", 
   assert.match(toc.stdout, /d02\.h2 {2}A．质/);
   assert.match(toc.stdout, /d02\.h4 {2}§2/);
   // 没有残留桩：缺参数的命令是用法错误（退出码 2），而不是 NOT_IMPLEMENTED
-  for (const command of ["candidates", "confirm", "assemble", "validate", "incremental", "submit"]) {
+  for (const command of ["export-site", "candidates", "confirm", "assemble", "validate", "incremental", "submit"]) {
     const run = pipeline(command);
     assert.equal(run.status, 2, command);
     assert.match(run.stderr, /--workdir is required/, command);

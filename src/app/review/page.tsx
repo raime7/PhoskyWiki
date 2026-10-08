@@ -15,6 +15,7 @@ import { getWikiLinkTargets } from "@/lib/content";
 import { pageIdFromKey } from "@/lib/slug";
 import { renderMarkdown, previewWikiLinkResolver } from "@/lib/markdown";
 import { ReviewActions } from "@/components/review-actions";
+import { SubmissionNote } from "@/components/submission-note";
 import type { QueueItem } from "@/lib/review";
 import type { SubmissionKind } from "@/db/schema";
 import { formatWhen } from "@/lib/format";
@@ -75,12 +76,7 @@ async function QueueEntry({ item, catalog }: { item: QueueItem; catalog: EditorC
         )}
       </p>
 
-      {item.note && (
-        <section aria-label="提交说明" data-testid="submission-note" className="mt-4 rounded-md border border-border bg-muted/40 p-3 text-sm">
-          <h3 className="text-sm font-medium">提交说明</h3>
-          <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{item.note}</p>
-        </section>
-      )}
+      {item.note && <SubmissionNote note={item.note} collapseLong className="mt-4" />}
 
       <details className="mt-4 border-t border-border pt-3">
         <summary className="min-h-11 cursor-pointer py-1 text-sm text-muted-foreground hover:text-foreground">

@@ -92,9 +92,15 @@ function frozenQuote(wd, { paragraph, from, to }) {
 
 test("assemble backfills excerpts verbatim, marks truncation, and adds citations, coverage, translation and the AI notice", () =>
   withWorkdir((wd) => {
+    // 缺省只组装新视角；已有视角（cunzai）归 incremental，跳过
     assert.deepEqual(
       ok("assemble", "--workdir", wd).map((r) => [r.key, r.status, r.mode, r.excerpts]),
-      [["kaiduan", "written", "new", 6], ["cunzai", "written", "edit", 2]],
+      [["kaiduan", "written", "new", 6], ["cunzai", "skipped", undefined, undefined]],
+    );
+    assert.equal(existsSync(out(wd, "cunzai", "perspective.md")), false);
+    assert.deepEqual(
+      ok("assemble", "--workdir", wd, "--rewrite", "cunzai").map((r) => [r.key, r.status, r.mode, r.excerpts]),
+      [["cunzai", "written", "edit", 2]],
     );
     const markdown = readFileSync(out(wd, "kaiduan", "perspective.md"), "utf8");
     const assembled = json(out(wd, "kaiduan", "assembled.json"));
@@ -174,7 +180,7 @@ test("assemble backfills excerpts verbatim, marks truncation, and adds citations
       confirmation: sha256(readFileSync(join(wd, "candidates", "confirmation.json"))),
     });
 
-    // 已有视角 → 以 head 修订为 base 的编辑；两本书都被引用时按冻结顺序并列，引文同样逐字回填
+    // --rewrite 已有视角 → 以 head 修订为 base 的整篇编辑；两本书都被引用时按冻结顺序并列，引文同样逐字回填
     const edit = json(out(wd, "cunzai", "assembled.json"));
     assert.deepEqual([edit.mode, edit.baseRevisionId], ["edit", 7]);
     assert.deepEqual(edit.coverage.map((c) => [c.sourceId, c.paragraphs]), [["sample", ["sample:d02.p1"]], ["sample-md", ["sample-md:t.p2"]]]);
@@ -282,7 +288,7 @@ test("assemble rejects excerpts it cannot backfill verbatim, session-written quo
     for (const [code, edit, message] of cases) {
       claimMap(wd, "cunzai", edit);
       // 一个概念失败则整批都不落盘
-      assert.match(refused(code, "assemble", "--workdir", wd), message);
+      assert.match(refused(code, "assemble", "--workdir", wd, "--key", "kaiduan", "--rewrite", "cunzai"), message);
       assert.equal(existsSync(out(wd, "kaiduan", "perspective.md")), false);
       assert.equal(existsSync(out(wd, "cunzai", "perspective.md")), false);
     }
@@ -291,4 +297,23 @@ test("assemble rejects excerpts it cannot backfill verbatim, session-written quo
     const paragraphs = join(wd, "sources", "sample", "paragraphs.jsonl");
     writeFileSync(paragraphs, readFileSync(paragraphs, "utf8").replace("绝不！", "绝不。"));
     refused("ASSEMBLE_SOURCE_TAMPERED", "assemble", "--workdir", wd, "--key", "kaiduan");
+  }));
+
+test("existing perspectives belong to incremental: assemble refuses them unless --rewrite, which edits against the head base", () =>
+  withWorkdir((wd) => {
+    assert.match(refused("ASSEMBLE_EXISTING_PERSPECTIVE", "assemble", "--workdir", wd, "--key", "cunzai"), /incremental[\s\S]*--rewrite cunzai/);
+    refused("ASSEMBLE_EXISTING_PERSPECTIVE", "assemble", "--workdir", wd, "--key", "kaiduan", "--key", "cunzai");
+    assert.equal(existsSync(out(wd, "kaiduan", "perspective.md")), false, "nothing is written when one key is refused");
+    refused("ASSEMBLE_REWRITE_NEW", "assemble", "--workdir", wd, "--rewrite", "kaiduan");
+    // 只有已有视角的论点映射时，缺省无事可做
+    rmSync(out(wd, "kaiduan", "claim-map.json"));
+    assert.match(refused("ASSEMBLE_NOTHING", "assemble", "--workdir", wd), /cunzai/);
+
+    // 整篇重写以导出的 head 为 base（base.json，与 submit 的取法一致），否则取候选清单的 head
+    writeFileSync(
+      out(wd, "cunzai", "base.json"),
+      JSON.stringify({ schema: "phosky.book-pipeline/incremental-base@1", pageId: 42, head: { revisionId: 9, content: "人工写的旧稿，不合模板。\n" }, lastAi: null }),
+    );
+    assert.deepEqual(ok("assemble", "--workdir", wd, "--rewrite", "cunzai").map((r) => [r.key, r.mode]), [["cunzai", "edit"]]);
+    assert.deepEqual([json(out(wd, "cunzai", "assembled.json")).mode, json(out(wd, "cunzai", "assembled.json")).baseRevisionId], ["edit", 9]);
   }));

@@ -17,14 +17,11 @@ import type {
 } from "./types";
 import { SCHEMAS, isPseudoInterpreter } from "./types";
 import { ID_PATTERN, fileEquals, jsonText, readJson, readJsonl, sha256, workdirLayout, writeText } from "./workdir";
+import { fail } from "./errors";
 
 /** 名称比较用的规范形：NFKC、去空白与间隔点、小写。 */
 export function nameKey(name: string): string {
   return name.normalize("NFKC").replace(/[\s·・•．.\-_]/g, "").toLowerCase();
-}
-
-function fail(code: string, message: string): never {
-  throw new Error(`${code}: ${message}`);
 }
 
 function readInput(path: string, what: string): string {
@@ -89,6 +86,7 @@ export function buildCandidateList(workdir: string): { list: CandidateList; text
       }
       nameOwner.set(name, c.key);
     }
+    if (c.termSummary !== null && typeof c.termSummary !== "string") fail("SCHEMA", `candidate ${c.key}: termSummary must be a string or null`);
     for (const id of [...c.centralParagraphs, ...c.proposedClaims.flatMap((p) => p.paragraphs)]) {
       if (!knownParagraphs.has(id)) fail("UNKNOWN_PARAGRAPH", `candidate ${c.key} cites ${id}, which is not an in-range frozen paragraph of ${session.sourceIds.join(",")}`);
     }
@@ -139,6 +137,11 @@ export function buildCandidateList(workdir: string): { list: CandidateList; text
       if (prev) fail("DUPLICATE_CONCEPT", `candidates "${prev}" and "${c.key}" both match existing term #${id}; merge them in the session`);
       termClaimedBy.set(id, c.key);
     }
+    // 新建词条需要会话给出中性的一句话词条简介（不是诠释者的一句话核心），submit 用它作 new_term 的 summary
+    const termSummary = hit ? null : (c.termSummary ?? "").trim();
+    if (termSummary !== null && (!termSummary || termSummary.includes("\n"))) {
+      fail("TERM_SUMMARY_MISSING", `candidate ${c.key} ("${c.canonicalName}") is a new term and needs termSummary: one neutral sentence saying what the term means (not ${interpreter}'s view)`);
+    }
     const perspective = hit
       ? site.perspectives.find((p) => p.termId === hit!.id && !p.deleted && interpreterIds.has(p.interpreterId))
       : undefined;
@@ -153,6 +156,7 @@ export function buildCandidateList(workdir: string): { list: CandidateList; text
       related: c.related,
       existingTerm: hit ? { pageId: hit.id, title: termById.get(hit.id)!.title, matchedBy: hit.by } : null,
       existingPerspective: perspective ? { pageId: perspective.pageId, headRevisionId: perspective.headRevisionId } : null,
+      termSummary,
       proposedClaimCount: validClaims(c),
       evidenceParagraphs: [...new Set([...c.centralParagraphs, ...c.proposedClaims.flatMap((p) => p.paragraphs)])],
       admission,
