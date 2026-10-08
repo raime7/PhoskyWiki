@@ -15,6 +15,7 @@ import { getWikiLinkTargets } from "@/lib/content";
 import { pageIdFromKey } from "@/lib/slug";
 import { renderMarkdown, previewWikiLinkResolver } from "@/lib/markdown";
 import { ReviewActions } from "@/components/review-actions";
+import { SubmissionNote } from "@/components/submission-note";
 import type { QueueItem } from "@/lib/review";
 import type { SubmissionKind } from "@/db/schema";
 import { formatWhen } from "@/lib/format";
@@ -74,6 +75,8 @@ async function QueueEntry({ item, catalog }: { item: QueueItem; catalog: EditorC
           </Link>
         )}
       </p>
+
+      {item.note && <SubmissionNote note={item.note} collapseLong className="mt-4" />}
 
       <details className="mt-4 border-t border-border pt-3">
         <summary className="min-h-11 cursor-pointer py-1 text-sm text-muted-foreground hover:text-foreground">

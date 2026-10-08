@@ -42,6 +42,8 @@ function parseSubmissionInput(body: Record<string, unknown>): SubmissionInput {
     interpreterId: optionalInt(body.interpreterId, "interpreterId"),
     baseRevisionId: optionalInt(body.baseRevisionId, "baseRevisionId"),
     supersedes: optionalInt(body.supersedes, "supersedes"),
+    // 类型校验只在领域层做一次（lib/review.ts）：非字符串的 note 原样下传，由它返回 400
+    note: body.note as string | undefined,
     confirmedBaseRevisionId: optionalInt(body.confirmedBaseRevisionId, "confirmedBaseRevisionId"),
   };
 }

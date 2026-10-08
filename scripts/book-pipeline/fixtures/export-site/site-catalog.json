@@ -1,0 +1,13 @@
+{
+  "terms": [
+    { "pageId": 41, "title": "存在", "slug": "cunzai", "aliases": ["Sein"] },
+    { "pageId": 10, "title": "尺度", "slug": "chidu", "aliases": [] }
+  ],
+  "interpreters": [
+    { "pageId": 20, "title": "范例思", "slug": "fanlisi" }
+  ],
+  "perspectives": [
+    { "pageId": 42, "termId": 41, "interpreterId": 20, "headRevisionId": 9 },
+    { "pageId": 30, "termId": 10, "interpreterId": 20, "headRevisionId": 300 }
+  ]
+}

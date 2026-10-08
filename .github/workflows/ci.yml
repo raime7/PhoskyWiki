@@ -58,6 +58,7 @@ jobs:
       - run: pnpm test
       - run: pnpm test:ops
       - run: node --test scripts/release-gate.test.mjs scripts/release-image.test.mjs scripts/release-migrations.test.mjs scripts/release-refusal.test.mjs
+      - run: pnpm test:pipeline
 
   e2e:
     name: playwright + container

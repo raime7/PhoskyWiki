@@ -6,6 +6,7 @@ import { notFound, redirect } from "next/navigation";
 import { PageContainer } from "@/components/page-container";
 import { StatusChip, TaskPageHeader } from "@/components/task-page";
 import { ContentDiff } from "@/components/content-diff";
+import { SubmissionNote } from "@/components/submission-note";
 import { TermMetadataDiff } from "@/components/term-metadata-diff";
 import { formatKeyTexts } from "@/lib/key-texts";
 import { getSessionUser } from "@/lib/session";
@@ -80,6 +81,8 @@ export default async function SubmissionDetailPage({ params }: Props) {
           {submission.votes.length === 0 && <p className="mt-2 text-muted-foreground">还没有管理员处理这条提交。</p>}
         </section>
       </div>
+
+      {submission.note && <SubmissionNote note={submission.note} className="mt-6" />}
 
       <section aria-labelledby="submission-diff-heading" className="mt-8">
         <h2 id="submission-diff-heading" className="border-t border-border pt-6 text-xl font-semibold tracking-tight">提交差异</h2>

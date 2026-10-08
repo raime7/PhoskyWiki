@@ -51,9 +51,9 @@ async function history(request: APIRequestContext, pageId: number) {
   return response.json() as Promise<{ revisions: { id: number; content: string }[] }>;
 }
 
-async function edit(request: APIRequestContext, pageId: number, content: string) {
+async function edit(request: APIRequestContext, pageId: number, content: string, note?: string) {
   const base = (await history(request, pageId)).revisions[0].id;
-  return submit(request, { kind: "edit", pageId, content, baseRevisionId: base });
+  return submit(request, { kind: "edit", pageId, content, baseRevisionId: base, note });
 }
 
 async function fixture(request: APIRequestContext) {
@@ -100,8 +100,10 @@ test("队列显示票数、批准者、过期基准与两侧 diff；提交详情
   await getDb().update(submissions).set({ quorum: 2 }).where(eq(submissions.id, created.submissionId));
   expect(await review(request, created.submissionId, "approve")).toEqual({ outcome: "pending", approveCount: 1, quorum: 2 });
   await edit(request, source.perspective.pageId, "直编推进 head。");
-  const fresh = await edit(page.request, source.perspective.pageId, "第二条待审提交。");
-  const staleProposal = await edit(page.request, source.perspective.pageId, "等待旧基准受理的提案。");
+  const note = "审稿说明 <img src=x onerror=\"window.__noteXss=1\"> **不渲染**";
+  const fresh = await edit(page.request, source.perspective.pageId, "第二条待审提交。", note);
+  const longNote = ["机器审稿报告：", ...Array.from({ length: 8 }, (_, i) => `- 第 ${i + 1} 条意见`)].join("\n");
+  const staleProposal = await edit(page.request, source.perspective.pageId, "等待旧基准受理的提案。", longNote);
 
   await loginAdmin(page.request);
   await page.goto("/review");
@@ -116,6 +118,17 @@ test("队列显示票数、批准者、过期基准与两侧 diff；提交详情
   const freshItem = page.locator(`[data-submission-id="${fresh.submissionId}"]`);
   await expect(freshItem.getByTestId("stale-badge")).toHaveCount(0);
   await expect(freshItem).toContainText("批准 0/");
+  // 提交说明按纯文本显示：HTML 与 Markdown 标记原样可见，不执行
+  await expect(freshItem.getByTestId("submission-note")).toContainText(note);
+  await expect(freshItem.getByTestId("submission-note").locator("img")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __noteXss?: number }).__noteXss)).toBeUndefined();
+  // 长说明在队列中折叠为一行预览，展开后显示全文
+  const longNoteBox = page.locator(`[data-submission-id="${staleProposal.submissionId}"]`).getByTestId("submission-note");
+  await expect(longNoteBox.getByTestId("submission-note-collapsible")).not.toHaveAttribute("open", /.*/);
+  await expect(longNoteBox.locator("details > p")).toBeHidden();
+  await longNoteBox.locator("summary").click();
+  await expect(longNoteBox.locator("details > p")).toBeVisible();
+  await expect(longNoteBox.locator("details > p")).toContainText("- 第 8 条意见");
   const queueIds = await page.locator("[data-submission-id]").filter({ hasText: source.perspectiveTitle }).evaluateAll((items) => items.map((entry) => entry.getAttribute("data-submission-id")));
   await edit(request, source.perspective.pageId, "再次直编，不进入审核队列。");
   await page.reload();

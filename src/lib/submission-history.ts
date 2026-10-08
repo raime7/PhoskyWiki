@@ -46,6 +46,7 @@ export async function getMySubmission(userId: string, id: number, isAdmin = fals
       content: submissions.content,
       title: submissions.title,
       summary: submissions.summary,
+      note: submissions.note,
       aliases: submissions.aliases,
       keyTexts: submissions.keyTexts,
       baseRevisionId: submissions.baseRevisionId,

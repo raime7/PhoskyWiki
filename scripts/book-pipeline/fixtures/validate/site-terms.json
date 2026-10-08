@@ -1,0 +1,20 @@
+{
+  "schema": "phosky.book-pipeline/site-export@2",
+  "exportedAt": "2026-10-01T00:00:00.000Z",
+  "origin": "https://wiki.example.test",
+  "terms": [
+    { "pageId": 10, "title": "尺度", "slug": "chidu", "aliases": ["度"], "deleted": false },
+    { "pageId": 11, "title": "直接存在", "slug": "zhijie-cunzai", "aliases": ["直接性"], "deleted": false },
+    { "pageId": 12, "title": "规定性", "slug": "guidingxing", "aliases": [], "deleted": true },
+    { "pageId": 13, "title": "无关词条", "slug": "wuguan", "aliases": ["别名甲"], "deleted": false }
+  ],
+  "interpreters": [
+    { "pageId": 20, "title": "范例思", "slug": "fanlisi", "deleted": false },
+    { "pageId": 21, "title": "别的诠释者", "slug": "bie", "deleted": false }
+  ],
+  "perspectives": [
+    { "pageId": 30, "termId": 10, "interpreterId": 20, "headRevisionId": 300, "deleted": false },
+    { "pageId": 31, "termId": 11, "interpreterId": 21, "headRevisionId": 310, "deleted": false }
+  ],
+  "deletedTermTitles": null
+}
