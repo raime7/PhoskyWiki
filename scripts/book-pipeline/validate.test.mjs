@@ -440,3 +440,20 @@ test("every perspective needs the style profile and a polish pass that changed o
     rmSync(wd, { recursive: true, force: true });
   }
 });
+
+test("AI 腔清单认出常见套话，不误伤正常用法", () => {
+  const probe = (text) => {
+    const run = spawnSync(
+      process.execPath,
+      ["--conditions=react-server", "--import", "tsx", "--input-type=module", "-e",
+        `import { aiPatternHits } from ${JSON.stringify(join(root, "scripts/book-pipeline/style-patterns.ts"))};
+         console.log(JSON.stringify(aiPatternHits(process.argv[1]).map((h) => h.label)));`, text],
+      { cwd: root, encoding: "utf8" },
+    );
+    assert.equal(run.status, 0, run.stderr);
+    return JSON.parse(run.stdout);
+  };
+  assert.deepEqual(probe("值得一提的是，这一限定无疑具有重要意义，它有效地防止了误读。"), ["值得注意的是", "不难看出", "至关重要", "有效地"]);
+  assert.deepEqual(probe("这一规定极其简洁而又意味深长，在他的思想中占据着重要地位。"), ["深刻地揭示", "至关重要"]);
+  assert.deepEqual(probe("范例思说存在是直接的规定性，它只是它自己。"), []);
+});
