@@ -36,7 +36,7 @@ pnpm test:pipeline                                      # node --test scripts/bo
 | `perspectives/<key>/review.json` | `ReviewReport`：审稿子代理的报告，绑定 perspective.md 的哈希 | 会话子代理 |
 | `perspectives/<key>/overrides.json` | `LimitOverride[]`：人工放行的超限项 | 站长 |
 | `perspectives/<key>/validation.json` | `ValidationReport` | validate（#110） |
-| `perspectives/<key>/base.json` | `IncrementalBase`：现有视角的 head 修订和最近一次 AI 修订 | 导出（#111） |
+| `perspectives/<key>/base.json` | `IncrementalBase`：现有视角的 head 修订和最近一次 AI 修订 | incremental（#111，取自导出的修订） |
 | `perspectives/<key>/locks.json` | `LockInfo`：人工改过而锁定的块 | incremental（#111） |
 | `submit/plan.json` | `SubmitPlan`：试运行时列出的提交请求 | submit（#112） |
 | `submit/ledger.jsonl` | `LedgerEntry`：写入账本，只追加 | submit（#112） |
@@ -50,7 +50,7 @@ pnpm test:pipeline                                      # node --test scripts/bo
 - **层次**：段首标记切换层次（〔说明〕、附释一：……），并延续到下一个标题或节号；〔译注〕等标记只作用于本段。EPUB 的注释段落按链接目标配对，不按显示的数字配对，再按文字判定是译注、原注还是编者注。
 - **规范化**：只去掉段首尾空白和不可见字符，合并空白，并把中文之间的排版换行直接接上（不插空格）。不做 Unicode 归一化，不改字形和标点。每一项都记入日志。
 - **不支持 OCR**：只接受有文字层的 EPUB、UTF-8 编码的 TXT 和 Markdown。
-- **退出码**：0 表示成功；1 表示运行错误，错误信息以 `CODE: …` 开头；2 表示用法错误或命令尚未实现。
+- **退出码**：0 表示成功；1 表示运行错误，错误信息以 `CODE: …` 开头；2 表示用法错误。
 
 ## 候选与确认（#108）
 
@@ -96,3 +96,22 @@ pnpm book-pipeline validate --workdir <dir> [--key <key> ...]   # 缺省 = 全�
 ### 审稿报告的落盘位置
 
 审稿由会话中全新上下文的子代理执行，不由本命令执行。报告写到 `perspectives/<key>/review.json`（`ReviewReport`），其 `perspectiveSha256` 必须是被审阅的 `perspective.md` 的 sha256。稿子重新组装或被改动后，报告即过期，须重审。`validate` 在每个概念的输出行里给出 `review: {status: missing|stale|current, blockers}`，但不把审稿结果计入 `ok`；提交器（#112）应把当前的审稿报告与 `validation.json` 摘要一并写入提交说明，并拒绝过期的报告。
+
+## 增量更新（#111）
+
+```bash
+# 1. 导入现有视角：head 与上一次 AI 编者修订的 Markdown 导出 → base.json、locks.json，并输出增量论点映射的骨架
+pnpm book-pipeline incremental --workdir <dir> --key <key> \
+  --head head.md --head-revision <id> (--last-ai ai.md --last-ai-revision <id> | --no-last-ai) [--page <id>]
+# 2. 会话按骨架写 perspectives/<key>/claim-map.json（增量形式），再并稿（省略 --head 即沿用 base.json）
+pnpm book-pipeline incremental --workdir <dir> --key <key>
+pnpm book-pipeline validate --workdir <dir> --key <key>
+```
+
+- 只用于候选清单里已有视角（`existingPerspective`）的概念，并先过确认闸门；`--page` 缺省取该视角，给出时须一致。head 必须符合模板（否则用 assemble 整篇重写）；从无 AI 修订时用 `--no-last-ai`。
+- **锁定**：用 `blocks.ts` 的 `topLevelBlocks` 切 head；分隔线之前的正文块，若不以同样文字出现在上一次 AI 修订中，即人工改过，写入 `locks.json`（`--no-last-ai` 时正文全部锁定）。分隔线之后的资料说明由程序依引用推导，不锁；其中的人工改动会被覆盖，命令在 stderr 给出 `WARN`。
+- **增量论点映射**：仍是 `ClaimMap`（`claim-map@1`）。`core` 须逐字照抄 head；head 的每个论点按原顺序、以原标题出现一次：`kept` 不加任何东西，`extended` 的 `exposition` 只写追加的解读、`excerpts` 只列追加的摘录；`revision: "new"` 是新论点，可插在任意位置，标题不得与既有论点相同。不能删除、改写或调换既有论点。
+- **并稿**：正文以 head 原文为底，只插入，既有字节一个不改：追加的解读接在该论点原解读之后，追加的摘录接在原摘录之后，新论点整节插在前一个论点之后。新摘录与 assemble 一样依引用回填，出处行以《书名》标注所出书目；资料覆盖范围与译本按全部引用重新推导（与 assemble 同一套文案与顺序）。
+- **既有摘录**须能在本工作目录的冻结来源中逐字定位（出处行一致、某个句子范围回填出相同的可见文字），所以旧书也要冻结在同一目录；定位结果写入 `assembled.json`，validate 因而走精确回查。
+- 产物：`base.json`、`locks.json`，以及 `perspective.md` + `assembled.json`（`mode: "edit"`，`baseRevisionId` = head）。全部在内存中算好并自检（模板、站点渲染、既有正文块原样且顺序不变）后才落盘；重跑逐字节一致。submit 以 `base.json` 的 head 为 base，稿子的 `baseRevisionId` 与之不同即拒绝（`SUBMIT_STALE`）。
+- 错误码：`UNCONFIRMED`、`MISSING_INPUT`、`INCREMENTAL_NO_PERSPECTIVE`、`INCREMENTAL_PAGE_MISMATCH`、`INCREMENTAL_BASE_INVALID`、`INCREMENTAL_HEAD_TEMPLATE`、`INCREMENTAL_EXCERPT_UNRESOLVED`、`INCREMENTAL_CLAIM_MAP`、`INCREMENTAL_SELF_CHECK`、`ASSEMBLE_EXCERPT`、`ASSEMBLE_PSEUDO_INTERPRETER`、`ASSEMBLE_SOURCE_TAMPERED`。

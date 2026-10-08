@@ -109,7 +109,7 @@ export function translationLabel(manifest: SourceManifest): string {
   return `《${manifest.work.title}》：${parts.filter(Boolean).join("，")}`;
 }
 
-function topLevelTypes(markdown: string): string[] {
+export function topLevelTypes(markdown: string): string[] {
   const tree = markdownParser().parse(markdown) as { children?: { type: string }[] };
   return (tree.children ?? []).map((node) => node.type);
 }
@@ -207,30 +207,8 @@ export function assemblePerspective(workdirPath: string, key: ConceptKey): Assem
     }),
   }));
 
-  // 资料覆盖范围：只列实际被引用的来源（按冻结顺序），段落按阅读顺序
-  const coverage: SourceCoverage[] = workdir.sources
-    .filter((s) => cited.has(s.id))
-    .map((s) => {
-      const { manifest } = load(s.id);
-      return {
-        sourceId: s.id,
-        title: manifest.work.title,
-        translator: manifest.work.translator,
-        edition: manifest.work.edition,
-        range: { from: manifest.range.from, to: manifest.range.to },
-        paragraphs: cited.get(s.id)!.sort((a, b) => a.order - b.order).map((p) => p.id),
-      };
-    });
-
-  const markdown = renderPerspectiveMarkdown({
-    core: map.core,
-    claims,
-    coverage: coverage.map((c) => {
-      const source = load(c.sourceId);
-      return `《${c.title}》，整理范围：${rangeLabel(source)}；摘录出自 ${citedLabel(cited.get(c.sourceId)!)}`;
-    }),
-    translations: coverage.map((c) => translationLabel(load(c.sourceId).manifest)),
-  });
+  const derived = deriveCoverage(workdir, load, cited);
+  const markdown = renderPerspectiveMarkdown({ core: map.core, claims, coverage: derived.items, translations: derived.translations });
   selfCheck(key, markdown, claims.flatMap((c) => c.excerpts));
 
   const assembled: AssembledPerspective = {
@@ -243,24 +221,56 @@ export function assemblePerspective(workdirPath: string, key: ConceptKey): Assem
     inputs: { claimMap: sha256(claimMapText), candidateList: sha256(listText), confirmation: sha256(confirmationText) },
     markdownSha256: sha256(markdown),
     excerpts,
-    coverage,
+    coverage: derived.coverage,
   };
   return { key, markdown, assembled };
 }
 
+/**
+ * 资料覆盖范围与译本：只列实际被引用的来源（按冻结顺序），段落按阅读顺序。
+ * `cited` 为各来源被引用的段落（任意顺序，会就地排序）。assemble 与 incremental 共用。
+ */
+export function deriveCoverage(
+  workdir: WorkdirManifest,
+  load: ReturnType<typeof sourceLoader>,
+  cited: Map<string, FrozenParagraph[]>,
+): { coverage: SourceCoverage[]; items: string[]; translations: string[] } {
+  const sources = workdir.sources.filter((s) => cited.has(s.id)).map((s) => ({ id: s.id, source: load(s.id) }));
+  for (const { id } of sources) cited.get(id)!.sort((a, b) => a.order - b.order);
+  return {
+    coverage: sources.map(({ id, source: { manifest } }) => ({
+      sourceId: id,
+      title: manifest.work.title,
+      translator: manifest.work.translator,
+      edition: manifest.work.edition,
+      range: { from: manifest.range.from, to: manifest.range.to },
+      paragraphs: cited.get(id)!.map((p) => p.id),
+    })),
+    items: sources.map(
+      ({ id, source }) => `《${source.manifest.work.title}》，整理范围：${rangeLabel(source)}；摘录出自 ${citedLabel(cited.get(id)!)}`,
+    ),
+    translations: sources.map(({ source }) => translationLabel(source.manifest)),
+  };
+}
+
 /** 组装结果必须符合模板，且经站点渲染管线后引文与强调逐字一致。 */
-function selfCheck(key: ConceptKey, markdown: string, expected: { citation: string; check: ReturnType<typeof renderExcerpt> }[]): void {
+export function selfCheck(
+  key: ConceptKey,
+  markdown: string,
+  expected: { citation: string; check: ReturnType<typeof renderExcerpt> }[],
+  code = "ASSEMBLE_SELF_CHECK",
+): void {
   const parsed = parsePerspectiveMarkdown(markdown);
-  if (parsed.errors.length) fail("ASSEMBLE_SELF_CHECK", `${key}: ${parsed.errors.join("; ")}`);
+  if (parsed.errors.length) fail(code, `${key}: ${parsed.errors.join("; ")}`);
   const visible = renderedExcerpts(markdown);
-  if (visible.length !== expected.length) fail("ASSEMBLE_SELF_CHECK", `${key}: rendered ${visible.length} excerpts, expected ${expected.length}`);
+  if (visible.length !== expected.length) fail(code, `${key}: rendered ${visible.length} excerpts, expected ${expected.length}`);
   expected.forEach(({ citation, check }, i) => {
     const want = expectedVisibleQuote(check);
-    if (visible[i].text !== want) fail("ASSEMBLE_SELF_CHECK", `${key}: excerpt ${i + 1} renders as «${visible[i].text}», expected «${want}»`);
+    if (visible[i].text !== want) fail(code, `${key}: excerpt ${i + 1} renders as «${visible[i].text}», expected «${want}»`);
     if (JSON.stringify(visible[i].emphasis) !== JSON.stringify(expectedVisibleEmphasis(check, check.emphasis))) {
-      fail("ASSEMBLE_SELF_CHECK", `${key}: excerpt ${i + 1} emphasis does not survive rendering`);
+      fail(code, `${key}: excerpt ${i + 1} emphasis does not survive rendering`);
     }
-    if (visible[i].citation !== TEMPLATE.citationPrefix + citation) fail("ASSEMBLE_SELF_CHECK", `${key}: excerpt ${i + 1} citation renders wrongly`);
+    if (visible[i].citation !== TEMPLATE.citationPrefix + citation) fail(code, `${key}: excerpt ${i + 1} citation renders wrongly`);
   });
 }
 

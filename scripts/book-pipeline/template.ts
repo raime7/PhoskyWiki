@@ -169,20 +169,36 @@ function blockquote(lines: string): string {
     .join("\n");
 }
 
-export function renderPerspectiveMarkdown(input: TemplateInput): string {
-  const blocks: string[] = [input.core.trim()];
-  for (const claim of input.claims) {
-    blocks.push(`${"#".repeat(TEMPLATE.claimHeadingDepth)} ${claim.heading.trim()}`);
-    blocks.push(claim.exposition.trim());
-    for (const excerpt of claim.excerpts) {
-      blocks.push(blockquote(`${excerpt.quote}\n\n${TEMPLATE.citationPrefix}${escapeMarkdownText(excerpt.citation)}`));
-    }
-  }
-  blocks.push(TEMPLATE.separator);
+/** 一个摘录引用块：引文段与“——出处”段（出处为纯文本，会转义）。 */
+export function excerptBlockMarkdown(quote: string, citation: string): string {
+  return blockquote(`${quote}\n\n${TEMPLATE.citationPrefix}${escapeMarkdownText(citation)}`);
+}
+
+/** 一个论点小节的顶层块：标题、解读、各摘录引用块（incremental 新增论点也用它）。 */
+export function claimBlocks(claim: TemplateInput["claims"][number]): string[] {
+  return [
+    `${"#".repeat(TEMPLATE.claimHeadingDepth)} ${claim.heading.trim()}`,
+    claim.exposition.trim(),
+    ...claim.excerpts.map((excerpt) => excerptBlockMarkdown(excerpt.quote, excerpt.citation)),
+  ];
+}
+
+/** 分隔线及其后的资料说明（资料覆盖范围、译本、生成方式），不含末尾换行。 */
+export function footerMarkdown(coverage: string[], translations: string[]): string {
   const list = (items: string[]) => items.map((item) => `- ${escapeMarkdownText(item)}`).join("\n");
-  blocks.push(`**${TEMPLATE.labels.coverage}**`, list(input.coverage));
-  blocks.push(`**${TEMPLATE.labels.translations}**`, list(input.translations));
-  blocks.push(`**${TEMPLATE.labels.generation}**：${TEMPLATE.aiNotice}${TEMPLATE.generationDetail}`);
+  return [
+    TEMPLATE.separator,
+    `**${TEMPLATE.labels.coverage}**`,
+    list(coverage),
+    `**${TEMPLATE.labels.translations}**`,
+    list(translations),
+    `**${TEMPLATE.labels.generation}**：${TEMPLATE.aiNotice}${TEMPLATE.generationDetail}`,
+  ].join("\n\n");
+}
+
+export function renderPerspectiveMarkdown(input: TemplateInput): string {
+  const blocks: string[] = [input.core.trim(), ...input.claims.flatMap(claimBlocks)];
+  blocks.push(footerMarkdown(input.coverage, input.translations));
   return blocks.join("\n\n") + "\n";
 }
 
