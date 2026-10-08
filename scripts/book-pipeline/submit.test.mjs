@@ -100,10 +100,15 @@ test("dry run lists phase 1 (interpreter, term) before phase 2 and an edit carri
     assert.equal(existsSync(join(wd, "submit", "ledger.jsonl")), false, "dry run never touches the ledger");
   }));
 
-test("an edit uses base.json head when present", () =>
+test("an edit uses base.json head when present and refuses a draft built on another revision", () =>
   withWorkdir((wd) => {
-    writeFileSync(join(wd, "perspectives", "cunzai", "base.json"), JSON.stringify({ schema: "phosky.book-pipeline/incremental-base@1", pageId: 42, head: { revisionId: 11, content: "x" }, lastAi: null }));
-    assert.equal(requests(dry(wd)).find((r) => r.opKey === "perspective:cunzai").request.baseRevisionId, 11);
+    const base = (revisionId) =>
+      writeFileSync(join(wd, "perspectives", "cunzai", "base.json"), JSON.stringify({ schema: "phosky.book-pipeline/incremental-base@1", pageId: 42, head: { revisionId, content: "x" }, lastAi: null }));
+    base(7);
+    assert.equal(requests(dry(wd)).find((r) => r.opKey === "perspective:cunzai").request.baseRevisionId, 7);
+    // head 已前进而稿子未重并：以新 base 提交旧稿会覆盖期间的人工改动（#111 的正向路径见 incremental.test.mjs）
+    base(11);
+    refused("SUBMIT_STALE", "submit", "--workdir", wd);
   }));
 
 test("the note carries the review and validation summary and stays within the site limit", () =>

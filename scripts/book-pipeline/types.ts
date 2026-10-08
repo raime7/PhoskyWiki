@@ -310,11 +310,11 @@ export interface Claim {
   id: ClaimId;
   /** 论点小节标题 */
   heading: string;
-  /** 解读 Markdown，双链写作 [[规范名|原词]] */
+  /** 解读 Markdown，双链写作 [[规范名|原词]]。增量论点映射中：new = 全部解读；extended = 追加在原解读之后的部分（可为空）；kept = 空 */
   exposition: string;
-  /** 1–3 段摘录（超出由 validate 报告） */
+  /** 1–3 段摘录（超出由 validate 报告）。增量论点映射中只列新增的摘录（kept 为空），既有摘录由 head 原样保留 */
   excerpts: ExcerptRef[];
-  /** 增量更新：既有论点原样保留 / 追加了材料 / 新增论点；新建视角为 "new" */
+  /** 增量更新：既有论点原样保留 / 追加了材料 / 新增论点；新建视角为 "new"。增量时 kept/extended 按 head 顺序、以标题对应既有论点 */
   revision: "kept" | "extended" | "new";
 }
 
@@ -446,7 +446,7 @@ export interface ValidationReport {
 // 7. 增量更新（#111）：perspectives/<key>/base.json + locks.json
 // ---------------------------------------------------------------------------
 
-/** 现有视角的导出：当前 head 与上一次 AI 编者账号产生的修订。 */
+/** 现有视角的导出：当前 head 与上一次 AI 编者账号产生的修订（incremental 由 --head/--last-ai 写入）。 */
 export interface IncrementalBase {
   schema: typeof SCHEMAS.incrementalBase;
   pageId: PageId;
@@ -454,7 +454,7 @@ export interface IncrementalBase {
   lastAi: { revisionId: RevisionId; content: string } | null;
 }
 
-/** 人工改动过、因而锁定的块（按 Markdown 顶层块切分 head 内容）。 */
+/** 人工改动过、因而锁定的块：head 正文（分隔线之前）中不以同样文字出现在上一次 AI 修订里的顶层块（blocks.ts 的切法）。 */
 export interface LockedBlock {
   /** head 中的块序号（0 起） */
   index: number;

@@ -1,0 +1,30 @@
+{
+  "schema": "phosky.book-pipeline/claim-map@1",
+  "conceptKey": "cunzai",
+  "term": "存在",
+  "interpreter": "范例思",
+  "core": "范例思以存在为直接的规定性，并区分了存在与经验事物。",
+  "claims": [
+    {
+      "id": "k1",
+      "heading": "存在是直接的规定性",
+      "exposition": "",
+      "excerpts": [],
+      "revision": "kept"
+    },
+    {
+      "id": "k2",
+      "heading": "存在不是经验事物",
+      "exposition": "《论尺度》的说明更进一步：存在不是经验的事物，毋宁是思维的开端。",
+      "excerpts": [{ "paragraph": "sample:d02.p2", "from": 1, "to": 1 }],
+      "revision": "extended"
+    },
+    {
+      "id": "k3",
+      "heading": "从存在开始并非随意的选择",
+      "exposition": "范例思反对把开端当作可以随意选取的起点：从存在开始，意味着正视开端本身所包含的困难。",
+      "excerpts": [{ "paragraph": "sample:d02.p4", "from": 2, "to": 2 }],
+      "revision": "new"
+    }
+  ]
+}

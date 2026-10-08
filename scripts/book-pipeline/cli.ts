@@ -1,6 +1,6 @@
 // 书籍流水线 CLI（#105）：所有命令作用于同一个工作目录，可单独重跑。
 // 运行：pnpm book-pipeline <command> [...]（= node --conditions=react-server --import tsx scripts/book-pipeline/cli.ts）
-// 退出码：0 成功；1 运行错误；2 用法错误或命令尚未实现。
+// 退出码：0 成功；1 运行错误；2 用法错误。
 
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -9,6 +9,7 @@ import { assemble } from "./assemble";
 import { validate } from "./validate";
 import { writeCandidateList, writeConfirmation } from "./candidates";
 import { DEFAULT_RULES, detectFormat, freezeBook, writeFrozenSource } from "./freeze";
+import { incremental, type RevisionExport } from "./incremental";
 import { submit } from "./submit";
 import type { FreezeRules } from "./types";
 
@@ -36,14 +37,13 @@ const USAGE = `用法：book-pipeline <command> [options]
                                                  --send 才真正发出（环境变量 BOOK_PIPELINE_EMAIL / BOOK_PIPELINE_PASSWORD，须为 editor 账号）；
                                                  第一阶段（诠释者、词条）被受理后用 --reconcile opKey=pageId 记账，再 --send 发第二阶段
 
-  后续命令（尚未实现）：
-  incremental (#111)
+  incremental --workdir <dir> --key <key>
+         [--head <head.md> --head-revision <id> (--last-ai <ai.md> --last-ai-revision <id> | --no-last-ai) [--page <id>]]
+                                                 增量更新现有视角：导出的 head 修订写入 base.json，人工改过的块写入 locks.json；
+                                                 已有 claim-map.json（增量论点映射）时并入新材料，写出以 head 为 base 的编辑稿
+                                                 （perspective.md + assembled.json），否则输出供会话起草的骨架。省略 --head 则沿用 base.json
 
 工作目录布局见 scripts/book-pipeline/README.md。`;
-
-const PENDING: Record<string, string> = {
-  incremental: "#111",
-};
 
 function loadRules(path: string | undefined): Partial<FreezeRules> | undefined {
   if (!path) return undefined;
@@ -158,6 +158,53 @@ async function submitCommand(args: string[]): Promise<void> {
   });
 }
 
+function incrementalCommand(args: string[]): void {
+  const { values } = parseArgs({
+    args,
+    options: {
+      workdir: { type: "string" },
+      key: { type: "string" },
+      head: { type: "string" },
+      "head-revision": { type: "string" },
+      "last-ai": { type: "string" },
+      "last-ai-revision": { type: "string" },
+      "no-last-ai": { type: "boolean", default: false },
+      page: { type: "string" },
+    },
+  });
+  if (!values.workdir) throw new UsageError("--workdir is required");
+  if (!values.key) throw new UsageError("--key is required");
+  const id = (value: string | undefined, flag: string): number => {
+    const n = Number(value);
+    if (!value || !Number.isInteger(n) || n < 1) throw new UsageError(`${flag} must be a positive integer`);
+    return n;
+  };
+  const exported = (file: string, revision: string | undefined, flag: string): RevisionExport => ({
+    revisionId: id(revision, flag),
+    content: readFileSync(file, "utf8"),
+  });
+  let head: RevisionExport | undefined;
+  let lastAi: RevisionExport | null | undefined;
+  if (values.head) {
+    if (Boolean(values["last-ai"]) === values["no-last-ai"]) throw new UsageError("with --head, give exactly one of --last-ai <file> or --no-last-ai");
+    head = exported(values.head, values["head-revision"], "--head-revision");
+    lastAi = values["last-ai"] ? exported(values["last-ai"], values["last-ai-revision"], "--last-ai-revision") : null;
+  } else if (values["head-revision"] || values["last-ai"] || values["last-ai-revision"] || values["no-last-ai"] || values.page) {
+    throw new UsageError("--head-revision, --last-ai, --no-last-ai and --page only go with --head");
+  }
+  const result = incremental({
+    workdir: values.workdir,
+    key: values.key,
+    head,
+    lastAi,
+    pageId: values.page === undefined ? undefined : id(values.page, "--page"),
+  });
+  if (result.footerHumanEdits) {
+    console.error(`WARN: ${result.footerHumanEdits} human-edited block(s) in the source notes after the separator are re-derived from the citations`);
+  }
+  console.log(JSON.stringify(result));
+}
+
 function validateCommand(args: string[]): boolean {
   const { values } = parseArgs({ args, options: { workdir: { type: "string" }, key: { type: "string", multiple: true } } });
   if (!values.workdir) throw new UsageError("--workdir is required");
@@ -192,6 +239,10 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     if (command === "validate") return validateCommand(rest) ? 0 : 1;
+    if (command === "incremental") {
+      incrementalCommand(rest);
+      return 0;
+    }
     if (command === "submit") {
       await submitCommand(rest);
       return 0;
@@ -199,10 +250,6 @@ async function main(argv: string[]): Promise<number> {
     if (command === "rules") {
       console.log(JSON.stringify(DEFAULT_RULES, null, 2));
       return 0;
-    }
-    if (PENDING[command]) {
-      console.error(`NOT_IMPLEMENTED: "${command}" is specified in ${PENDING[command]} and not implemented yet`);
-      return 2;
     }
     throw new UsageError(`unknown command "${command}"`);
   } catch (error) {

@@ -235,7 +235,13 @@ export function buildPlan(workdir: string, options: { keys?: ConceptKey[]; origi
       if (!entry.existingPerspective) fail("SUBMIT_MODE_MISMATCH", `${key}: assembled as edit but candidates.json has no existingPerspective`);
       // base：优先 #111 导出的当前 head（base.json），其次 assemble 记录的 base，最后候选清单里的 head。
       let base: number | null = assembled.baseRevisionId ?? entry.existingPerspective.headRevisionId;
-      if (existsSync(paths.base)) base = readJson<{ head: { revisionId: number } }>(paths.base).head.revisionId;
+      if (existsSync(paths.base)) {
+        base = readJson<{ head: { revisionId: number } }>(paths.base).head.revisionId;
+        // 稿子须建在这个 head 上（incremental 写 base.json 时一并重并稿）；否则会以新 base 提交旧稿，覆盖期间的人工改动
+        if (assembled.baseRevisionId !== null && assembled.baseRevisionId !== base) {
+          fail("SUBMIT_STALE", `${key}: the draft was built on revision ${assembled.baseRevisionId} but base.json head is ${base}; run incremental again`);
+        }
+      }
       if (!base) fail("SUBMIT_NO_BASE", `${key}: edit needs a base revision`);
       perspectiveOps.push({
         opKey: `perspective:${key}`,

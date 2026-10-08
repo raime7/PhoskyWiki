@@ -251,15 +251,18 @@ test("frozen artifacts can be re-verified against the stored original", () =>
     assert.deepEqual(verify(), { ok: false, mismatched: ["paragraphs.jsonl"] });
   }));
 
-test("--toc lists landmarks without writing, and later commands are explicit stubs", () => {
+test("--toc lists landmarks without writing, and every command is implemented", () => {
   const toc = pipeline("freeze", EPUB, "--toc");
   assert.equal(toc.status, 0, toc.stderr);
   assert.match(toc.stdout, /d02\.h2 {2}A．质/);
   assert.match(toc.stdout, /d02\.h4 {2}§2/);
-  for (const command of ["incremental"]) {
+  // 没有残留桩：缺参数的命令是用法错误（退出码 2），而不是 NOT_IMPLEMENTED
+  for (const command of ["candidates", "confirm", "assemble", "validate", "incremental", "submit"]) {
     const run = pipeline(command);
     assert.equal(run.status, 2, command);
-    assert.match(run.stderr, /NOT_IMPLEMENTED/);
+    assert.match(run.stderr, /--workdir is required/, command);
+    assert.doesNotMatch(run.stderr, /NOT_IMPLEMENTED|尚未实现/, command);
   }
+  assert.doesNotMatch(pipeline("help").stdout, /NOT_IMPLEMENTED|尚未实现/);
   assert.equal(pipeline("bogus").status, 2);
 });
