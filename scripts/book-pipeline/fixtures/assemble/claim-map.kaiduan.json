@@ -1,0 +1,39 @@
+{
+  "schema": "phosky.book-pipeline/claim-map@1",
+  "conceptKey": "kaiduan",
+  "term": "开端",
+  "interpreter": "范例思",
+  "core": "范例思把开端（Anfang）理解为直接的规定性，它的困难本身就是思维首先要考察的对象。",
+  "claims": [
+    {
+      "id": "k1",
+      "heading": "开端是直接的规定性",
+      "exposition": "范例思所说的开端不是经验中的某个起点，而是思维的[[存在|存在]]：它直接地就是它自己，不靠别的东西来规定。",
+      "excerpts": [
+        { "paragraph": "sample:d02.p1", "from": 1, "to": 2 },
+        { "paragraph": "sample:d02.p2", "from": 1, "to": 1 }
+      ],
+      "revision": "new"
+    },
+    {
+      "id": "k2",
+      "heading": "开端的困难本身是考察对象",
+      "exposition": "通常的看法以为开端可以随意选取。范例思指出，这恰恰忽略了开端自身的困难；他并不回避这个困难，而是要求把它当作考察的对象。",
+      "excerpts": [
+        { "paragraph": "sample:d02.p4", "from": 1, "to": 3 },
+        { "paragraph": "sample:d02.p4", "from": 7, "to": 8 }
+      ],
+      "revision": "new"
+    },
+    {
+      "id": "k3",
+      "heading": "开端的两难",
+      "exposition": "开端若已有规定就不再纯粹，若毫无规定又什么也不是。\n\n- 这一两难不是放弃的理由；\n- 它说明开端的困难出自开端的概念本身。",
+      "excerpts": [
+        { "paragraph": "sample:d02.p4", "from": 4, "to": 6 },
+        { "paragraph": "sample:d02.p5", "from": 2, "to": 2 }
+      ],
+      "revision": "new"
+    }
+  ]
+}

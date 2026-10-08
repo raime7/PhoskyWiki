@@ -5,6 +5,7 @@
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
+import { assemble } from "./assemble";
 import { writeCandidateList, writeConfirmation } from "./candidates";
 import { DEFAULT_RULES, detectFormat, freezeBook, writeFrozenSource } from "./freeze";
 import type { FreezeRules } from "./types";
@@ -21,14 +22,15 @@ const USAGE = `用法：book-pipeline <command> [options]
 
   candidates --workdir <dir>                     读 candidates/session-candidates.json 与 site-terms.json，生成 candidates.json
   confirm --workdir <dir> --by <站长名> (--all | --keys a,b)   确认候选清单（清单变动后确认即失效）
+  assemble --workdir <dir> [--key <key> ...]     按模板把已确认概念的 claim-map.json 组装为 perspective.md 与 assembled.json
+                                                 （缺省 = 全部已确认且已有论点映射的概念；清单未确认即拒绝）
 
   后续命令（尚未实现）：
-  assemble (#109)   validate (#110)   incremental (#111)   submit (#112)
+  validate (#110)   incremental (#111)   submit (#112)
 
 工作目录布局见 scripts/book-pipeline/README.md。`;
 
 const PENDING: Record<string, string> = {
-  assemble: "#109",
   validate: "#110",
   incremental: "#111",
   submit: "#112",
@@ -114,6 +116,12 @@ function confirm(args: string[]): void {
   console.log(JSON.stringify({ status: "confirmed", confirmed: result.confirmed, candidateListSha256: result.candidateListSha256 }));
 }
 
+function assembleCommand(args: string[]): void {
+  const { values } = parseArgs({ args, options: { workdir: { type: "string" }, key: { type: "string", multiple: true } } });
+  if (!values.workdir) throw new UsageError("--workdir is required");
+  for (const result of assemble(values.workdir, values.key ?? [])) console.log(JSON.stringify(result));
+}
+
 function main(argv: string[]): number {
   const [command, ...rest] = argv;
   try {
@@ -131,6 +139,10 @@ function main(argv: string[]): number {
     }
     if (command === "confirm") {
       confirm(rest);
+      return 0;
+    }
+    if (command === "assemble") {
+      assembleCommand(rest);
       return 0;
     }
     if (command === "rules") {

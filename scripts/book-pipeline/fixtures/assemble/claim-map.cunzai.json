@@ -1,0 +1,19 @@
+{
+  "schema": "phosky.book-pipeline/claim-map@1",
+  "conceptKey": "cunzai",
+  "term": "存在",
+  "interpreter": "范例思",
+  "core": "范例思以存在为直接的规定性，并区分了存在与经验事物。",
+  "claims": [
+    {
+      "id": "k1",
+      "heading": "存在不是经验事物",
+      "exposition": "范例思强调，这里的存在不能按经验事物来理解，它是思维的[[开端|开端]]。",
+      "excerpts": [
+        { "paragraph": "sample-md:t.p2", "from": 1, "to": 1 },
+        { "paragraph": "sample:d02.p1", "from": 1, "to": 1 }
+      ],
+      "revision": "new"
+    }
+  ]
+}
