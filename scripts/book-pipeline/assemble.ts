@@ -40,14 +40,14 @@ function fail(code: string, message: string): never {
   throw new Error(`${code}: ${message}`);
 }
 
-interface LoadedSource {
+export interface LoadedSource {
   manifest: SourceManifest;
   landmarks: Landmark[];
   paragraphs: Map<string, FrozenParagraph>;
 }
 
 /** 按需读取冻结来源，并以来源清单中的哈希核对 paragraphs.jsonl 未被改动。 */
-function sourceLoader(layout: WorkdirLayout, workdir: WorkdirManifest) {
+export function sourceLoader(layout: WorkdirLayout, workdir: WorkdirManifest) {
   const cache = new Map<string, LoadedSource>();
   return (sourceId: string): LoadedSource => {
     const hit = cache.get(sourceId);
@@ -81,7 +81,7 @@ export function citationFor(paragraph: FrozenParagraph, manifest: SourceManifest
   return parts.filter(Boolean).join("，");
 }
 
-function rangeLabel(source: LoadedSource): string {
+export function rangeLabel(source: LoadedSource): string {
   const { from, to, fromLandmark, toLandmark } = source.manifest.range;
   const title = (id: string | null, fallback: string | null) => source.landmarks.find((l) => l.id === id)?.title ?? fallback;
   const start = title(fromLandmark, from);
@@ -93,7 +93,7 @@ function rangeLabel(source: LoadedSource): string {
 }
 
 /** 「摘录出自 §1（正文、说明）、§2（附释一）」：按阅读顺序列出实际被引用段落的位置与层次。 */
-function citedLabel(paragraphs: FrozenParagraph[]): string {
+export function citedLabel(paragraphs: FrozenParagraph[]): string {
   const groups: { at: string; layers: string[] }[] = [];
   for (const p of paragraphs) {
     const at = location(p) ?? "（无章节）";
@@ -104,7 +104,7 @@ function citedLabel(paragraphs: FrozenParagraph[]): string {
   return groups.map((g) => `${g.at}（${g.layers.join("、")}）`).join("、");
 }
 
-function translationLabel(manifest: SourceManifest): string {
+export function translationLabel(manifest: SourceManifest): string {
   const parts = [manifest.work.translator ? `${manifest.work.translator}译` : "未注明译者", manifest.work.edition];
   return `《${manifest.work.title}》：${parts.filter(Boolean).join("，")}`;
 }
