@@ -70,7 +70,7 @@ pnpm book-pipeline confirm --workdir <dir> --by <站长名> --keys a,b   # 或 -
 
 ### 7. 润色
 
-每个概念派一个**全新上下文**的润色子代理，提示词取自 [润色子代理提示词](references/polish-prompt.md)，按其中说明填入占位符。它按 [中文 humanizer](references/humanizer.md) 只改写一句话核心与解读（增量时只改 `extended`、`new` 论点的解读），论点 ID、标题、摘录和双链不动。完成条件：`claim-map.pre-polish.json` 已写出、`claim-map.json` 已改写。润色只改了文字由第 9 步的 `validate` 检查（`polish.missing`、`polish.structure-changed`），意思未变由审稿检查。
+每个概念派一个**全新上下文**的润色子代理，提示词取自 [润色子代理提示词](references/polish-prompt.md)，按其中说明填入占位符。它按通用技能 humanizer-zh 加 [视角专用规则](references/humanizer.md) 只改写一句话核心与解读（增量时只改 `extended`、`new` 论点的解读），论点 ID、标题、摘录和双链不动。完成条件：`claim-map.pre-polish.json` 已写出、`claim-map.json` 已改写。润色只改了文字由第 9 步的 `validate` 检查（`polish.missing`、`polish.structure-changed`），意思未变由审稿检查。
 
 ### 8. 组装
 
@@ -97,7 +97,7 @@ pnpm book-pipeline validate --workdir <dir> [--key <key> …]
 
 ### 10. 审稿
 
-每个概念派一个**全新上下文**的子代理（Agent 工具），提示词取自 [审稿子代理提示词](references/review-prompt.md)，按其中说明填入占位符。它只读 `perspective.md` 与冻结来源，写出 `perspectives/<key>/review.json`。
+每个概念派一个**全新上下文**的子代理，提示词取自 [审稿子代理提示词](references/review-prompt.md)，按其中说明填入占位符。它只读 `perspective.md` 与冻结来源，写出 `perspectives/<key>/review.json`。
 
 有 `blocker` 或你认同的 `warning`：改 claim-map → 润色 → 重新组装 → 校验 → 再派新的子代理审稿（稿子一变，旧报告即过期）。完成条件：`validate` 输出里每个概念 `review.status` 为 `current`，且 `blockers` 为 0。
 

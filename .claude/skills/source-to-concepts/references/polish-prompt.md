@@ -1,6 +1,6 @@
 # 润色子代理提示词
 
-主流程第 7 步使用。每个概念派一个新的子代理（Agent 工具，不用 fork：润色人只看成文，按规则改字句）。把下面分隔线之间的文字原样作为提示词，替换尖括号占位符：
+主流程第 7 步使用。每个概念派一个全新会话的子代理（执行者与模型按 `AGENTS.md`「Subagents」选：优先 `codex exec`；用 Agent 工具时不用 fork。润色人只看成文，按规则改字句）。把下面分隔线之间的文字原样作为提示词，替换尖括号占位符：
 
 - `<工作目录>`、`<key>`、`<词条>`、`<诠释者>`；
 - `<范围>`：新视角与整篇重写填「一句话核心（core）和每个论点的 exposition」；增量论点映射填「`revision` 为 extended 或 new 的论点的 exposition；core 与 kept 论点一字不改」。
@@ -11,7 +11,7 @@
 
 先读这三份：
 
-- 规则：`.claude/skills/source-to-concepts/references/humanizer.md`，逐类照做；
+- 规则：先读通用技能 `.claude/skills/humanizer-zh/SKILL.md`（编辑约束、检查点 zh§1–31、交付前核对），再读视角专用规则 `.claude/skills/source-to-concepts/references/humanizer.md`（P1–P8，冲突时以它为准），逐类照做；
 - 文风档案：`<工作目录>/style/profile.md`，解读借用其中的术语、译名与论证次序，避开「仿写风险」一节列出的写法；
 - 论点映射：`<工作目录>/perspectives/<key>/claim-map.json`。
 
@@ -28,7 +28,7 @@
    - 格式：只用段落和列表，列表项保持完整的句子。
 4. 写回 `claim-map.json`（两格缩进的 JSON，末尾换行）。
 
-最后只回复：每个论点一行，`<论点 ID>：改了哪几类（用 humanizer.md 的类别编号）`；没有改动的写“未改”。
+最后只回复：每个论点一行，`<论点 ID>：改了哪几类（写 zh§n 或 Pn）`；没有改动的写“未改”。
 
 ---
 
